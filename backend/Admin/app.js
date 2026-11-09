@@ -4,6 +4,7 @@ const pool = require("../shared/config/db");
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const vehicleTypeRoutes = require("./routes/vehicleTypeRoutes");
+const vehicleBrandRoutes = require("./routes/vehicleBrandRoutes");
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 app.use("/api/admin/auth", authRoutes);
 app.use("/api/admin/dashboard", dashboardRoutes);
 app.use("/api/admin/vehicle-types", vehicleTypeRoutes);
+app.use("/api/admin/vehicle-brands", vehicleBrandRoutes);
 
 app.get("/", (req, res) => {
   res.json({
