@@ -3,6 +3,7 @@ const cors = require("cors");
 const pool = require("../shared/config/db");
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const vehicleTypeRoutes = require("./routes/vehicleTypeRoutes");
 
 const app = express();
 
@@ -10,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/admin/auth", authRoutes);
 app.use("/api/admin/dashboard", dashboardRoutes);
+app.use("/api/admin/vehicle-types", vehicleTypeRoutes);
 
 app.get("/", (req, res) => {
   res.json({
