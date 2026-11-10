@@ -11,8 +11,7 @@ async function getSummary() {
     [vehicleRows],
     [todayBookingRows],
     [bookingStatusSummary],
-    [todayRevenueRows],
-    [monthlyRevenueRows],
+    [revenueRows],
     [recentBookings],
   ] = await Promise.all([
     pool.execute(
@@ -26,10 +25,45 @@ async function getSummary() {
       "SELECT booking_status, COUNT(*) AS count FROM bookings GROUP BY booking_status",
     ),
     pool.execute(
-      "SELECT COALESCE(SUM(amount), 0) AS todayRevenue FROM payments WHERE payment_status = 'PAID' AND paid_at >= CURRENT_DATE() AND paid_at < CURRENT_DATE() + INTERVAL 1 DAY",
-    ),
-    pool.execute(
-      "SELECT COALESCE(SUM(amount), 0) AS monthlyRevenue FROM payments WHERE payment_status = 'PAID' AND paid_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01') AND paid_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')",
+      `SELECT
+        payments.todayGrossRevenue,
+        refunds.todayRefunds,
+        payments.todayGrossRevenue - refunds.todayRefunds AS todayRevenue,
+        payments.monthlyGrossRevenue,
+        refunds.monthlyRefunds,
+        payments.monthlyGrossRevenue - refunds.monthlyRefunds AS monthlyRevenue
+      FROM (
+        SELECT
+          COALESCE(SUM(CASE
+            WHEN paid_at >= CURRENT_DATE()
+              AND paid_at < CURRENT_DATE() + INTERVAL 1 DAY
+            THEN amount ELSE 0
+          END), 0) AS todayGrossRevenue,
+          COALESCE(SUM(CASE
+            WHEN paid_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+              AND paid_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+            THEN amount ELSE 0
+          END), 0) AS monthlyGrossRevenue
+        FROM payments
+        WHERE payment_status = 'PAID'
+          AND paid_at IS NOT NULL
+      ) AS payments
+      CROSS JOIN (
+        SELECT
+          COALESCE(SUM(CASE
+            WHEN processed_at >= CURRENT_DATE()
+              AND processed_at < CURRENT_DATE() + INTERVAL 1 DAY
+            THEN refund_amount ELSE 0
+          END), 0) AS todayRefunds,
+          COALESCE(SUM(CASE
+            WHEN processed_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+              AND processed_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+            THEN refund_amount ELSE 0
+          END), 0) AS monthlyRefunds
+        FROM refunds
+        WHERE refund_status = 'REFUNDED'
+          AND processed_at IS NOT NULL
+      ) AS refunds`,
     ),
     pool.execute(
       `SELECT
@@ -67,8 +101,12 @@ async function getSummary() {
       booking_status: row.booking_status,
       count: toNumber(row.count),
     })),
-    todayRevenue: toNumber(todayRevenueRows[0]?.todayRevenue),
-    monthlyRevenue: toNumber(monthlyRevenueRows[0]?.monthlyRevenue),
+    todayGrossRevenue: toNumber(revenueRows[0]?.todayGrossRevenue),
+    todayRefunds: toNumber(revenueRows[0]?.todayRefunds),
+    todayRevenue: toNumber(revenueRows[0]?.todayRevenue),
+    monthlyGrossRevenue: toNumber(revenueRows[0]?.monthlyGrossRevenue),
+    monthlyRefunds: toNumber(revenueRows[0]?.monthlyRefunds),
+    monthlyRevenue: toNumber(revenueRows[0]?.monthlyRevenue),
     recentBookings: recentBookings.map((booking) => ({
       booking_id: booking.booking_id,
       booking_date: booking.booking_date,
