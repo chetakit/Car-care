@@ -11,6 +11,9 @@ const userRoutes = require("./routes/userRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const cancellationRoutes = require("./routes/cancellationRoutes");
+const walletRoutes = require("./routes/walletRoutes");
 
 const app = express();
 
@@ -26,6 +29,9 @@ app.use("/api/admin/users", userRoutes);
 app.use("/api/admin/coupons", couponRoutes);
 app.use("/api/admin/bookings", bookingRoutes);
 app.use("/api/admin/reports", reportRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/cancellations", cancellationRoutes);
+app.use("/api/wallet", walletRoutes);
 
 app.get("/", (req, res) => {
   res.json({
