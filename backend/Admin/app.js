@@ -7,6 +7,8 @@ const vehicleTypeRoutes = require("./routes/vehicleTypeRoutes");
 const vehicleBrandRoutes = require("./routes/vehicleBrandRoutes");
 const vehicleModelRoutes = require("./routes/vehicleModelRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
+const userRoutes = require("./routes/userRoutes");
+const couponRoutes = require("./routes/couponRoutes");
 
 const app = express();
 
@@ -18,6 +20,8 @@ app.use("/api/admin/vehicle-types", vehicleTypeRoutes);
 app.use("/api/admin/vehicle-brands", vehicleBrandRoutes);
 app.use("/api/admin/vehicle-models", vehicleModelRoutes);
 app.use("/api/admin/services", serviceRoutes);
+app.use("/api/admin/users", userRoutes);
+app.use("/api/admin/coupons", couponRoutes);
 
 app.get("/", (req, res) => {
   res.json({
