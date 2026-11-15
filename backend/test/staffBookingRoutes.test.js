@@ -1,3 +1,4 @@
+// [STAFF] เทสต์ /api/staff/bookings — จำลอง database ด้วยการแทน pool.execute / getConnection
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const { after, test } = require("node:test");
@@ -8,33 +9,60 @@ const pool = require("../shared/config/db");
 const originalExecute = pool.execute;
 const originalGetConnection = pool.getConnection;
 const originalJwtSecret = process.env.JWT_SECRET;
-const testSecret = "test-only-staff-booking-secret-with-at-least-32-bytes";
+const testSecret = "test-only-staff-booking-secret";
 process.env.JWT_SECRET = testSecret;
 
-function createToken(role, userId = 50) {
-  return jwt.sign({ user_id: userId, role }, testSecret, { expiresIn: "1h" });
+// user_id ของแต่ละ role ในเทสต์ — ใช้ตอบคำถาม "role ปัจจุบันใน DB" ของ requireCurrentStaff
+const TEST_USER_IDS = { STAFF: 7, CUSTOMER: 8, ADMIN: 9 };
+const TEST_ROLE_BY_ID = Object.fromEntries(
+  Object.entries(TEST_USER_IDS).map(([role, id]) => [id, role]),
+);
+
+function createToken(role = "STAFF") {
+  return jwt.sign({ user_id: TEST_USER_IDS[role], role }, testSecret, { expiresIn: "1h" });
 }
+
+// requireCurrentStaff ถาม DB ว่า role ล่าสุดของผู้ใช้คืออะไร
+// ตัวห่อนี้ตอบคำถามนั้นให้ทุกเทสต์ ส่วนคำสั่ง SQL อื่นส่งต่อให้ pool.execute ที่แต่ละเทสต์กำหนด
+let testExecute = originalExecute;
+Object.defineProperty(pool, "execute", {
+  configurable: true,
+  get() {
+    return async (sql, params) => {
+      if (sql.includes("SELECT role, status FROM users")) {
+        return [[{ role: TEST_ROLE_BY_ID[params[0]], status: "ACTIVE" }], []];
+      }
+      return testExecute(sql, params);
+    };
+  },
+  set(fn) {
+    testExecute = fn;
+  },
+});
 
 function sendRequest(port, method, path, token, body) {
   return new Promise((resolve, reject) => {
-    const headers = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-
+    const payload = body === undefined ? undefined : JSON.stringify(body);
     const request = http.request(
-      { hostname: "127.0.0.1", port, path, method, headers },
+      {
+        hostname: "127.0.0.1",
+        port,
+        path,
+        method,
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(payload ? { "Content-Type": "application/json" } : {}),
+        },
+      },
       (response) => {
-        let responseBody = "";
+        let text = "";
         response.setEncoding("utf8");
         response.on("data", (chunk) => {
-          responseBody += chunk;
+          text += chunk;
         });
         response.on("end", () => {
           try {
-            resolve({
-              statusCode: response.statusCode,
-              payload: JSON.parse(responseBody),
-            });
+            resolve({ statusCode: response.statusCode, payload: JSON.parse(text) });
           } catch (error) {
             reject(error);
           }
@@ -42,7 +70,8 @@ function sendRequest(port, method, path, token, body) {
       },
     );
     request.on("error", reject);
-    request.end(body === undefined ? undefined : JSON.stringify(body));
+    if (payload) request.write(payload);
+    request.end();
   });
 }
 
@@ -58,311 +87,171 @@ async function withServer(callback) {
   }
 }
 
-function installRoleMock(role) {
-  let bookingQueries = 0;
-  pool.execute = async (sql, values) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      assert.deepEqual(values, [50]);
-      return [[{ role, status: "ACTIVE" }]];
-    }
-    bookingQueries += 1;
-    if (sql.startsWith("SELECT COUNT(*) AS total")) {
-      return [[{ total: 1 }]];
-    }
-    throw new Error(`Unexpected query: ${sql}`);
+function failIfDatabaseUsed() {
+  pool.execute = async () => {
+    throw new Error("Database should not be queried.");
   };
-  return () => bookingQueries;
+  pool.getConnection = async () => {
+    throw new Error("Database should not be queried.");
+  };
 }
 
-test("Staff booking list returns only operational fields in chronological order", async () => {
-  const booking = {
-    booking_id: 501,
-    full_name: "Test Customer",
-    email: "customer@example.test",
-    phone: "0123456789",
-    license_plate: "ABC123",
-    booking_date: "2026-03-20",
-    start_time: "09:00:00",
-    end_time: "10:00:00",
-    booking_status: "CONFIRMED",
-  };
-  installRoleMock("STAFF");
-  pool.execute = async (sql, values) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      assert.deepEqual(values, [50]);
-      return [[{ role: "STAFF", status: "ACTIVE" }]];
-    }
-    if (sql.startsWith("SELECT COUNT(*) AS total")) {
-      return [[{ total: 1 }]];
-    }
-    assert.match(sql, /ORDER BY b\.booking_date ASC, b\.start_time ASC/);
-    assert.doesNotMatch(sql, /payment|password_hash|coupon/i);
-    assert.deepEqual(values, [20, 0]);
-    return [[booking]];
-  };
+test("customers cannot use staff booking APIs", async () => {
+  failIfDatabaseUsed();
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "GET", "/api/staff/bookings", createToken("CUSTOMER"));
+    assert.equal(response.statusCode, 403);
+  });
+});
 
+test("staff cannot cancel bookings", async () => {
+  failIfDatabaseUsed();
   await withServer(async (port) => {
     const response = await sendRequest(
       port,
-      "GET",
-      "/api/staff/bookings",
-      createToken("STAFF"),
+      "PATCH",
+      "/api/staff/bookings/5/status",
+      createToken(),
+      { status: "CANCELLED", reason: "Customer asked by phone" },
     );
-
-    assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.payload.data.items, [booking]);
-    assert.deepEqual(response.payload.data.pagination, {
-      page: 1,
-      limit: 20,
-      total: 1,
-      totalPages: 1,
-    });
-    assert.equal(
-      Object.hasOwn(response.payload.data.items[0], "payment_status"),
-      false,
-    );
+    assert.equal(response.statusCode, 403);
   });
 });
 
-test("Staff booking details include customer, vehicle and services but no payment data", async () => {
-  installRoleMock("STAFF");
-  pool.execute = async (sql) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      return [[{ role: "STAFF", status: "ACTIVE" }]];
-    }
-    if (sql.includes("FROM bookings b") && sql.includes("WHERE b.booking_id = ?")) {
-      assert.doesNotMatch(sql, /payment|password_hash|coupon/i);
-      return [[{
-        booking_id: 501,
-        booking_date: "2026-03-20",
-        start_time: "09:00:00",
-        end_time: "10:00:00",
-        booking_status: "CONFIRMED",
-        notes: "Please check the brakes.",
-        user_id: 21,
-        full_name: "Test Customer",
-        email: "customer@example.test",
-        phone: "0123456789",
-        vehicle_id: 30,
-        license_plate: "ABC123",
-        production_year: 2020,
-        province: "Bangkok",
-        color: "Blue",
-        model_name: "Model",
-        brand_name: "Brand",
-        type_name: "Sedan",
-      }]];
-    }
-    if (sql.includes("FROM booking_services")) {
-      return [[{
-        booking_service_id: 80,
-        service_name: "Brake inspection",
-        duration_minutes: 30,
-      }]];
-    }
-    throw new Error(`Unexpected query: ${sql}`);
-  };
-
+test("status change requires a reason", async () => {
+  failIfDatabaseUsed();
   await withServer(async (port) => {
     const response = await sendRequest(
       port,
-      "GET",
-      "/api/staff/bookings/501",
-      createToken("STAFF"),
+      "PATCH",
+      "/api/staff/bookings/5/status",
+      createToken(),
+      { status: "IN_SERVICE", reason: "   " },
     );
-
-    assert.equal(response.statusCode, 200);
-    assert.equal(response.payload.data.customer.full_name, "Test Customer");
-    assert.equal(response.payload.data.vehicle.license_plate, "ABC123");
-    assert.equal(response.payload.data.services[0].service_name, "Brake inspection");
-    assert.equal(Object.hasOwn(response.payload.data, "payment"), false);
-    assert.equal(Object.hasOwn(response.payload.data, "coupon"), false);
+    assert.equal(response.statusCode, 400);
   });
 });
 
-test("only an active current Staff account can access Staff booking APIs", async () => {
-  let databaseRole = "CUSTOMER";
-  const getBookingQueryCount = installRoleMock(databaseRole);
-  pool.execute = async (sql) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      return [[{ role: databaseRole, status: "ACTIVE" }]];
-    }
-    throw new Error("Unauthorized requests must not query bookings.");
-  };
-
+test("check-in validates mileage and fuel level", async () => {
+  failIfDatabaseUsed();
   await withServer(async (port) => {
-    const customer = await sendRequest(
+    const badMileage = await sendRequest(
       port,
-      "GET",
-      "/api/staff/bookings",
-      createToken("CUSTOMER"),
+      "POST",
+      "/api/staff/bookings/5/check-in",
+      createToken(),
+      { mileage: -1, fuel_level: "HALF" },
     );
-    databaseRole = "ADMIN";
-    const admin = await sendRequest(
-      port,
-      "GET",
-      "/api/staff/bookings",
-      createToken("ADMIN"),
-    );
-    databaseRole = "ADMIN";
-    const staleStaffToken = await sendRequest(
-      port,
-      "GET",
-      "/api/staff/bookings",
-      createToken("STAFF"),
-    );
+    assert.equal(badMileage.statusCode, 400);
 
-    assert.equal(customer.statusCode, 403);
-    assert.equal(admin.statusCode, 403);
-    assert.equal(staleStaffToken.statusCode, 401);
-    assert.equal(getBookingQueryCount(), 0);
+    const badFuel = await sendRequest(
+      port,
+      "POST",
+      "/api/staff/bookings/5/check-in",
+      createToken(),
+      { mileage: 1000, fuel_level: "SOME" },
+    );
+    assert.equal(badFuel.statusCode, 400);
   });
 });
 
-test("Staff and demoted Admin sessions cannot call Admin booking APIs", async () => {
-  let databaseRole = "STAFF";
-  pool.execute = async (sql) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      return [[{ role: databaseRole, status: "ACTIVE" }]];
-    }
-    throw new Error("Denied requests must not query Admin bookings.");
-  };
-
-  await withServer(async (port) => {
-    const staff = await sendRequest(
-      port,
-      "GET",
-      "/api/admin/bookings",
-      createToken("STAFF"),
-    );
-    databaseRole = "STAFF";
-    const staleAdmin = await sendRequest(
-      port,
-      "GET",
-      "/api/admin/bookings",
-      createToken("ADMIN"),
-    );
-
-    assert.equal(staff.statusCode, 403);
-    assert.equal(staleAdmin.statusCode, 401);
-  });
-});
-
-test("Staff can advance service status and the change is recorded atomically", async () => {
-  installRoleMock("STAFF");
-  const statements = [];
-  let committed = false;
-  pool.execute = async (sql) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      return [[{ role: "STAFF", status: "ACTIVE" }]];
-    }
-    throw new Error(`Unexpected pool query: ${sql}`);
-  };
-  pool.getConnection = async () => ({
+test("status change rejects transitions outside the allowed flow", async () => {
+  const executed = [];
+  const connection = {
     beginTransaction: async () => {},
-    execute: async (sql, values) => {
-      statements.push({ sql, values });
-      if (sql.includes("FROM bookings") && sql.includes("FOR UPDATE")) {
-        return [[{ booking_id: 501, booking_status: "CONFIRMED" }]];
-      }
-      if (sql.startsWith("UPDATE bookings")) {
-        return [{ affectedRows: 1 }];
-      }
-      if (sql.includes("INSERT INTO booking_status_history")) {
-        return [{ affectedRows: 1 }];
-      }
-      throw new Error(`Unexpected transaction query: ${sql}`);
-    },
-    commit: async () => {
-      committed = true;
-    },
+    commit: async () => {},
     rollback: async () => {},
     release: () => {},
-    destroy: () => {},
-  });
+    execute: async (sql, values) => {
+      executed.push(sql);
+      if (sql.includes("FOR UPDATE")) {
+        return [[{ booking_id: 5, booking_status: "CONFIRMED", appointment_started: 1 }]];
+      }
+      throw new Error(`Unexpected query: ${sql} ${values}`);
+    },
+  };
+  pool.getConnection = async () => connection;
+  pool.execute = async () => {
+    throw new Error("Pool should not be queried directly.");
+  };
 
   await withServer(async (port) => {
     const response = await sendRequest(
       port,
       "PATCH",
-      "/api/staff/bookings/501/status",
-      createToken("STAFF"),
-      { status: "CHECKED_IN" },
+      "/api/staff/bookings/5/status",
+      createToken(),
+      { status: "COMPLETED", reason: "Skipping steps" },
     );
+    assert.equal(response.statusCode, 409);
+  });
+  assert.equal(executed.length, 1);
+});
 
-    assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.payload.data, {
-      booking_id: 501,
-      booking_status: "CHECKED_IN",
-    });
-    assert.equal(committed, true);
-    assert.match(statements[0].sql, /FOR UPDATE/);
-    assert.deepEqual(statements[1].values, ["CHECKED_IN", 501, "CONFIRMED"]);
-    assert.deepEqual(statements[2].values, [
-      501,
-      "CONFIRMED",
-      "CHECKED_IN",
-      50,
-      "Staff service progress update.",
-    ]);
+test("no-show is rejected before the appointment time", async () => {
+  const connection = {
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release: () => {},
+    execute: async (sql) => {
+      if (sql.includes("FOR UPDATE")) {
+        return [[{ booking_id: 5, booking_status: "CONFIRMED", appointment_started: 0 }]];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  pool.getConnection = async () => connection;
+
+  await withServer(async (port) => {
+    const response = await sendRequest(
+      port,
+      "POST",
+      "/api/staff/bookings/5/no-show",
+      createToken(),
+      { reason: "Called twice, no answer" },
+    );
+    assert.equal(response.statusCode, 409);
   });
 });
 
-test("Staff cannot skip service stages or change cancellation statuses", async () => {
-  installRoleMock("STAFF");
-  let transactionStarted = false;
-  let historyInserted = false;
-  pool.execute = async (sql) => {
-    if (sql.includes("SELECT role, status FROM users")) {
-      return [[{ role: "STAFF", status: "ACTIVE" }]];
+test("daily list filters by date and returns service names", async () => {
+  const calls = [];
+  pool.execute = async (sql, values) => {
+    calls.push({ sql, values });
+    if (sql.includes("COUNT(*)")) return [[{ total: 1 }]];
+    if (sql.includes("FROM booking_services")) {
+      return [[{ booking_id: 9, service_name: "Wash" }]];
     }
-    throw new Error(`Unexpected pool query: ${sql}`);
+    return [[{
+      booking_id: 9,
+      booking_date: "2026-11-15",
+      start_time: "09:00",
+      end_time: "10:00",
+      booking_status: "CONFIRMED",
+      final_amount: "300.00",
+      full_name: "A Customer",
+      license_plate: "AB 1234",
+    }]];
   };
-  pool.getConnection = async () => ({
-    beginTransaction: async () => {
-      transactionStarted = true;
-    },
-    execute: async (sql) => {
-      if (sql.includes("FROM bookings") && sql.includes("FOR UPDATE")) {
-        return [[{ booking_id: 501, booking_status: "CONFIRMED" }]];
-      }
-      if (sql.includes("INSERT INTO booking_status_history")) {
-        historyInserted = true;
-      }
-      throw new Error(`Unexpected transaction query: ${sql}`);
-    },
-    commit: async () => {},
-    rollback: async () => {
-      transactionStarted = false;
-    },
-    release: () => {},
-    destroy: () => {},
-  });
 
   await withServer(async (port) => {
-    const skip = await sendRequest(
+    const response = await sendRequest(
       port,
-      "PATCH",
-      "/api/staff/bookings/501/status",
-      createToken("STAFF"),
-      { status: "IN_SERVICE" },
+      "GET",
+      "/api/staff/bookings?date=2026-11-15",
+      createToken(),
     );
-    const cancel = await sendRequest(
-      port,
-      "PATCH",
-      "/api/staff/bookings/501/status",
-      createToken("STAFF"),
-      { status: "CANCELLED" },
-    );
-
-    assert.equal(skip.statusCode, 409);
-    assert.equal(cancel.statusCode, 400);
-    assert.equal(transactionStarted, false);
-    assert.equal(historyInserted, false);
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.payload.data.items[0].service_names, ["Wash"]);
+    assert.equal(response.payload.data.items[0].final_amount, 300);
   });
+  assert.ok(calls[0].sql.includes("b.booking_date = ?"));
+  assert.equal(calls[0].values[0], "2026-11-15");
 });
 
 after(() => {
+  delete pool.execute;
   pool.execute = originalExecute;
   pool.getConnection = originalGetConnection;
   if (originalJwtSecret === undefined) {

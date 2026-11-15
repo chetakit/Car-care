@@ -13,10 +13,18 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
-import StaffDashboard from './Staff/StaffDashboard.jsx'
+// [STAFF] หน้าพนักงาน (Staff & Service Management) — แทน StaffDashboard เดิม
+import StaffApp from './Staff/StaffApp.jsx'
+// [STAFF][MOCK] true เมื่อตั้ง VITE_STAFF_MOCK=true ใน frontend/.env.local
+import { STAFF_MOCK } from './Staff/api/staffBookingApi.js'
 
 function isAdminPath(pathname) {
   return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
+// [STAFF] path ของพนักงานทั้งหมดขึ้นต้นด้วย /staff (รวม /staff/dashboard เดิม)
+function isStaffPath(pathname) {
+  return pathname === '/staff' || pathname.startsWith('/staff/')
 }
 
 function isCustomerPath(pathname) {
@@ -119,6 +127,8 @@ function AppContent() {
 
   useEffect(() => {
     if (authStatus === 'checking') return
+    // [STAFF][MOCK] โหมดข้อมูลจำลอง: เปิด /staff ได้โดยไม่ต้องล็อกอิน
+    if (STAFF_MOCK && isStaffPath(currentPath)) return
 
     if (authStatus !== 'authenticated') {
       const isPublicPath = currentPath === '/' || currentPath === '/services'
@@ -135,15 +145,17 @@ function AppContent() {
       return
     }
 
-    if (currentPath === '/login' && user?.role === 'STAFF') {
-      navigateTo('/staff/dashboard', true)
-    } else if (currentPath === '/login') {
+    // [STAFF] พนักงานล็อกอินแล้วไปหน้าคิวงาน /staff เสมอ (รวมถึงหน้า / และ /login)
+    if (user?.role === 'STAFF') {
+      if (!isStaffPath(currentPath)) navigateTo('/staff', true)
+      return
+    }
+
+    if (currentPath === '/login') {
       const destination = getCustomerReturnPath(
         window.history.state?.customerReturnTo,
       )
       navigateTo(destination || '/', true)
-    } else if (user?.role === 'STAFF' && currentPath !== '/staff/dashboard') {
-      navigateTo('/staff/dashboard', true)
     } else if (currentPath === '/' || currentPath === '/services') {
       return
     } else if (user?.role === 'ADMIN') {
@@ -160,9 +172,14 @@ function AppContent() {
   if (authStatus === 'checking') {
     return <SessionLoading message="Verifying your session…" />
   }
+  // [STAFF][MOCK] โหมดข้อมูลจำลอง: แสดงหน้าพนักงานทันที ไม่ต้องมี backend
+  if (STAFF_MOCK && isStaffPath(currentPath)) {
+    return <StaffApp onLogout={() => navigateTo('/', true)} user={{ full_name: 'พนักงานทดสอบ (Mock)' }} />
+  }
+  // [STAFF] แสดง StaffApp เมื่อผู้ใช้เป็นพนักงาน
   if (authStatus === 'authenticated' && user?.role === 'STAFF') {
-    return currentPath === '/staff/dashboard'
-      ? <StaffDashboard onLogout={logout} user={user} />
+    return isStaffPath(currentPath)
+      ? <StaffApp onLogout={logout} user={user} />
       : <SessionLoading message="Opening the Staff workspace…" />
   }
   if (currentPath === '/services') {

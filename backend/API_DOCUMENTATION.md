@@ -307,8 +307,23 @@ These are mounted but are not Admin/Customer business APIs:
 ## Not implemented / limits
 
 - There is no individual Customer booking-detail endpoint or Admin booking mutation endpoint. Booking history is available through the Customer read endpoints; cancellation is the separate shared endpoint above.
-- There is no Staff login/API module. Although Admin user management accepts the `STAFF` role, shared login accepts only ADMIN and CUSTOMER.
+- [STAFF] Shared login accepts ADMIN, CUSTOMER and STAFF. Staff APIs are documented under "Staff APIs".
 - There are no Admin user create/delete routes, and no password-reset or token-refresh HTTP endpoints.
 - Customer catalog routes are read-only. Customer service listing does not expose pagination or search filters; price lookup requires one `vehicle_type_id`.
 - The documented database-backed behavior reflects source code only; endpoint responses can still depend on the configured database schema/data.
 - The Customer booking route tests use a mocked connection and cannot prove concurrent InnoDB schedule-locking behavior; that requires an isolated MySQL concurrency test.
+
+## Staff APIs  <!-- [STAFF] Staff & Service Management -->
+
+All routes require a `Bearer` token whose current database role is `STAFF` (`requireCurrentStaff`). Requires the tables from `database/migrations/2026-11-15_staff_service.sql`.
+
+| Endpoint | Body / Query | Notes |
+|---|---|---|
+| `GET /api/staff/bookings` | `date` (one day) or `date_from`/`date_to`, `booking_status`, `search`, `vehicle_id`, `page`, `limit` (max 200) | Daily queue sorted by start time when `date` is given; otherwise newest first. Items include `service_names`. |
+| `GET /api/staff/bookings/:id` | – | `booking`, `customer`, `vehicle`, `services`, `payment`, `check_in`, `status_history`, `notes`, `allowed_next_statuses`. |
+| `POST /api/staff/bookings/:id/check-in` | `{ mileage, fuel_level, condition_note?, note? }` | `CONFIRMED → CHECKED_IN`; writes `vehicle_check_ins`. `fuel_level`: `EMPTY`, `QUARTER`, `HALF`, `THREE_QUARTER`, `FULL`. |
+| `PATCH /api/staff/bookings/:id/status` | `{ status, reason }` (reason required) | Allowed: `CHECKED_IN → IN_SERVICE`, `IN_SERVICE → COMPLETED`. `CANCELLED` returns `403` (staff cannot cancel). |
+| `POST /api/staff/bookings/:id/no-show` | `{ reason }` | `CONFIRMED → NO_SHOW`, only after the appointment start time. |
+| `POST /api/staff/bookings/:id/notes` | `{ note }` | Adds a note without changing status; writes `booking_notes`. |
+
+Mutations return the updated booking detail. Errors: `400` invalid body, `403` role/cancel, `404` not found, `409` status not allowed.
