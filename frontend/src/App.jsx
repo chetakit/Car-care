@@ -13,6 +13,10 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
+// [STAFF] หน้าพนักงาน
+import StaffApp from './Staff/StaffApp.jsx'
+// [STAFF][MOCK]
+import { STAFF_MOCK } from './Staff/api/staffBookingApi.js'
 
 function isAdminPath(pathname) {
   return pathname === '/admin' || pathname.startsWith('/admin/')
@@ -20,6 +24,11 @@ function isAdminPath(pathname) {
 
 function isCustomerPath(pathname) {
   return pathname === '/customer' || pathname.startsWith('/customer/')
+}
+
+[STAFF]
+function isStaffPath(pathname) {
+  return pathname === '/staff' || pathname.startsWith('/staff/')
 }
 
 function normalizePath(pathname) {
@@ -119,6 +128,9 @@ function AppContent() {
   useEffect(() => {
     if (authStatus === 'checking') return
 
+    // [STAFF][MOCK] โหมดข้อมูลจำลอง: เปิด /staff ได้โดยไม่ต้องล็อกอิน
+    if (STAFF_MOCK && isStaffPath(currentPath)) return
+
     if (authStatus !== 'authenticated') {
       const isPublicPath = currentPath === '/' || currentPath === '/services'
       if (
@@ -131,6 +143,19 @@ function AppContent() {
         )
         navigateTo('/login', true, destination ? { customerReturnTo: destination } : {})
       }
+      return
+    }
+
+    // [STAFF] แสดง StaffApp เมื่อผู้ใช้เป็นพนักงาน
+    if (user?.role === 'STAFF') {
+      return isStaffPath(currentPath)
+        ? <StaffApp onLogout={logout} user={user} />
+        : <SessionLoading message="Opening the Staff workspace…" />
+    }
+
+    // [STAFF] พนักงานล็อกอินแล้วไปหน้าคิวงานเสมอ (รวมถึงหน้า / และ /login)
+    if (user?.role === 'STAFF') {
+      if (!isStaffPath(currentPath)) navigateTo('/staff', true)
       return
     }
 
@@ -155,6 +180,12 @@ function AppContent() {
   if (authStatus === 'checking') {
     return <SessionLoading message="Verifying your session…" />
   }
+
+  // [STAFF][MOCK] โหมดข้อมูลจำลอง
+  if (STAFF_MOCK && isStaffPath(currentPath)) {
+    return <StaffApp onLogout={() => navigateTo('/', true)} user={{ full_name: 'พนักงานทดสอบ (Mock)' }} />
+  }
+
   if (currentPath === '/services') {
     return (
       <ServicesPage
