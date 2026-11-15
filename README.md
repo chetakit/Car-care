@@ -8,184 +8,220 @@
 
 ---
 
-# ความคืบหน้า: Staff & Service Management (Flame)
+# การนำเสนอความคืบหน้า (CSI400)
 
-ส่วนงานฝั่งพนักงาน: จัดการคิวงานในร้านและติดตามสถานะรถแต่ละคัน
-**ข้อกำหนดสำคัญ:** พนักงานไม่มีสิทธิ์ยกเลิกการจองแทนลูกค้า
+ระบบจองบริการดูแลรถยนต์ออนไลน์ ใช้งานได้ 3 บทบาท
+- **ลูกค้า (CUSTOMER):** จองบริการ ชำระเงิน ยกเลิก และดูประวัติ
+- **ผู้ดูแลระบบ (ADMIN):** จัดการข้อมูลหลัก ผู้ใช้ คูปอง การจอง และรายงาน
+- **พนักงาน (STAFF):** จัดการคิวงานในร้านและติดตามสถานะรถแต่ละคัน
 
-| ขอบเขตงาน | สถานะ | อยู่ที่ไหน |
-|---|---|---|
-| 1. ดูรายการจองในแต่ละวัน | ✅ เสร็จ | หน้า `/staff` + `GET /api/staff/bookings?date=` |
-| 2. ดูรายละเอียดลูกค้าและรถยนต์ | ✅ เสร็จ | หน้า `/staff/bookings/:id` + `GET /api/staff/bookings/:id` |
-| 3. ตรวจสอบรายการบริการที่ลูกค้าจอง | ✅ เสร็จ | หน้ารายละเอียด (ชื่อบริการ เวลา ราคา ส่วนลด) |
-| 4. บันทึกการรับรถเข้าร้าน | ✅ เสร็จ | `POST /api/staff/bookings/:id/check-in` → ตาราง `vehicle_check_ins` |
-| 5. เปลี่ยนสถานะการให้บริการ | ✅ เสร็จ | `PATCH /api/staff/bookings/:id/status` |
-| 6. บันทึกหมายเหตุและเหตุผล | ✅ เสร็จ | เหตุผล → `booking_status_history.reason`, หมายเหตุ → `booking_notes` |
-| 7. บันทึก No-show | ✅ เสร็จ | `POST /api/staff/bookings/:id/no-show` |
-| 8. ดูประวัติการให้บริการ | ✅ เสร็จ | หน้า `/staff/history` + ประวัติของรถแต่ละคันในหน้ารายละเอียด |
+| ส่วน | เทคโนโลยี |
+|---|---|
+| Frontend | React 19, Vite 8, lucide-react |
+| Backend | Node.js, Express 5, mysql2, jsonwebtoken, bcryptjs, cors, dotenv |
+| Database | MySQL 8.4 บน Railway |
+| Testing | `node:test` (เทสต์ในตัวของ Node.js), ESLint |
+
+ข้อมูลทุกตัวเลขในเอกสารนี้ตรวจจากโค้ดและฐานข้อมูลจริง ณ วันที่ 15 พ.ย. 2569
 
 ---
 
-## 1. Architecture: หน้าที่ของแต่ละส่วนและเส้นทางข้อมูล
+## 1. Architecture: หน้าที่ของแต่ละบริการและเส้นทางข้อมูล
 
 ```mermaid
 flowchart LR
-  subgraph FE["Frontend (React 19 + Vite) :5173"]
-    P["หน้าพนักงาน<br/>src/Staff/pages"]
-    A["staffBookingApi.js<br/>+ useApi (แนบ JWT)"]
+  subgraph FE["Frontend · React + Vite (:5173)"]
+    AUTH["auth/<br/>Login · Register · AuthContext"]
+    CUS["Customer/<br/>หน้าลูกค้า"]
+    ADM["Admin/<br/>หน้าผู้ดูแล"]
+    STF["Staff/<br/>หน้าพนักงาน"]
+    CLI["Admin/api/client.js<br/>useApi (แนบ JWT)"]
   end
-  subgraph BE["Backend (Node.js + Express 5) :5000"]
-    R["app.js<br/>จุดรับ request /api/*"]
-    M["authenticateToken<br/>requireCurrentStaff"]
-    V["staffBookingValidator"]
-    C["staffBookingController"]
-    S["staffBookingService"]
+  subgraph BE["Backend · Node.js + Express (:5000)"]
+    APP["app.js<br/>จุดรับ request /api/*"]
+    MW["Auth middleware<br/>ตรวจ JWT + role"]
+    MOD["Routes → Validators →<br/>Controllers → Services"]
   end
-  DB[("MySQL 8.4<br/>Railway")]
-  P --> A -->|"HTTP + Bearer token"| R --> M --> V --> C --> S -->|"SQL (mysql2)"| DB
-  DB --> S --> C -->|"JSON {status, data}"| A --> P
+  DB[("MySQL 8.4<br/>Railway · 21 ตาราง")]
+  AUTH & CUS & ADM & STF --> CLI -->|"HTTP JSON + Bearer token"| APP --> MW --> MOD -->|"SQL (mysql2 pool)"| DB
 ```
 
-| ส่วน | ไฟล์ | หน้าที่ |
-|---|---|---|
-| หน้าเว็บ | `frontend/src/Staff/pages/*.jsx` | แสดงคิวงาน ปฏิทิน รายละเอียด ประวัติ และฟอร์มรับรถ/เปลี่ยนสถานะ |
-| ตัวเรียก API | `frontend/src/Staff/api/staffBookingApi.js` | เรียก `/api/staff/bookings` ผ่าน `useApi` ของทีม ซึ่งแนบ `Authorization: Bearer <token>` ให้อัตโนมัติ |
-| จุดรับ request | `backend/app.js` | ผูก path `/api/staff/bookings` กับ router ของพนักงาน |
-| Route | `backend/Staff/routes/staffBookingRoutes.js` | กำหนด endpoint และลำดับ middleware |
-| Middleware | `backend/Auth/middleware/authMiddleware.js` | ตรวจ JWT และตรวจว่า role ปัจจุบันใน DB เป็น STAFF |
-| Validator | `backend/Staff/validators/staffBookingValidator.js` | ตรวจข้อมูลที่ส่งมา ถ้าผิดตอบ 400 ก่อนถึง DB |
-| Controller | `backend/Staff/controllers/staffBookingController.js` | แปลงผลลัพธ์/error เป็น HTTP status (200/400/403/404/409/500) |
-| Service | `backend/Staff/services/staffBookingService.js` | คำสั่ง SQL และกติกาการเปลี่ยนสถานะ ใช้ transaction + `SELECT ... FOR UPDATE` กันพนักงาน 2 คนแก้การจองเดียวกันพร้อมกัน |
-| ฐานข้อมูล | MySQL บน Railway | เก็บข้อมูลจริง |
+### Frontend (`frontend/src`)
+| โฟลเดอร์ | หน้าที่ |
+|---|---|
+| `App.jsx` | ตัวเลือกหน้าตาม URL และพาผู้ใช้ไปพื้นที่ของ role ตัวเอง (`/customer`, `/admin`, `/staff`) |
+| `auth/` | หน้า Login และ Register, `AuthContext` เก็บ JWT ใน sessionStorage และตรวจ session ด้วย `GET /api/auth/me` |
+| `Customer/` | หน้าแรก, บริการ, แดชบอร์ด, รถของฉัน, จองบริการ, การจองของฉัน, ชำระเงิน, กระเป๋าเงิน |
+| `Admin/` | แดชบอร์ด, การจอง, ลูกค้า, พนักงาน, บริการและราคา, คูปอง, การชำระเงิน, กระเป๋าเงิน, รายงาน |
+| `Staff/` | คิวงานรายวันพร้อมปฏิทิน, รายละเอียดการจอง (รับรถ/เปลี่ยนสถานะ/หมายเหตุ/No-show), ประวัติการให้บริการ |
+| `Admin/api/client.js` | ตัวเรียก API กลาง ใช้ร่วมกันทุกส่วน ใส่ `Authorization: Bearer <token>` และอ่าน `VITE_API_BASE_URL` |
 
-> **หมายเหตุเรื่อง API Gateway:** โปรเจกต์นี้ยังไม่มี API Gateway แยกเป็นบริการ ตอนนี้ `backend/app.js` ทำหน้าที่เป็นจุดรับ request เดียวของทุก `/api/*` แล้วส่งต่อไปยัง router ของแต่ละโมดูล (Auth, Customer, Admin, Staff)
+### Backend (`backend/`)
+ทุกโมดูลแบ่งชั้นเหมือนกัน: **routes** (กำหนด path + middleware) → **validators** (ตรวจข้อมูลเข้า) → **controllers** (แปลงผลเป็น HTTP status) → **services** (SQL และกติกาธุรกิจ)
 
-### กติกาสถานะที่พนักงานทำได้
+| โมดูล | หน้าที่ |
+|---|---|
+| `Auth/` | ล็อกอิน, ตรวจ session, ออกจากระบบ, สมัครสมาชิกลูกค้า และ middleware ตรวจ JWT/role |
+| `Public/` | แคตตาล็อกบริการที่ไม่ต้องล็อกอิน (หน้าแรก) |
+| `Customer/` | โปรไฟล์, รถของลูกค้า, แคตตาล็อกรถ/บริการ/ราคา, ตารางเวลาว่าง, สร้างการจอง, ประวัติ |
+| `Admin/` | ข้อมูลหลัก (ประเภท/ยี่ห้อ/รุ่นรถ, บริการ, ราคา), ผู้ใช้และสิทธิ์, คูปอง, การจอง, รายงาน, แดชบอร์ด และบริการกลางเรื่องชำระเงิน/ยกเลิก/กระเป๋าเงิน |
+| `Staff/` | คิวงาน, รับรถ, เปลี่ยนสถานะ, No-show, หมายเหตุ |
+| `shared/config/db.js` | connection pool ของ MySQL อ่านค่าจาก `backend/.env` |
+| `scripts/generate-schedules.js` | สร้างช่วงเวลาให้บริการล่วงหน้า 30 วัน (จันทร์–เสาร์ วันละ 6 รอบ รอบละ 90 นาที รับได้ 2 คัน) |
+
+> **เรื่อง API Gateway:** ตอนนี้ยังไม่มี API Gateway แยกเป็นบริการ `backend/app.js` ทำหน้าที่เป็นจุดรับ request เดียวของทุก `/api/*` แล้วส่งต่อไปยัง router ของแต่ละโมดูล พร้อมตั้ง CORS และแปลง JSON ให้ทุก request
+
+### เส้นทางข้อมูลหลักของระบบ (วงจรการจอง)
 
 ```mermaid
 stateDiagram-v2
-  [*] --> CONFIRMED: ลูกค้าจอง
-  CONFIRMED --> CHECKED_IN: พนักงานรับรถ (บันทึกเลขไมล์/น้ำมัน)
-  CHECKED_IN --> IN_SERVICE: เริ่มบริการ (ต้องมีเหตุผล)
-  IN_SERVICE --> COMPLETED: เสร็จสิ้น (ต้องมีเหตุผล)
-  CONFIRMED --> NO_SHOW: ลูกค้าไม่มา (หลังเลยเวลานัดเท่านั้น)
-  CONFIRMED --> CANCELLED: ลูกค้ายกเลิกเอง (พนักงานทำไม่ได้)
+  [*] --> CONFIRMED: ลูกค้าจอง (เลือกรถ บริการ ช่วงเวลา)
+  CONFIRMED --> CHECKED_IN: พนักงานรับรถ
+  CHECKED_IN --> IN_SERVICE: พนักงานเริ่มบริการ
+  IN_SERVICE --> COMPLETED: พนักงานปิดงาน
+  CONFIRMED --> NO_SHOW: พนักงานบันทึกลูกค้าไม่มา
+  CONFIRMED --> CANCELLED: ลูกค้ายกเลิก (คืนเงินเข้ากระเป๋า หัก 20%)
 ```
 
 ---
 
 ## 2. API implementation: Endpoint และ HTTP Methods
 
-ทุก endpoint ต้องส่ง header `Authorization: Bearer <JWT>` ของผู้ใช้ role `STAFF`
+ทั้งระบบมี **78 endpoint** นับจาก route ที่เปิดใช้ใน `backend/app.js`
 
-| Method | Endpoint | ใช้ทำอะไร | Body / Query |
-|---|---|---|---|
-| `GET` | `/api/staff/bookings` | 1) คิวรายวัน · 8) ประวัติ | `date` หรือ `date_from` + `date_to`, `booking_status`, `search`, `vehicle_id`, `page`, `limit` (≤ 200) |
-| `GET` | `/api/staff/bookings/:id` | 2) 3) รายละเอียดลูกค้า รถ บริการ + ไทม์ไลน์ | – |
-| `POST` | `/api/staff/bookings/:id/check-in` | 4) รับรถเข้าร้าน | `{ mileage, fuel_level, condition_note?, note? }` |
-| `PATCH` | `/api/staff/bookings/:id/status` | 5) 6) เปลี่ยนสถานะ + เหตุผล | `{ status, reason }` |
-| `POST` | `/api/staff/bookings/:id/no-show` | 7) ลูกค้าไม่มาตามนัด | `{ reason }` |
-| `POST` | `/api/staff/bookings/:id/notes` | 6) หมายเหตุ (ไม่เปลี่ยนสถานะ) | `{ note }` |
+| กลุ่ม | จำนวน | สิทธิ์ที่ต้องมี |
+|---|---|---|
+| Admin | 42 | ADMIN (รวม `/api/admin/auth/*` 3 ตัว) |
+| Customer | 16 | CUSTOMER (ยกเว้น `register` ที่ไม่ต้องล็อกอิน) |
+| Shared: payments / cancellations / wallet | 8 | CUSTOMER (เฉพาะของตัวเอง) หรือ ADMIN |
+| Staff | 6 | STAFF |
+| Auth (ล็อกอินกลาง) | 3 | `login` ไม่ต้องล็อกอิน, `me`/`logout` ต้องมี token |
+| Public | 1 | ไม่ต้องล็อกอิน |
+| System (`/`, `/api/health/db`) | 2 | ไม่ต้องล็อกอิน |
 
-**ทำไมไม่มี `PUT` และ `DELETE`:**
-- ไม่มี `DELETE` โดยตั้งใจ เพราะพนักงานต้องลบหรือยกเลิกการจองไม่ได้ ถ้าส่ง `status: "CANCELLED"` มาที่ `PATCH /status` ระบบจะตอบ `403`
-- ใช้ `PATCH` แทน `PUT` เพราะแก้แค่ฟิลด์สถานะ ไม่ได้แทนที่ข้อมูลการจองทั้งก้อน
+| HTTP Method | จำนวน | ตัวอย่าง |
+|---|---|---|
+| `GET` | 41 | `GET /api/customer/bookings`, `GET /api/admin/reports/revenue`, `GET /api/staff/bookings?date=` |
+| `POST` | 19 | `POST /api/auth/login`, `POST /api/customer/bookings`, `POST /api/payments/:bookingId` |
+| `PATCH` | 16 | `PATCH /api/admin/users/:id/role`, `PATCH /api/customer/profile`, `PATCH /api/staff/bookings/:id/status` |
+| `PUT` | 1 | `PUT /api/admin/services/:id/prices` (แทนที่ตารางราคาของบริการทั้งชุด) |
+| `DELETE` | 1 | `DELETE /api/customer/vehicles/:vehicleId` |
 
-ตัวอย่าง request และ response:
+ระบบเลือกใช้ `PATCH` เป็นหลักแทน `PUT` เพราะส่วนใหญ่แก้แค่บางฟิลด์ ส่วน "ลบ" ข้อมูลหลักใช้การเปลี่ยน `status` เป็น `INACTIVE` (เช่น `PATCH .../:id/status`) เพื่อไม่ให้ข้อมูลเก่าที่อ้างอิงอยู่เสีย
 
-```http
-PATCH /api/staff/bookings/5/status
-Authorization: Bearer eyJhbGciOi...
-Content-Type: application/json
+### Endpoint สำคัญของแต่ละส่วน
+| Method | Endpoint | ใช้ทำอะไร |
+|---|---|---|
+| `POST` | `/api/auth/login` | ล็อกอินทุก role ได้ JWT กลับมา |
+| `POST` | `/api/customer/auth/register` | สมัครสมาชิก (ได้ role CUSTOMER เสมอ) |
+| `GET` | `/api/customer/schedules/availability` | ดูช่วงเวลาที่ยังว่าง |
+| `POST` | `/api/customer/bookings` | สร้างการจอง |
+| `POST` | `/api/payments/:bookingId/wallet` | จ่ายเงินด้วยกระเป๋าเงิน |
+| `POST` | `/api/cancellations/:bookingId` | ลูกค้ายกเลิกและคืนเงินเข้ากระเป๋า |
+| `GET` | `/api/admin/dashboard/summary` | ตัวเลขสรุปบนแดชบอร์ด Admin |
+| `PUT` | `/api/admin/services/:id/prices` | ตั้งราคาบริการตามประเภทรถ |
+| `PATCH` | `/api/admin/users/:id/role` | เปลี่ยนสิทธิ์ผู้ใช้ เช่น ตั้งเป็น STAFF |
+| `POST` | `/api/staff/bookings/:id/check-in` | พนักงานรับรถ |
+| `PATCH` | `/api/staff/bookings/:id/status` | พนักงานเปลี่ยนสถานะพร้อมเหตุผล |
 
-{ "status": "IN_SERVICE", "reason": "ช่างเริ่มงานแล้ว" }
-```
+ทุก response ใช้รูปแบบเดียวกัน: สำเร็จ `{ "status": "success", "data": ... }` และผิดพลาด `{ "status": "error", "message": "..." }`
 
-```json
-{
-  "status": "success",
-  "data": {
-    "booking": { "booking_id": 5, "booking_status": "IN_SERVICE", "...": "..." },
-    "customer": { "full_name": "...", "phone": "..." },
-    "vehicle": { "license_plate": "...", "brand_name": "Mercedes-Benz", "model_name": "C-Class" },
-    "services": [{ "service_name": "Basic Wash", "unit_price": "150.00" }],
-    "status_history": [{ "old_status": "CHECKED_IN", "new_status": "IN_SERVICE", "reason": "ช่างเริ่มงานแล้ว" }],
-    "allowed_next_statuses": ["COMPLETED"]
-  }
-}
-```
-
-เอกสาร API ฉบับเต็มอยู่ที่ [`backend/API_DOCUMENTATION.md`](backend/API_DOCUMENTATION.md) หัวข้อ "Staff APIs"
+รายละเอียดครบทุก endpoint (body, query, error) อยู่ที่ [`backend/API_DOCUMENTATION.md`](backend/API_DOCUMENTATION.md)
 
 ---
 
 ## 3. Database: โครงสร้างข้อมูลและผลการบันทึกข้อมูลจริง
 
-ฐานข้อมูล MySQL 8.4 อยู่บน Railway (database `railway`)
-
-### ตารางที่ส่วนพนักงานใช้
+MySQL 8.4 บน Railway (database `railway`) มี **21 ตาราง**
 
 ```mermaid
 erDiagram
+  users ||--o{ vehicles : "เป็นเจ้าของ"
   users ||--o{ bookings : "จอง"
-  vehicles ||--o{ bookings : "รถที่นำมา"
+  users ||--o| wallets : "มีกระเป๋าเงิน"
+  vehicle_brands ||--o{ vehicle_models : ""
+  vehicle_types ||--o{ vehicle_models : ""
+  vehicle_models ||--o{ vehicles : ""
+  services ||--o{ service_prices : "ราคาตาม"
+  vehicle_types ||--o{ service_prices : "ประเภทรถ"
+  schedules ||--o{ bookings : "ช่วงเวลา"
+  vehicles ||--o{ bookings : ""
+  coupons ||--o{ bookings : "ส่วนลด"
   bookings ||--|{ booking_services : "บริการที่จอง"
-  bookings ||--o| payments : "การชำระเงิน"
-  bookings ||--o{ booking_status_history : "ประวัติสถานะ + เหตุผล"
-  bookings ||--o| vehicle_check_ins : "การรับรถ (ใหม่)"
-  bookings ||--o{ booking_notes : "หมายเหตุพนักงาน (ใหม่)"
-  users ||--o{ vehicle_check_ins : "พนักงานผู้รับรถ"
-  users ||--o{ booking_notes : "พนักงานผู้เขียน"
+  services ||--o{ booking_services : ""
+  bookings ||--o| payments : "ชำระเงิน"
+  payments ||--o{ refunds : "คืนเงิน"
+  wallets ||--o{ wallet_transactions : "เข้า/ออก"
+  bookings ||--o{ booking_status_history : "ประวัติสถานะ"
+  bookings ||--o| vehicle_check_ins : "รับรถ"
+  bookings ||--o{ booking_notes : "หมายเหตุพนักงาน"
+  coupons ||--o{ coupon_usages : "การใช้คูปอง"
 ```
 
-ตารางเดิมของทีมที่อ่าน/เขียน: `bookings`, `users`, `vehicles`, `vehicle_models`, `vehicle_brands`, `vehicle_types`, `booking_services`, `payments`, `booking_status_history`
-
-**ตารางใหม่ 2 ตาราง** สร้างจาก [`database/migrations/2026-11-15_staff_service.sql`](database/migrations/2026-11-15_staff_service.sql)
-
-| ตาราง | คอลัมน์หลัก | หมายเหตุ |
+| กลุ่ม | ตาราง | จำนวนแถวจริง |
 |---|---|---|
-| `vehicle_check_ins` | `booking_id` (UNIQUE, FK), `mileage`, `fuel_level` (`EMPTY`/`QUARTER`/`HALF`/`THREE_QUARTER`/`FULL`), `condition_note`, `checked_in_by` (FK users), `checked_in_at` | 1 การจองรับรถได้ครั้งเดียว |
-| `booking_notes` | `booking_id` (FK), `note`, `created_by` (FK users), `created_at` | หมายเหตุที่ไม่เปลี่ยนสถานะ |
+| ผู้ใช้ | `users` (role: ADMIN / CUSTOMER / STAFF) | 7 |
+| รถ | `vehicle_types` · `vehicle_brands` · `vehicle_models` · `vehicles` | 7 · 14 · 25 · 5 |
+| บริการและราคา | `services` · `service_prices` (ราคาแยกตามประเภทรถ) | 7 · 36 |
+| เวลาให้บริการ | `business_hours` · `schedules` | 7 · 160 |
+| การจอง | `bookings` · `booking_services` · `booking_status_history` | 7 · 9 · 4 |
+| พนักงาน | `vehicle_check_ins` · `booking_notes` | 1 · 1 |
+| คูปอง | `coupons` · `coupon_usages` | 1 · 0 |
+| การเงิน | `payments` · `refunds` · `wallets` · `wallet_transactions` | 7 · 1 · 1 · 2 |
+| ตรวจสอบย้อนหลัง | `audit_logs` | 0 |
 
-### หลักฐานจากฐานข้อมูลจริง (ตรวจเมื่อ 15 พ.ย. 2569)
-- เชื่อมต่อ Railway ได้ ดูได้จาก `GET /api/health/db` ซึ่งตอบ `{"status":"success","database":"railway"}`
-- รัน migration บน Railway แล้ว มีตาราง `vehicle_check_ins` และ `booking_notes` จริง
-- ข้อมูลในระบบตอนตรวจ: การจอง 7 รายการ (CONFIRMED 6, CANCELLED 1) และผู้ใช้ ADMIN 1, CUSTOMER 3, STAFF 1
-- `GET /api/staff/bookings` ดึงการจองจริงได้ครบ 7 รายการ พร้อมชื่อบริการและทะเบียนรถ
-- `GET /api/staff/bookings/:id` ของการจอง #1, #2, #5 คืนข้อมูลลูกค้า รถ บริการ ราคา และการชำระเงินถูกต้อง
+**จุดออกแบบที่สำคัญ**
+- **สถานะการจอง** เป็น ENUM 6 ค่า: `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW` และทุกครั้งที่เปลี่ยนจะบันทึกลง `booking_status_history` พร้อมผู้เปลี่ยนและเหตุผล
+- **ชื่อและราคาบริการ** ถูกคัดลอกลง `booking_services` ตอนจอง ถ้าแก้ราคาในภายหลัง ราคาของการจองเก่าจะไม่เปลี่ยน
+- **การจองหนึ่งรายการชำระเงินได้ครั้งเดียว** เพราะ `payments.booking_id` เป็น UNIQUE
+- **การรับรถ** บันทึกได้ครั้งเดียวต่อการจอง เพราะ `vehicle_check_ins.booking_id` เป็น UNIQUE
+- **ลบข้อมูลหลักแบบ soft delete** ด้วยคอลัมน์ `status` (`ACTIVE` / `INACTIVE`)
 
-SQL สำหรับเปิดให้ดูตอนนำเสนอ (หลังกดรับรถหรือเปลี่ยนสถานะในหน้าเว็บ):
+**หลักฐานการบันทึกข้อมูลจริง:** ตัวเลขจำนวนแถวในตารางด้านบนนับจาก Railway จริง และมีข้อมูลจากการใช้งานผ่านหน้าเว็บแล้ว เช่น การจอง 7 รายการ การชำระเงิน 7 รายการ การคืนเงิน 1 รายการ และการรับรถกับหมายเหตุของพนักงานอย่างละ 1 รายการ
+
+SQL สำหรับเปิดโชว์ตอนนำเสนอ:
 
 ```sql
--- การรับรถล่าสุด
-SELECT c.booking_id, c.mileage, c.fuel_level, c.condition_note, u.full_name AS staff, c.checked_in_at
-FROM vehicle_check_ins c JOIN users u ON u.user_id = c.checked_in_by
-ORDER BY c.checked_in_at DESC LIMIT 5;
+-- การจองล่าสุด พร้อมลูกค้า รถ และการชำระเงิน
+SELECT b.booking_id, u.full_name, v.license_plate, b.booking_date, b.start_time,
+       b.booking_status, b.final_amount, p.payment_method, p.payment_status
+FROM bookings b
+JOIN users u ON u.user_id = b.user_id
+JOIN vehicles v ON v.vehicle_id = b.vehicle_id
+LEFT JOIN payments p ON p.booking_id = b.booking_id
+ORDER BY b.created_at DESC LIMIT 10;
 
--- ประวัติสถานะพร้อมเหตุผล
+-- ประวัติการเปลี่ยนสถานะ (ใครเปลี่ยน เมื่อไร เพราะอะไร)
 SELECT h.booking_id, h.old_status, h.new_status, h.reason, u.full_name AS changed_by, h.created_at
 FROM booking_status_history h LEFT JOIN users u ON u.user_id = h.changed_by
 ORDER BY h.created_at DESC LIMIT 10;
 
--- หมายเหตุของพนักงาน
-SELECT n.booking_id, n.note, u.full_name AS staff, n.created_at
-FROM booking_notes n JOIN users u ON u.user_id = n.created_by
-ORDER BY n.created_at DESC LIMIT 10;
+-- กระเป๋าเงินและการคืนเงิน
+SELECT w.user_id, w.balance, t.transaction_type, t.amount, t.description, t.created_at
+FROM wallets w JOIN wallet_transactions t ON t.wallet_id = w.wallet_id
+ORDER BY t.created_at DESC;
 ```
+
+ตารางที่ส่วนพนักงานเพิ่ม (`vehicle_check_ins`, `booking_notes`) สร้างจาก [`database/migrations/2026-11-15_staff_service.sql`](database/migrations/2026-11-15_staff_service.sql)
 
 ---
 
-## 4. Integration: Frontend → Backend → Database
+## 4. Integration: Frontend → (จุดรับ API) → Backend → Database
 
-ลำดับการทำงานจริงตอนพนักงานกด "รับรถเข้าร้าน":
+**ตัวอย่าง 1: ลูกค้าจองบริการ**
+1. `CustomerBookingPage.jsx` ดึงรถของลูกค้า (`GET /api/customer/vehicles`), บริการและราคา (`GET /api/customer/catalog/services`) และช่วงเวลาว่าง (`GET /api/customer/schedules/availability`)
+2. ลูกค้ากดยืนยัน หน้าเว็บส่ง `POST /api/customer/bookings` ผ่าน `client.js` ซึ่งแนบ JWT ให้
+3. `app.js` → `authenticateToken` → `requireCustomer` → validator → service
+4. Service เปิด transaction ล็อกช่วงเวลา (`SELECT ... FOR UPDATE`) ตรวจจำนวนที่ว่าง คำนวณราคาตามประเภทรถ แล้วบันทึก `bookings` + `booking_services`
+5. หน้าเว็บพาไปหน้าชำระเงิน `POST /api/payments/:bookingId` หรือจ่ายด้วยกระเป๋าเงิน `POST /api/payments/:bookingId/wallet`
 
-1. **หน้าเว็บ:** `StaffBookingDetailPage.jsx` เปิดฟอร์มรับรถ ตรวจว่าเลขไมล์เป็นจำนวนเต็ม แล้วเรียก `checkInBooking(api, id, body)`
-2. **ตัวเรียก API:** `staffBookingApi.js` ส่ง `POST http://localhost:5000/api/staff/bookings/:id/check-in` โดย `useApi` แนบ JWT จาก sessionStorage
-3. **Backend:** `app.js` → `authenticateToken` (ตรวจลายเซ็นและวันหมดอายุของ JWT) → `requireCurrentStaff` (ตรวจ role ใน DB) → `validateCheckIn` → controller → service
-4. **Service:** เปิด transaction, `SELECT ... FOR UPDATE` ล็อกแถวการจอง, ตรวจว่าเป็น `CONFIRMED`, `INSERT vehicle_check_ins`, `UPDATE bookings` เป็น `CHECKED_IN`, `INSERT booking_status_history` แล้ว commit
-5. **ตอบกลับ:** ส่งรายละเอียดการจองที่อัปเดตแล้วกลับไป หน้าเว็บแสดงสถานะใหม่และไทม์ไลน์ทันทีโดยไม่ต้องโหลดหน้าใหม่
+**ตัวอย่าง 2: พนักงานรับรถและปิดงาน**
+1. `StaffQueuePage.jsx` เรียก `GET /api/staff/bookings?date=` แสดงคิวของวัน และปฏิทินเรียก `?date_from=&date_to=` เพื่อแสดงจุดบอกวันที่มีการจอง
+2. กด "รับรถเข้าร้าน" → `POST /api/staff/bookings/:id/check-in`
+3. `authenticateToken` → `requireCurrentStaff` → `validateCheckIn` → service ใช้ transaction และ `SELECT ... FOR UPDATE` บันทึก `vehicle_check_ins` แล้วเปลี่ยนสถานะเป็น `CHECKED_IN` และเขียน `booking_status_history`
+4. หน้าเว็บได้ข้อมูลใหม่กลับมาทันที จากนั้นใช้ `PATCH /status` เปลี่ยนเป็น `IN_SERVICE` และ `COMPLETED`
 
-ปฏิทินในหน้าคิวงานเรียก `GET /api/staff/bookings?date_from=&date_to=` เดือนละครั้ง แล้วนับจำนวนการจองต่อวันเพื่อแสดงจุดสีและตัวเลข
+**ตัวอย่าง 3: Admin ตั้งพนักงาน**: หน้า "พนักงาน" ของ Admin เรียก `PATCH /api/admin/users/:id/role` เปลี่ยน role เป็น `STAFF` เมื่อผู้ใช้คนนั้นล็อกอินครั้งต่อไป ระบบจะพาไปหน้า `/staff`
 
 **วิธีรันเพื่อสาธิต**
 
@@ -194,88 +230,113 @@ cd backend && npm install && npm start      # http://localhost:5000
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-จากนั้นล็อกอินด้วยบัญชี role `STAFF` ระบบจะพาไปหน้า `/staff` เอง
-
-ถ้าอยากดูหน้าจอโดยไม่ต่อ backend ให้สร้างไฟล์ `frontend/.env.local` ที่มีบรรทัด `VITE_STAFF_MOCK=true` หน้าพนักงานจะใช้ข้อมูลจำลองจาก `staffMockApi.js` แทน
+ต้องมีไฟล์ `backend/.env` ตาม `backend/.env.example` (ค่าเชื่อมต่อ Railway, `JWT_SECRET` ยาวอย่างน้อย 32 ตัวอักษร และ `JWT_EXPIRES_IN`) ตรวจการเชื่อมต่อได้ที่ `GET http://localhost:5000/api/health/db`
 
 ---
 
 ## 5. Security: การตรวจสอบ JWT และการจัดการสิทธิ์
 
-| ชั้น | ตรวจอะไร | ถ้าไม่ผ่าน |
+**การล็อกอิน**
+- รหัสผ่านเก็บเป็น hash ด้วย **bcryptjs** และไม่ส่ง hash กลับในทุก response
+- ล็อกอินสำเร็จได้ JWT ที่เซ็นด้วย `JWT_SECRET` (ต้องยาว ≥ 32 ตัวอักษร) และมีอายุตาม `JWT_EXPIRES_IN`
+- บัญชีที่ `status = INACTIVE` ล็อกอินไม่ได้
+- สมัครสมาชิกได้แค่ role CUSTOMER เท่านั้น ถ้าส่ง `role` หรือ `status` มาเองจะถูกปฏิเสธ
+
+**Middleware ตรวจสิทธิ์** (`backend/Auth/middleware/authMiddleware.js`)
+| Middleware | ตรวจอะไร | ใช้กับ |
 |---|---|---|
-| `authenticateToken` | ต้องมี header `Authorization: Bearer <token>` และ token ต้องเซ็นด้วย `JWT_SECRET` และยังไม่หมดอายุ (`JWT_EXPIRES_IN`) | `401 Authentication required.` / `401 Invalid or expired token.` |
-| `requireCurrentStaff` | อ่าน `role` และ `status` **ล่าสุดจากตาราง users** ไม่เชื่อแค่ใน token ถ้า Admin เปลี่ยน role หรือปิดบัญชี สิทธิ์จะหายทันที | `401` ถ้าบัญชีถูกปิดหรือ role ไม่ตรงกับ token, `403 Staff access required.` ถ้าไม่ใช่ STAFF |
-| Validator | รับเฉพาะฟิลด์ที่กำหนด เช่น check-in รับแค่ `mileage`, `fuel_level`, `condition_note`, `note` ตรวจชนิด ความยาว และค่าที่อนุญาต | `400` |
-| Service | ห้ามยกเลิกการจองแทนลูกค้า และเปลี่ยนสถานะได้ตามลำดับที่กำหนดเท่านั้น | `403` / `409` |
-| SQL | ใช้ parameterized query (`?`) ทุกคำสั่ง ป้องกัน SQL injection | – |
+| `authenticateToken` | header `Authorization: Bearer <token>`, ลายเซ็น และวันหมดอายุของ JWT | ทุก route ที่ต้องล็อกอิน |
+| `requireAdmin` / `requireCurrentAdmin` | อ่าน role และ status **ล่าสุดจากตาราง users** ต้องเป็น ADMIN | โมดูล Admin ทั้งหมด |
+| `requireCurrentStaff` | แบบเดียวกัน แต่ต้องเป็น STAFF | โมดูล Staff |
+| `requireCustomer` | role ใน token ต้องเป็น CUSTOMER | โมดูล Customer |
+| `requireCustomerOrAdmin` | CUSTOMER หรือ ADMIN, และลูกค้าเข้าถึงได้เฉพาะการจอง/กระเป๋าเงินของตัวเอง | payments, cancellations, wallet |
+| `requireSupportedSessionRole` | role ต้องเป็น ADMIN / STAFF / CUSTOMER | `/api/auth/me`, `/api/auth/logout` |
 
-ฝั่งหน้าเว็บ: `App.jsx` พาผู้ใช้ role `STAFF` ไปที่ `/staff/*` เท่านั้น แต่การป้องกันจริงอยู่ที่ backend ถ้าลูกค้ายิง API พนักงานเองจะได้ `403`
+Admin และ Staff ตรวจ role จากฐานข้อมูลทุก request ถ้า Admin ปิดบัญชีหรือเปลี่ยน role ของใคร สิทธิ์เดิมจะใช้ไม่ได้ทันที แม้ token ยังไม่หมดอายุ
 
-**ข้อกำหนดของ `.env`:** `JWT_SECRET` ต้องยาวอย่างน้อย 32 ตัวอักษร และต้องตั้ง `JWT_EXPIRES_IN` เช่น `8h` ถ้าไม่ครบ การล็อกอินจะตอบ `500` (ดู `backend/.env.example`)
+**ป้องกันอื่น ๆ**
+- ทุกคำสั่ง SQL ใช้ parameterized query (`?`) ป้องกัน SQL injection
+- Validator รับเฉพาะฟิลด์ที่กำหนด และตรวจชนิด ความยาว และค่าที่อนุญาต
+- งานที่แก้หลายตารางพร้อมกัน (จอง, ชำระเงิน, ยกเลิก, คืนเงิน, รับรถ) ใช้ transaction กันข้อมูลค้างครึ่งทาง
+- กติกาสิทธิ์ทางธุรกิจ: พนักงานยกเลิกการจองแทนลูกค้าไม่ได้ (`403`) และลูกค้าดูหรือจ่ายการจองของคนอื่นไม่ได้
+
+**ฝั่งหน้าเว็บ:** `App.jsx` พาผู้ใช้ไปเฉพาะพื้นที่ของ role ตัวเอง แต่การป้องกันจริงอยู่ที่ backend ถ้ายิง API ข้ามสิทธิ์เองจะได้ `401`/`403`
 
 ---
 
 ## 6. Testing: ผลทดสอบ API และกรณี Error
 
-รันเทสต์:
-
 ```bash
 cd backend && node --test test/*.test.js
+cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 ```
 
-**ผลล่าสุด (15 พ.ย. 2569):** `tests 139 · pass 139 · fail 0` (ทั้งโปรเจกต์) และฝั่ง frontend `npx eslint .` ไม่มี error, `npm run build` สำเร็จ
+**ผลล่าสุด (15 พ.ย. 2569)**
+| ส่วน | ผล |
+|---|---|
+| Backend: 17 ไฟล์เทสต์ | `tests 139 · pass 139 · fail 0` |
+| Frontend: ESLint ทั้งโปรเจกต์ | ไม่มี error |
+| Frontend: build | สำเร็จ |
+| Frontend: unit test | `pass 2 · fail 0` |
 
-เทสต์เฉพาะส่วนพนักงาน อยู่ใน [`backend/test/staffBookingRoutes.test.js`](backend/test/staffBookingRoutes.test.js) (7 เทสต์ ผ่านทั้งหมด):
-
-| # | เทสต์ | ผลที่คาดหวัง |
-|---|---|---|
-| 1 | customers cannot use staff booking APIs | ลูกค้าเรียก API พนักงาน → `403` |
-| 2 | staff cannot cancel bookings | ส่ง `status: "CANCELLED"` → `403` |
-| 3 | status change requires a reason | เปลี่ยนสถานะโดยไม่มี `reason` → `400` |
-| 4 | check-in validates mileage and fuel level | เลขไมล์ติดลบ / `fuel_level` ผิด → `400` |
-| 5 | status change rejects transitions outside the allowed flow | เช่น `CONFIRMED` → `COMPLETED` ข้ามขั้น → `409` |
-| 6 | no-show is rejected before the appointment time | บันทึก No-show ก่อนถึงเวลานัด → `409` |
-| 7 | daily list filters by date and returns service names | `?date=` คืนเฉพาะวันนั้น พร้อม `service_names` → `200` |
+| ไฟล์เทสต์ | ครอบคลุม |
+|---|---|
+| `authService`, `sessionRoutes` | ล็อกอิน, role ที่อนุญาต, ตรวจ session |
+| `customerRegistrationService`, `customerRegistrationValidator` | สมัครสมาชิก, อีเมลซ้ำ, ข้อมูลไม่ถูกต้อง |
+| `customerProfileRoutes`, `customerVehicleRoutes` | โปรไฟล์และรถของลูกค้า |
+| `customerCatalogRoutes`, `customerServiceCatalogRoutes` | แคตตาล็อกรถ บริการ และราคา |
+| `customerScheduleAvailabilityRoutes`, `scheduleGeneration` | ช่วงเวลาว่างและการสร้างตารางเวลา |
+| `customerBookingRoutes`, `customerBookingValidator`, `customerBookingHistoryRoutes` | สร้างการจองและประวัติการจอง |
+| `paymentWalletRoutes` | ชำระเงิน, กระเป๋าเงิน, ยกเลิก, คืนเงิน |
+| `adminUserManagementRoutes`, `dashboardService` | จัดการผู้ใช้/สิทธิ์ และแดชบอร์ด Admin |
+| `staffBookingRoutes` | สิทธิ์พนักงาน, ห้ามยกเลิก, บังคับเหตุผล, กติกาสถานะ, No-show |
 
 ### ตัวอย่าง Error ที่ระบบตอบกลับ
 
-| สถานการณ์ | HTTP | Response |
+| สถานการณ์ | HTTP | `message` |
 |---|---|---|
-| ไม่ส่ง token | 401 | `{"status":"error","message":"Authentication required."}` |
-| token ผิดหรือหมดอายุ | 401 | `{"status":"error","message":"Invalid or expired token."}` |
-| ลูกค้าเรียก API พนักงาน | 403 | `{"status":"error","message":"Staff access required."}` |
-| พนักงานพยายามยกเลิกการจอง | 403 | `{"status":"error","message":"Staff cannot cancel bookings on behalf of customers."}` |
-| เลขไมล์ไม่ถูกต้อง | 400 | `{"status":"error","message":"mileage must be an integer between 0 and 9999999."}` |
-| ช่วงวันที่กลับด้าน | 400 | `{"status":"error","message":"date_from must not be after date_to."}` |
-| ไม่พบการจอง | 404 | `{"status":"error","message":"Booking not found."}` |
-| รับรถซ้ำ | 409 | `{"status":"error","message":"Only CONFIRMED bookings can be checked in."}` |
-| No-show ก่อนเวลานัด | 409 | `{"status":"error","message":"Cannot mark no-show before the appointment time."}` |
-| หมายเหตุในการจองที่ยกเลิกแล้ว | 409 | `{"status":"error","message":"Cannot add notes to a cancelled booking."}` |
+| เรียก API ที่ต้องล็อกอินโดยไม่มี token | 401 | `Authentication required.` |
+| token ปลอมหรือหมดอายุ | 401 | `Invalid or expired token.` |
+| ลูกค้าเรียก API ของ Admin | 403 | `Administrator access required.` |
+| ลูกค้าเรียก API ของพนักงาน | 403 | `Staff access required.` |
+| พนักงานเรียก API ของลูกค้า | 403 | `Customer access required.` |
+| พนักงานพยายามยกเลิกการจอง | 403 | `Staff cannot cancel bookings on behalf of customers.` |
+| ข้อมูลที่ส่งมาไม่ถูกต้อง เช่น วันที่ผิดรูปแบบ | 400 | เช่น `date_from must not be after date_to.` |
+| ไม่พบข้อมูล | 404 | เช่น `Booking not found.` |
+| สมัครด้วยอีเมลที่มีอยู่แล้ว | 409 | `An account with this email already exists.` |
+| ชำระเงินซ้ำ / เปลี่ยนสถานะผิดลำดับ | 409 | เช่น `Only CONFIRMED bookings can be checked in.` |
+| `.env` ไม่ครบ (เช่นไม่มี `JWT_EXPIRES_IN`) | 500 | ล็อกอินไม่สำเร็จ (ข้อความ error ทั่วไป ไม่เปิดเผยรายละเอียด) |
 
 ---
 
 ## 7. Project status
 
 ### ✅ เสร็จแล้ว
-- Backend โมดูล Staff ครบ 6 endpoint พร้อม validator, การตรวจสิทธิ์ และ transaction
-- ตารางใหม่ `vehicle_check_ins`, `booking_notes` สร้างบน Railway แล้ว
-- หน้าเว็บพนักงาน 3 หน้า (คิวงาน, รายละเอียด, ประวัติ) ใช้ธีมเดียวกับหน้าหลัก กว้างเต็มจอ มีปฏิทินแสดงจุดวันที่มีการจอง
-- โหมดข้อมูลจำลอง (`VITE_STAFF_MOCK`) สำหรับพัฒนาหน้าเว็บโดยไม่ต้องมี backend
-- เทสต์ backend ผ่าน 139/139 และอัปเดต `API_DOCUMENTATION.md`
+- **Auth:** ล็อกอินรวมทุก role, สมัครสมาชิกลูกค้า, ตรวจ session, ออกจากระบบ
+- **ลูกค้า:** หน้าแรกและหน้าบริการ, โปรไฟล์, จัดการรถ, ดูราคาตามประเภทรถ, ดูเวลาว่าง, จอง, ชำระเงิน (เงินสด/โอน/กระเป๋าเงิน/จำลอง), ยกเลิกพร้อมคืนเงินเข้ากระเป๋า, ประวัติการจอง
+- **Admin:** แดชบอร์ด, จัดการประเภท/ยี่ห้อ/รุ่นรถ, บริการและราคา, ผู้ใช้และสิทธิ์ (รวมตั้ง STAFF), คูปอง, ดูการจองพร้อมประวัติ, รายงานการจองและรายได้, การชำระเงินและกระเป๋าเงิน
+- **พนักงาน:** คิวงานรายวันพร้อมปฏิทิน, รายละเอียดลูกค้า/รถ/บริการ, รับรถ, เปลี่ยนสถานะพร้อมเหตุผล, หมายเหตุ, No-show, ประวัติการให้บริการ
+- **ระบบ:** ฐานข้อมูล 21 ตารางบน Railway, สคริปต์สร้างตารางเวลา, API 78 endpoint, เทสต์ backend ผ่าน 139/139, เอกสาร API
 
 ### 🔄 กำลังดำเนินการ
-- Pull Request จาก branch `feat/staff-service` เข้า `main` รอเพื่อนในทีมตรวจ
-- ทดสอบครบทุกขั้นกับข้อมูลจริง (ล็อกอิน STAFF → รับรถ → เปลี่ยนสถานะ → ปิดงาน) บน Railway
+- รวมงานของแต่ละ branch เข้า `main` ผ่าน Pull Request (เช่น `feat/staff-service`)
+- ทดสอบวงจรเต็มกับข้อมูลจริง: ลูกค้าจอง → ชำระเงิน → พนักงานรับรถ → ปิดงาน → Admin ดูรายงาน
 
 ### ⚠️ ปัญหาที่พบ
-- `database/schema.sql` ของทีมยังว่าง สมาชิกใหม่จึงตั้ง Database ในเครื่องเองไม่ได้ ต้องใช้ Railway อย่างเดียว
-- `.env` ต้องมี `JWT_SECRET` ยาว ≥ 32 ตัวอักษร และ `JWT_EXPIRES_IN` ไม่งั้นล็อกอินไม่ได้ (เพิ่มไว้ใน `.env.example` แล้ว)
-- โค้ด Staff เวอร์ชันแรกของเพื่อน (`StaffDashboard`, `Staff/*/booking*.js`) ถูกแทนด้วยเวอร์ชันนี้ API `PATCH /status` เปลี่ยนให้ต้องส่ง `reason` ทุกครั้ง และย้ายการรับรถไปใช้ `POST /check-in` ต้องแจ้งทีม
-- ไฟล์ migration ต้องรันเองทีละครั้ง ยังไม่มีระบบ migration อัตโนมัติ
+- **ยังไม่มี API Gateway แยก:** ตอนนี้ใช้ `app.js` เป็นจุดรับ request เดียว
+- **`database/schema.sql` ยังว่าง:** สมาชิกตั้งฐานข้อมูลในเครื่องตัวเองไม่ได้ ทุกคนต้องใช้ Railway ร่วมกัน และไม่มีฐานข้อมูลแยกสำหรับทดสอบ
+- **การเปลี่ยนโครงสร้างฐานข้อมูลต้องรันเอง:** ยังไม่มีระบบ migration อัตโนมัติ
+- **การชำระเงินเป็นแบบจำลอง:** ยังไม่เชื่อมผู้ให้บริการชำระเงินจริง และคืนเงินอัตโนมัติได้เฉพาะการจองที่จ่ายด้วยกระเป๋าเงิน
+- **ยังไม่มีเทสต์การจองพร้อมกันกับ MySQL จริง:** เทสต์การจองใช้ฐานข้อมูลจำลอง จึงยังพิสูจน์ไม่ได้ว่าล็อกช่วงเวลาถูกต้องเมื่อมีคนจองพร้อมกัน
+- **ยังไม่มีปุ่มลืมรหัสผ่านและการต่ออายุ token:** ผู้ใช้ต้องล็อกอินใหม่เมื่อ token หมดอายุ
+- **ตาราง `audit_logs` มีแล้วแต่ยังไม่ได้ใช้บันทึก**
+- **คูปองยังใช้ตอนจองไม่ได้:** Admin สร้างและจัดการคูปองได้แล้ว แต่ขั้นตอนจองของลูกค้ายังไม่รับคูปอง (`coupon_usages` จึงยังว่าง)
 
 ### 📌 แผนงานถัดไป
-1. Merge เข้า `main` หลังเพื่อนตรวจ และแจ้งการเปลี่ยน API ให้ทีม
-2. เพิ่มข้อมูลทดสอบ (seed) ของการรับรถและหมายเหตุ เพื่อใช้สาธิต
-3. เพิ่มเทสต์ของ check-in สำเร็จ, หมายเหตุ และประวัติรถรายคัน
-4. ขอให้ทีม export โครงสร้างฐานข้อมูลลง `database/schema.sql`
+1. Merge ทุก branch เข้า `main` และทดสอบรวมทั้งระบบ
+2. Export โครงสร้างฐานข้อมูลลง `database/schema.sql` พร้อมข้อมูลตัวอย่าง (seed)
+3. เพิ่ม API Gateway หรือ reverse proxy หน้า backend
+4. เพิ่มเทสต์ integration กับ MySQL จริง โดยเฉพาะการจองช่วงเวลาเดียวกันพร้อมกัน
+5. ให้ลูกค้าใส่คูปองตอนจอง และบันทึกลง `coupon_usages`
+6. บันทึกการกระทำสำคัญของ Admin/Staff ลง `audit_logs`
+7. เพิ่มลืมรหัสผ่านและการต่ออายุ token
