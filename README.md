@@ -91,12 +91,12 @@ stateDiagram-v2
 
 | กลุ่ม | จำนวน | สิทธิ์ที่ต้องมี |
 |---|---|---|
-| Admin | 42 | ADMIN (รวม `/api/admin/auth/*` 3 ตัว) |
-| Customer | 16 | CUSTOMER (ยกเว้น `register` ที่ไม่ต้องล็อกอิน) |
-| Shared: payments / cancellations / wallet | 8 | CUSTOMER (เฉพาะของตัวเอง) หรือ ADMIN |
-| Staff | 6 | STAFF |
-| Auth (ล็อกอินกลาง) | 3 | `login` ไม่ต้องล็อกอิน, `me`/`logout` ต้องมี token |
+| Auth: ล็อกอิน / สมัครสมาชิก | 7 | `login` และ `register` ไม่ต้องล็อกอิน, ที่เหลือต้องมี token |
 | Public | 1 | ไม่ต้องล็อกอิน |
+| Customer | 15 | CUSTOMER |
+| Shared: payments / cancellations / wallet | 8 | CUSTOMER (เฉพาะของตัวเอง) หรือ ADMIN |
+| Admin | 39 | ADMIN |
+| Staff | 6 | STAFF |
 | System (`/`, `/api/health/db`) | 2 | ไม่ต้องล็อกอิน |
 
 | HTTP Method | จำนวน | ตัวอย่าง |
@@ -109,20 +109,115 @@ stateDiagram-v2
 
 ระบบเลือกใช้ `PATCH` เป็นหลักแทน `PUT` เพราะส่วนใหญ่แก้แค่บางฟิลด์ ส่วน "ลบ" ข้อมูลหลักใช้การเปลี่ยน `status` เป็น `INACTIVE` (เช่น `PATCH .../:id/status`) เพื่อไม่ให้ข้อมูลเก่าที่อ้างอิงอยู่เสีย
 
-### Endpoint สำคัญของแต่ละส่วน
-| Method | Endpoint | ใช้ทำอะไร |
-|---|---|---|
-| `POST` | `/api/auth/login` | ล็อกอินทุก role ได้ JWT กลับมา |
-| `POST` | `/api/customer/auth/register` | สมัครสมาชิก (ได้ role CUSTOMER เสมอ) |
-| `GET` | `/api/customer/schedules/availability` | ดูช่วงเวลาที่ยังว่าง |
-| `POST` | `/api/customer/bookings` | สร้างการจอง |
-| `POST` | `/api/payments/:bookingId/wallet` | จ่ายเงินด้วยกระเป๋าเงิน |
-| `POST` | `/api/cancellations/:bookingId` | ลูกค้ายกเลิกและคืนเงินเข้ากระเป๋า |
-| `GET` | `/api/admin/dashboard/summary` | ตัวเลขสรุปบนแดชบอร์ด Admin |
-| `PUT` | `/api/admin/services/:id/prices` | ตั้งราคาบริการตามประเภทรถ |
-| `PATCH` | `/api/admin/users/:id/role` | เปลี่ยนสิทธิ์ผู้ใช้ เช่น ตั้งเป็น STAFF |
-| `POST` | `/api/staff/bookings/:id/check-in` | พนักงานรับรถ |
-| `PATCH` | `/api/staff/bookings/:id/status` | พนักงานเปลี่ยนสถานะพร้อมเหตุผล |
+### รายการ API ทั้งหมด (78 ตัว)
+
+**สิทธิ์:** `Public` = ไม่ต้องล็อกอิน · `CUSTOMER` / `ADMIN` / `STAFF` = ต้องล็อกอินด้วย role นั้น · `CUSTOMER/ADMIN` = ลูกค้า (เฉพาะข้อมูลของตัวเอง) หรือ Admin
+
+#### Auth: ล็อกอินและสมัครสมาชิก (7)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 1 | `POST` | `/api/auth/login` | ล็อกอินด้วยอีเมลและรหัสผ่าน ได้ JWT กลับมา (ทุก role) | Public |
+| 2 | `GET` | `/api/auth/me` | ดูข้อมูลผู้ใช้ที่ล็อกอินอยู่ (ใช้ตรวจ session ตอนเปิดเว็บ) | ADMIN / STAFF / CUSTOMER |
+| 3 | `POST` | `/api/auth/logout` | ออกจากระบบ | ADMIN / STAFF / CUSTOMER |
+| 4 | `POST` | `/api/customer/auth/register` | สมัครสมาชิกใหม่ (ได้ role CUSTOMER เสมอ) | Public |
+| 5 | `POST` | `/api/admin/auth/login` | ล็อกอิน (path เดิมของ Admin ทำงานเหมือนข้อ 1) | Public |
+| 6 | `GET` | `/api/admin/auth/me` | ดูข้อมูล Admin จาก token | ADMIN |
+| 7 | `POST` | `/api/admin/auth/logout` | ออกจากระบบฝั่ง Admin | ADMIN |
+
+#### Public (1)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 8 | `GET` | `/api/public/catalog/services` | รายการบริการที่แสดงบนหน้าแรก | Public |
+
+#### Customer: ลูกค้า (15)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 9 | `GET` | `/api/customer/profile` | ดูโปรไฟล์ของตัวเอง | CUSTOMER |
+| 10 | `PATCH` | `/api/customer/profile` | แก้ไขโปรไฟล์ (ชื่อ, เบอร์โทร) | CUSTOMER |
+| 11 | `GET` | `/api/customer/vehicles` | ดูรายการรถของตัวเอง | CUSTOMER |
+| 12 | `POST` | `/api/customer/vehicles` | เพิ่มรถคันใหม่ | CUSTOMER |
+| 13 | `PATCH` | `/api/customer/vehicles/:vehicleId` | แก้ไขข้อมูลรถ | CUSTOMER |
+| 14 | `DELETE` | `/api/customer/vehicles/:vehicleId` | ลบรถออกจากบัญชี | CUSTOMER |
+| 15 | `GET` | `/api/customer/catalog/vehicle-types` | ดูประเภทรถ (ใช้ตอนเพิ่มรถ) | CUSTOMER |
+| 16 | `GET` | `/api/customer/catalog/vehicle-brands` | ดูยี่ห้อรถ | CUSTOMER |
+| 17 | `GET` | `/api/customer/catalog/vehicle-models` | ดูรุ่นรถ | CUSTOMER |
+| 18 | `GET` | `/api/customer/catalog/services` | ดูรายการบริการ | CUSTOMER |
+| 19 | `GET` | `/api/customer/catalog/services/:serviceId/prices` | ดูราคาบริการตามประเภทรถ | CUSTOMER |
+| 20 | `GET` | `/api/customer/schedules/availability` | ดูช่วงเวลาที่ยังว่างให้จอง | CUSTOMER |
+| 21 | `POST` | `/api/customer/bookings` | สร้างการจอง (เลือกรถ บริการ ช่วงเวลา) | CUSTOMER |
+| 22 | `GET` | `/api/customer/bookings` | ดูประวัติการจองของตัวเอง | CUSTOMER |
+| 23 | `GET` | `/api/customer/vehicles/:vehicleId/bookings` | ดูประวัติการจองของรถคันนั้น | CUSTOMER |
+
+#### Shared: ชำระเงิน ยกเลิก กระเป๋าเงิน (8)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 24 | `GET` | `/api/payments/:bookingId` | ดูการชำระเงินของการจอง | CUSTOMER/ADMIN |
+| 25 | `POST` | `/api/payments/:bookingId` | สร้างรายการชำระเงิน (CASH, BANK_TRANSFER, WALLET, SIMULATED) | CUSTOMER/ADMIN |
+| 26 | `POST` | `/api/payments/:bookingId/simulate` | จำลองผลการชำระเงิน (PAID หรือ FAILED) | CUSTOMER/ADMIN |
+| 27 | `POST` | `/api/payments/:bookingId/wallet` | จ่ายด้วยยอดเงินในกระเป๋า | CUSTOMER/ADMIN |
+| 28 | `POST` | `/api/cancellations/:bookingId` | ยกเลิกการจอง และคืนเงินเข้ากระเป๋า (หักค่าธรรมเนียม 20%) | CUSTOMER/ADMIN |
+| 29 | `GET` | `/api/wallet` | ดูยอดเงินในกระเป๋า | CUSTOMER/ADMIN |
+| 30 | `GET` | `/api/wallet/transactions` | ดูรายการเงินเข้า-ออกของกระเป๋า | CUSTOMER/ADMIN |
+| 31 | `GET` | `/api/wallet/refunds` | ดูรายการคืนเงิน | CUSTOMER/ADMIN |
+
+#### Admin: ผู้ดูแลระบบ (39)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 32 | `GET` | `/api/admin/dashboard/summary` | ตัวเลขสรุปบนแดชบอร์ด | ADMIN |
+| 33 | `GET` | `/api/admin/vehicle-types` | ดูรายการประเภทรถ | ADMIN |
+| 34 | `GET` | `/api/admin/vehicle-types/:id` | ดูประเภทรถ 1 รายการ | ADMIN |
+| 35 | `POST` | `/api/admin/vehicle-types` | เพิ่มประเภทรถ | ADMIN |
+| 36 | `PATCH` | `/api/admin/vehicle-types/:id/status` | เปิด/ปิดการใช้งานประเภทรถ | ADMIN |
+| 37 | `PATCH` | `/api/admin/vehicle-types/:id` | แก้ไขประเภทรถ | ADMIN |
+| 38 | `GET` | `/api/admin/vehicle-brands` | ดูรายการยี่ห้อรถ | ADMIN |
+| 39 | `GET` | `/api/admin/vehicle-brands/:id` | ดูยี่ห้อรถ 1 รายการ | ADMIN |
+| 40 | `POST` | `/api/admin/vehicle-brands` | เพิ่มยี่ห้อรถ | ADMIN |
+| 41 | `PATCH` | `/api/admin/vehicle-brands/:id/status` | เปิด/ปิดการใช้งานยี่ห้อรถ | ADMIN |
+| 42 | `PATCH` | `/api/admin/vehicle-brands/:id` | แก้ไขยี่ห้อรถ | ADMIN |
+| 43 | `GET` | `/api/admin/vehicle-models` | ดูรายการรุ่นรถ | ADMIN |
+| 44 | `GET` | `/api/admin/vehicle-models/:id` | ดูรุ่นรถ 1 รายการ | ADMIN |
+| 45 | `POST` | `/api/admin/vehicle-models` | เพิ่มรุ่นรถ | ADMIN |
+| 46 | `PATCH` | `/api/admin/vehicle-models/:id/status` | เปิด/ปิดการใช้งานรุ่นรถ | ADMIN |
+| 47 | `PATCH` | `/api/admin/vehicle-models/:id` | แก้ไขรุ่นรถ | ADMIN |
+| 48 | `GET` | `/api/admin/services` | ดูรายการบริการ | ADMIN |
+| 49 | `GET` | `/api/admin/services/:id/prices` | ดูราคาของบริการแยกตามประเภทรถ | ADMIN |
+| 50 | `PUT` | `/api/admin/services/:id/prices` | ตั้งราคาบริการตามประเภทรถ (แทนที่ทั้งชุด) | ADMIN |
+| 51 | `GET` | `/api/admin/services/:id` | ดูบริการ 1 รายการ | ADMIN |
+| 52 | `POST` | `/api/admin/services` | เพิ่มบริการ | ADMIN |
+| 53 | `PATCH` | `/api/admin/services/:id/status` | เปิด/ปิดการใช้งานบริการ | ADMIN |
+| 54 | `PATCH` | `/api/admin/services/:id` | แก้ไขบริการ | ADMIN |
+| 55 | `GET` | `/api/admin/users` | ดูรายการผู้ใช้ (ค้นหา, กรองตาม role/สถานะ) | ADMIN |
+| 56 | `GET` | `/api/admin/users/:id` | ดูผู้ใช้ 1 คน | ADMIN |
+| 57 | `PATCH` | `/api/admin/users/:id/role` | เปลี่ยนสิทธิ์ผู้ใช้ (ADMIN / CUSTOMER / STAFF) | ADMIN |
+| 58 | `PATCH` | `/api/admin/users/:id/status` | เปิด/ปิดบัญชีผู้ใช้ | ADMIN |
+| 59 | `PATCH` | `/api/admin/users/:id` | แก้ไขข้อมูลผู้ใช้ | ADMIN |
+| 60 | `GET` | `/api/admin/coupons` | ดูรายการคูปอง | ADMIN |
+| 61 | `GET` | `/api/admin/coupons/:id/usages` | ดูประวัติการใช้คูปอง | ADMIN |
+| 62 | `GET` | `/api/admin/coupons/:id` | ดูคูปอง 1 รายการ | ADMIN |
+| 63 | `POST` | `/api/admin/coupons` | สร้างคูปอง | ADMIN |
+| 64 | `PATCH` | `/api/admin/coupons/:id/status` | เปิด/ปิดการใช้งานคูปอง | ADMIN |
+| 65 | `PATCH` | `/api/admin/coupons/:id` | แก้ไขคูปอง | ADMIN |
+| 66 | `GET` | `/api/admin/bookings` | ดูรายการการจองทั้งหมด | ADMIN |
+| 67 | `GET` | `/api/admin/bookings/:id/history` | ดูประวัติการเปลี่ยนสถานะของการจอง | ADMIN |
+| 68 | `GET` | `/api/admin/bookings/:id` | ดูรายละเอียดการจอง | ADMIN |
+| 69 | `GET` | `/api/admin/reports/bookings` | รายงานการจอง | ADMIN |
+| 70 | `GET` | `/api/admin/reports/revenue` | รายงานรายได้ | ADMIN |
+
+#### Staff: พนักงาน (6)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 71 | `GET` | `/api/staff/bookings` | คิวงานรายวัน (`?date=`) และประวัติ (`?date_from=&date_to=`) | STAFF |
+| 72 | `GET` | `/api/staff/bookings/:id` | รายละเอียดลูกค้า รถ บริการ การรับรถ และไทม์ไลน์ | STAFF |
+| 73 | `POST` | `/api/staff/bookings/:id/check-in` | บันทึกการรับรถเข้าร้าน (เลขไมล์, น้ำมัน, สภาพรถ) | STAFF |
+| 74 | `PATCH` | `/api/staff/bookings/:id/status` | เปลี่ยนสถานะการให้บริการพร้อมเหตุผล | STAFF |
+| 75 | `POST` | `/api/staff/bookings/:id/no-show` | บันทึกลูกค้าไม่มาตามนัด | STAFF |
+| 76 | `POST` | `/api/staff/bookings/:id/notes` | เพิ่มหมายเหตุโดยไม่เปลี่ยนสถานะ | STAFF |
+
+#### System (2)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 77 | `GET` | `/` | ตรวจว่า backend ทำงานอยู่ | Public |
+| 78 | `GET` | `/api/health/db` | ตรวจการเชื่อมต่อฐานข้อมูล | Public |
 
 ทุก response ใช้รูปแบบเดียวกัน: สำเร็จ `{ "status": "success", "data": ... }` และผิดพลาด `{ "status": "error", "message": "..." }`
 
