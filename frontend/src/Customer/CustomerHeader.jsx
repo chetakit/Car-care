@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminAccountMenu from '../Admin/components/AdminAccountMenu.jsx'
+import './customer-theme.css'
 
 export function BrandMark() {
   return (
@@ -24,7 +25,8 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isPublicLanding = currentPath === '/'
   const isBookingPage = currentPath === '/customer/booking'
-  const useLandingNavigation = landingPage || (isBookingPage && user?.role === 'CUSTOMER')
+  const isCustomer = user?.role === 'CUSTOMER'
+  const useLandingNavigation = landingPage || isCustomer
   const profileTriggerRef = useRef(null)
   const homeHref = '/'
   const servicesHref = '/services'
@@ -59,7 +61,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   }
 
   return (
-    <header className={`customer-header${useLandingNavigation ? ' customer-header-landing' : ''}`}>
+    <header className={`customer-header${useLandingNavigation ? ' customer-header-landing' : ''}${isCustomer ? ' customer-header-customer' : ''}`}>
       <div className="customer-container customer-header-inner">
         <a aria-label="Car Care home" className="customer-brand" href={homeHref}>
           <BrandMark />

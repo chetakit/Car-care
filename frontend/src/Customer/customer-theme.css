@@ -1,0 +1,225 @@
+.customer-home:not(.customer-landing):not(.customer-services-page):has(.customer-header-customer) {
+  --customer-ink: #202324;
+  --customer-muted: #626867;
+  --customer-teal: #d72d37;
+  --customer-teal-dark: #b8242d;
+  --customer-pale: #f5f3f3;
+  --customer-line: #dfe1df;
+  --car-care-accent-rgb: 215 45 55;
+}
+
+.customer-header.customer-header-customer .customer-header-inner {
+  width: min(1200px, calc(100% - 64px));
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-main,
+  .vehicles-main,
+  .bookings-main,
+  .booking-main,
+  .payment-main,
+  .wallet-main
+) {
+  background: #f5f5f3;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-heading,
+  .vehicles-heading,
+  .bookings-heading,
+  .booking-heading,
+  .payment-heading,
+  .wallet-heading
+) {
+  padding: 28px 30px;
+  border: 0;
+  border-radius: 9px;
+  background: #141718;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-heading,
+  .vehicles-heading,
+  .bookings-heading,
+  .booking-heading,
+  .payment-heading,
+  .wallet-heading
+) h1 {
+  color: #f7f7f5;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-heading,
+  .vehicles-heading,
+  .bookings-heading,
+  .booking-heading,
+  .payment-heading,
+  .wallet-heading
+) :is(p, .bookings-filter) {
+  color: #d3d6d5;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-heading,
+  .vehicles-heading,
+  .bookings-heading,
+  .booking-heading,
+  .payment-heading,
+  .wallet-heading
+) .customer-eyebrow {
+  color: #ff777d;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .customer-button-primary,
+  .bookings-pay-now,
+  .payment-action-button,
+  .payment-primary-link,
+  .payment-state button
+) {
+  border-radius: 5px;
+  background: #c62832;
+  box-shadow: none;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .customer-button-primary,
+  .bookings-pay-now,
+  .payment-action-button,
+  .payment-primary-link,
+  .payment-state button
+):hover:not(:disabled) {
+  background: #a91f28;
+  box-shadow: none;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .vehicles-card,
+  .bookings-card,
+  .booking-panel,
+  .booking-steps,
+  .booking-success,
+  .payment-booking-card,
+  .payment-options-card,
+  .payment-state,
+  .wallet-panel
+) {
+  border-color: #dfe1df;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .vehicles-card,
+  .bookings-card
+):hover {
+  border-color: #c6c9c7;
+  box-shadow: none;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .vehicles-card-icon,
+  .vehicles-empty-icon,
+  .bookings-empty-icon,
+  .booking-card-icon,
+  .booking-heading-mark,
+  .payment-demo-icon,
+  .payment-method-icon
+) {
+  color: #b8242d;
+  background: #fcebed;
+}
+
+.customer-home:has(.customer-header-customer) .booking-heading-mark {
+  border-color: #f0cdd0;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .booking-vehicle-card.is-selected,
+  .booking-service-card.is-selected,
+  .booking-date-option.is-selected,
+  .booking-slot.is-selected
+) {
+  border-color: #d72d37;
+  background: #fff3f3;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .booking-vehicle-card:hover:not(.is-unavailable),
+  .booking-service-card:hover:not(.is-unavailable),
+  .booking-date-option:hover,
+  .booking-slot:hover:not(:disabled)
+) {
+  border-color: #d72d37;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .booking-total-bar,
+  .booking-summary-total,
+  .booking-panel-actions,
+  .payment-wallet-balance
+) {
+  background: #f6f6f4;
+}
+
+.customer-home:has(.customer-header-customer) .payment-demo-notice {
+  border-color: #e5dfdf;
+  background: #f7f5f5;
+}
+
+.customer-home:has(.customer-header-customer) .payment-demo-notice strong {
+  color: #a51f29;
+}
+
+.customer-home:has(.customer-header-customer) .payment-demo-notice p {
+  color: #575d5c;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .booking-text-button,
+  .booking-text-link,
+  .vehicles-edit-button,
+  .bookings-detail-toggle
+):hover {
+  color: #8e1c24;
+}
+
+.customer-home:has(.customer-header-customer) .bookings-status-confirmed {
+  border-color: #dadcdb;
+  color: #3d4241;
+  background: #f2f3f2;
+}
+
+.customer-home:has(.customer-header-customer) .wallet-balance {
+  background: #141718;
+}
+
+@media (max-width: 960px) {
+  .customer-header.customer-header-customer .customer-header-inner {
+    width: min(820px, calc(100% - 48px));
+  }
+}
+
+@media (max-width: 700px) {
+  .customer-header.customer-header-customer .customer-header-inner {
+    width: calc(100% - 40px);
+  }
+
+  .customer-home:has(.customer-header-customer) :is(
+    .dashboard-heading,
+    .vehicles-heading,
+    .bookings-heading,
+    .booking-heading,
+    .payment-heading,
+    .wallet-heading
+  ) {
+    padding: 23px 20px;
+  }
+}
+
+@media (max-width: 390px) {
+  .customer-header.customer-header-customer .customer-header-inner {
+    width: calc(100% - 32px);
+  }
+}
