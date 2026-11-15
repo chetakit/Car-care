@@ -2,13 +2,13 @@ const express = require("express");
 const userController = require("../controllers/userController");
 const {
   authenticateToken,
-  requireAdmin,
+  requireCurrentAdmin,
 } = require("../../Auth/middleware/authMiddleware");
 const userValidator = require("../validators/userValidator");
 
 const router = express.Router();
 
-router.use(authenticateToken, requireAdmin);
+router.use(authenticateToken, requireCurrentAdmin);
 
 router.get("/", userValidator.validateListQuery, userController.list);
 router.get("/:id", userValidator.parseId, userController.getById);

@@ -22,6 +22,13 @@ function handleError(res, error) {
     });
   }
 
+  if (error instanceof userService.InvalidRoleTransitionError) {
+    return res.status(400).json({
+      status: "error",
+      message: "The requested role transition is not allowed.",
+    });
+  }
+
   if (error instanceof userService.SelfDeactivationError) {
     return res.status(400).json({
       status: "error",

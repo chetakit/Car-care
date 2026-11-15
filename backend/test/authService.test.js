@@ -58,7 +58,7 @@ function postJson(port, path, body) {
   });
 }
 
-for (const role of ["ADMIN", "CUSTOMER"]) {
+for (const role of ["ADMIN", "STAFF", "CUSTOMER"]) {
   test(`login issues database role claims for ${role}`, async () => {
     const user = {
       user_id: role === "ADMIN" ? 11 : 22,
@@ -147,12 +147,12 @@ test("login rejects inactive accounts", async () => {
   );
 });
 
-test("login rejects roles outside ADMIN and CUSTOMER", async () => {
+test("login rejects roles outside the supported account roles", async () => {
   const user = {
     user_id: 33,
-    email: "staff@example.test",
+    email: "unknown@example.test",
     password_hash: passwordHash,
-    role: "STAFF",
+    role: "UNKNOWN",
     status: "ACTIVE",
   };
   mockUser(user);

@@ -4,7 +4,7 @@ import AuthContext from './authContext.js'
 
 const TOKEN_KEY = 'car-care-auth-token'
 const LEGACY_ADMIN_TOKEN_KEY = 'car-care-admin-token'
-const SUPPORTED_ROLES = new Set(['ADMIN', 'CUSTOMER'])
+const SUPPORTED_ROLES = new Set(['ADMIN', 'STAFF', 'CUSTOMER'])
 
 function getStoredToken() {
   if (typeof window === 'undefined') return null

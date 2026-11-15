@@ -13,6 +13,7 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
+import StaffDashboard from './Staff/StaffDashboard.jsx'
 
 function isAdminPath(pathname) {
   return pathname === '/admin' || pathname.startsWith('/admin/')
@@ -134,11 +135,15 @@ function AppContent() {
       return
     }
 
-    if (currentPath === '/login') {
+    if (currentPath === '/login' && user?.role === 'STAFF') {
+      navigateTo('/staff/dashboard', true)
+    } else if (currentPath === '/login') {
       const destination = getCustomerReturnPath(
         window.history.state?.customerReturnTo,
       )
       navigateTo(destination || '/', true)
+    } else if (user?.role === 'STAFF' && currentPath !== '/staff/dashboard') {
+      navigateTo('/staff/dashboard', true)
     } else if (currentPath === '/' || currentPath === '/services') {
       return
     } else if (user?.role === 'ADMIN') {
@@ -154,6 +159,11 @@ function AppContent() {
 
   if (authStatus === 'checking') {
     return <SessionLoading message="Verifying your session…" />
+  }
+  if (authStatus === 'authenticated' && user?.role === 'STAFF') {
+    return currentPath === '/staff/dashboard'
+      ? <StaffDashboard onLogout={logout} user={user} />
+      : <SessionLoading message="Opening the Staff workspace…" />
   }
   if (currentPath === '/services') {
     return (

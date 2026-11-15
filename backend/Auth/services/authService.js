@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const pool = require("../../shared/config/db");
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
-const ALLOWED_LOGIN_ROLES = new Set(["ADMIN", "CUSTOMER"]);
+const ALLOWED_LOGIN_ROLES = new Set(["ADMIN", "STAFF", "CUSTOMER"]);
 
 class AuthenticationError extends Error {}
 
