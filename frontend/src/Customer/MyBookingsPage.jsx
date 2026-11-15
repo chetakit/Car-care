@@ -6,9 +6,9 @@ import CustomerHeader from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import {
   formatCustomerBookingStatus,
+  formatCustomerBookingPaymentStatus,
   formatCustomerDate,
   formatCustomerPaymentMethod,
-  formatCustomerPaymentStatus,
   formatCustomerTime,
   formatCustomerTimestamp,
 } from './customerFormatters.js'
@@ -134,7 +134,7 @@ function BookingDetails({ booking }) {
           <dl className="bookings-detail-grid">
             <div>
               <dt>Status</dt>
-              <dd>{formatCustomerPaymentStatus(booking.payment.payment_status)}</dd>
+              <dd>{formatCustomerBookingPaymentStatus(booking.payment)}</dd>
             </div>
             <div>
               <dt>Method</dt>
@@ -152,7 +152,7 @@ function BookingDetails({ booking }) {
             )}
           </dl>
         ) : (
-          <p className="bookings-muted">No payment information is available.</p>
+          <p className="bookings-muted">{formatCustomerBookingPaymentStatus(null)}</p>
         )}
       </section>
 
@@ -193,8 +193,18 @@ function BookingCard({ booking, expanded, onToggle, onPay }) {
           <span className="bookings-card-label">BOOKING</span>
           <h2>#{booking.booking_id}</h2>
         </div>
-        <BookingStatus status={booking.booking_status} />
       </div>
+
+      <dl className="bookings-card-statuses">
+        <div>
+          <dt>Booking status</dt>
+          <dd><BookingStatus status={booking.booking_status} /></dd>
+        </div>
+        <div>
+          <dt>Payment status</dt>
+          <dd><span className="bookings-payment-status">{formatCustomerBookingPaymentStatus(booking.payment)}</span></dd>
+        </div>
+      </dl>
 
       <div className="bookings-card-summary">
         <div>

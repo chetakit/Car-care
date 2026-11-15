@@ -252,6 +252,46 @@
   background: #fff5f3;
 }
 
+.bookings-card-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 15px 0 0;
+}
+
+.bookings-card-statuses > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.bookings-card-statuses dt {
+  color: #647170;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.bookings-card-statuses dd {
+  margin: 0;
+}
+
+.bookings-card-statuses .bookings-status,
+.bookings-payment-status {
+  display: inline-block;
+}
+
+.bookings-payment-status {
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 1px solid #e4e9e7;
+  border-radius: 20px;
+  color: #42514d;
+  background: #f7f8f8;
+  font-size: 11px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
 .bookings-card-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;

@@ -3,6 +3,8 @@ import { createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
+import ServiceIcon from './ServiceIcon.jsx'
+import { SERVICE_IMAGE_URL } from './serviceAssets.js'
 import './customer.css'
 
 const HERO_IMAGE_URL = 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7'
@@ -12,9 +14,6 @@ const HERO_IMAGE_SRCSET = [
   `${HERO_IMAGE_URL}?auto=format&fit=crop&w=960&q=85 960w`,
   `${HERO_IMAGE_URL}?auto=format&fit=crop&w=1600&q=85 1600w`,
 ].join(', ')
-const SERVICE_IMAGE_URL =
-  'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1000&q=85'
-
 function ArrowIcon({ diagonal = false }) {
   return (
     <svg
@@ -247,11 +246,9 @@ function CustomerLanding({ user, onLogout }) {
                 )}
                 {serviceState === 'ready' && (
                   <div className="customer-service-list">
-                    {services.map((service, index) => (
+                    {services.slice(0, 3).map((service) => (
                       <article className="customer-service-card" key={service.service_id}>
-                        <span aria-hidden="true" className="customer-service-index">
-                          {String(index + 1).padStart(2, '0')}
-                        </span>
+                        <ServiceIcon name={service.service_name} />
                         <div className="customer-service-copy">
                           <h3>{service.service_name}</h3>
                           <p>
@@ -270,6 +267,11 @@ function CustomerLanding({ user, onLogout }) {
                 )}
               </div>
             </div>
+
+            <a className="customer-section-cta customer-view-all-services" href="/services">
+              View All Services
+              <ArrowIcon />
+            </a>
 
             {serviceState === 'ready' && (
               <div className="customer-services-action">
