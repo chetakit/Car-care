@@ -1,7 +1,6 @@
 const pool = require("../../shared/config/db");
 
-// [STAFF] เพิ่ม "STAFF" เพื่อให้ GET /api/auth/me ตอบข้อมูลพนักงานได้
-const SESSION_ROLES = new Set(["ADMIN", "CUSTOMER", "STAFF"]);
+const SESSION_ROLES = new Set(["ADMIN", "CUSTOMER"]);
 
 class InvalidSessionError extends Error {}
 

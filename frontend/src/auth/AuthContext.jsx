@@ -4,8 +4,7 @@ import AuthContext from './authContext.js'
 
 const TOKEN_KEY = 'car-care-auth-token'
 const LEGACY_ADMIN_TOKEN_KEY = 'car-care-admin-token'
-// [STAFF] เพิ่ม 'STAFF' เพื่อให้พนักงานล็อกอินผ่านหน้า Login เดียวกันได้
-const SUPPORTED_ROLES = new Set(['ADMIN', 'CUSTOMER', 'STAFF'])
+const SUPPORTED_ROLES = new Set(['ADMIN', 'CUSTOMER'])
 
 function getStoredToken() {
   if (typeof window === 'undefined') return null

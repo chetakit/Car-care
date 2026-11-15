@@ -13,16 +13,9 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
-// [STAFF] หน้าพนักงาน (Staff & Service Management)
-import StaffApp from './Staff/StaffApp.jsx'
 
 function isAdminPath(pathname) {
   return pathname === '/admin' || pathname.startsWith('/admin/')
-}
-
-// [STAFF] path ของพนักงานทั้งหมดขึ้นต้นด้วย /staff
-function isStaffPath(pathname) {
-  return pathname === '/staff' || pathname.startsWith('/staff/')
 }
 
 function isCustomerPath(pathname) {
@@ -141,12 +134,6 @@ function AppContent() {
       return
     }
 
-    // [STAFF] พนักงานล็อกอินแล้วไปหน้าคิวงานเสมอ (รวมถึงหน้า / และ /login)
-    if (user?.role === 'STAFF') {
-      if (!isStaffPath(currentPath)) navigateTo('/staff', true)
-      return
-    }
-
     if (currentPath === '/login') {
       const destination = getCustomerReturnPath(
         window.history.state?.customerReturnTo,
@@ -192,13 +179,6 @@ function AppContent() {
       return <CustomerLanding user={null} />
     }
     return <SessionLoading message="Redirecting to sign in…" />
-  }
-
-  // [STAFF] แสดง StaffApp เมื่อผู้ใช้เป็นพนักงาน
-  if (user?.role === 'STAFF') {
-    return isStaffPath(currentPath)
-      ? <StaffApp onLogout={logout} user={user} />
-      : <SessionLoading message="Opening the Staff workspace…" />
   }
 
   if (currentPath === '/customer/booking') {

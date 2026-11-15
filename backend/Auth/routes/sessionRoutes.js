@@ -3,9 +3,7 @@ const authController = require("../controllers/authController");
 const sessionController = require("../controllers/sessionController");
 const {
   authenticateToken,
-  // [STAFF] เดิมใช้ requireCustomerOrAdmin -> เปลี่ยนเป็น requireAnySignedInRole
-  //         เพื่อให้ STAFF เรียก /me และ /logout ได้ด้วย
-  requireAnySignedInRole,
+  requireCustomerOrAdmin,
 } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -13,13 +11,13 @@ const router = express.Router();
 router.get(
   "/me",
   authenticateToken,
-  requireAnySignedInRole,
+  requireCustomerOrAdmin,
   sessionController.me,
 );
 router.post(
   "/logout",
   authenticateToken,
-  requireAnySignedInRole,
+  requireCustomerOrAdmin,
   authController.logout,
 );
 
