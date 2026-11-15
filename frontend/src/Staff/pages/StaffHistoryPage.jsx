@@ -50,6 +50,7 @@ export default function StaffHistoryPage({ navigate }) {
     <>
       <div className="staff-page-head">
         <div>
+          <span className="staff-eyebrow">Staff · Service History</span>
           <h1>ประวัติการให้บริการ</h1>
           <p className="staff-muted">ค้นหาตามลูกค้า ทะเบียนรถ ช่วงวันที่ หรือสถานะ</p>
         </div>

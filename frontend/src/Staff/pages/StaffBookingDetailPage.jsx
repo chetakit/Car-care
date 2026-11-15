@@ -86,6 +86,7 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
 
       <div className="staff-page-head">
         <div>
+          <span className="staff-eyebrow">Staff · Booking Detail</span>
           <h1>การจอง #{booking.booking_id} <StatusBadge status={status} /></h1>
           <p className="staff-muted">
             นัดหมาย {formatThaiDate(booking.booking_date)} เวลา {booking.start_time}–{booking.end_time} น.
