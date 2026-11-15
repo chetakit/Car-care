@@ -55,7 +55,13 @@ export default function StaffApp({ user, onLogout }) {
     <div className="staff-app">
       <header className="staff-topbar">
         <div className="staff-brand">
-          <span className="staff-brand-mark">◆</span>
+          {/* โลโก้รถแบบเดียวกับ CustomerHeader ของหน้าหลัก */}
+          <span aria-hidden="true" className="staff-brand-mark">
+            <svg fill="none" viewBox="0 0 32 32">
+              <path d="M5 20.5h2.2l2.1-7.1a2.8 2.8 0 0 1 2.7-2h8a2.8 2.8 0 0 1 2.7 2l2.1 7.1H27v4h-2.1v1.7h-3v-1.7H10.1v1.7h-3v-1.7H5v-4Z" />
+              <path d="M9.3 18.2h13.4l-1.5-4.7H10.8l-1.5 4.7ZM10.4 21.3h.1m11 0h.1" />
+            </svg>
+          </span>
           <div>
             <strong>Car Care</strong>
             <small>Staff &amp; Service</small>
