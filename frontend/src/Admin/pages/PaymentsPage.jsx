@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeading, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
+import { formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
 
 const MAX_BOOKING_ID = 2147483647
@@ -33,7 +34,8 @@ function paymentActionConfirmation(operation, booking, paymentMethod) {
 }
 
 function PaymentsPage() {
-  const [bookingId, setBookingId] = useState('')
+  const initialBookingId = new URLSearchParams(window.location.search).get('booking_id') ?? ''
+  const [bookingId, setBookingId] = useState(initialBookingId)
   const [searchedBookingId, setSearchedBookingId] = useState('')
   const [booking, setBooking] = useState(null)
   const [payment, setPayment] = useState(null)
@@ -46,6 +48,7 @@ function PaymentsPage() {
   const [notice, setNotice] = useState('')
   const [lookupComplete, setLookupComplete] = useState(false)
   const [paymentLookupComplete, setPaymentLookupComplete] = useState(false)
+  const autoLookupAttempted = useRef(false)
   const api = useApi()
 
   const bookingCanHavePayment = booking &&
@@ -59,8 +62,8 @@ function PaymentsPage() {
   const canPayWithWallet = paymentLookupComplete &&
     isWalletPaymentAllowed(booking, payment, walletBalance)
 
-  async function loadPayment(event) {
-    event.preventDefault()
+  const loadPayment = useCallback(async (event) => {
+    event?.preventDefault()
     const id = bookingId.trim()
     if (!/^[1-9]\d*$/.test(id) || Number(id) > MAX_BOOKING_ID) {
       setError(`Enter a valid Booking ID between 1 and ${MAX_BOOKING_ID}.`)
@@ -131,7 +134,13 @@ function PaymentsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [api, bookingId])
+
+  useEffect(() => {
+    if (!initialBookingId || autoLookupAttempted.current) return
+    autoLookupAttempted.current = true
+    void loadPayment()
+  }, [initialBookingId, loadPayment])
 
   async function runAction(operation) {
     if (!booking || action || loading) return
@@ -179,25 +188,40 @@ function PaymentsPage() {
   return (
     <div className="admin-payments-page">
       <PageHeading
-        description="Find a payment by Booking ID and use only payment actions allowed by the backend."
+        description="Search with the numeric Booking ID shown in Bookings. Only payment actions supported by the backend are available."
         eyebrow="FINANCE"
         title="Payments"
       />
       <form className="admin-filter-bar admin-payment-search" onSubmit={loadPayment}>
-        <label htmlFor="payment-booking-id">Booking ID</label>
-        <input
-          autoComplete="off"
-          disabled={loading || Boolean(action)}
-          id="payment-booking-id"
-          inputMode="numeric"
-          maxLength="10"
-          onChange={(event) => setBookingId(event.target.value)}
-          pattern="[1-9][0-9]*"
-          placeholder="e.g. 1024"
-          required
-          type="text"
-          value={bookingId}
-        />
+        <label className="admin-lookup-field" htmlFor="payment-booking-id">
+          Booking ID
+          <input
+            aria-describedby="payment-booking-id-hint"
+            autoComplete="off"
+            disabled={loading || Boolean(action)}
+            id="payment-booking-id"
+            inputMode="numeric"
+            maxLength="10"
+            onChange={(event) => {
+              const nextValue = event.target.value
+              setBookingId(nextValue)
+              setError('')
+              setNotice('')
+              if (nextValue.trim() !== searchedBookingId) {
+                setBooking(null)
+                setPayment(null)
+                setWalletBalance(null)
+                setLookupComplete(false)
+                setPaymentLookupComplete(false)
+              }
+            }}
+            placeholder="e.g. 1024"
+            required
+            type="text"
+            value={bookingId}
+          />
+          <small id="payment-booking-id-hint">Use the ID for a booking, not a customer or payment.</small>
+        </label>
         <button className="admin-primary-button" disabled={loading || Boolean(action)} type="submit">
           {loading ? 'Searching…' : 'Search'}
         </button>
@@ -225,7 +249,7 @@ function PaymentsPage() {
                 <div><dt>Amount</dt><dd>{formatMoney(payment.amount)}</dd></div>
                 <div><dt>Payment method</dt><dd>{payment.payment_method ?? '—'}</dd></div>
                 <div><dt>Payment status</dt><dd><StatusBadge value={payment.payment_status} /></dd></div>
-                <div><dt>Paid at</dt><dd>{payment.paid_at || '—'}</dd></div>
+                <div><dt>Paid at</dt><dd>{formatDateTime(payment.paid_at)}</dd></div>
                 <div className="admin-payment-reference"><dt>Transaction reference</dt><dd>{payment.transaction_ref || '—'}</dd></div>
               </dl>
               {payment.payment_status === 'PENDING' && payment.payment_method === 'SIMULATED' && (
@@ -328,7 +352,7 @@ function PaymentsPage() {
       {!loading && !lookupComplete && !error && (
         <div className="admin-request-state">
           <strong>Search for a Booking</strong>
-          <span>Enter a Booking ID to view its Payment and available actions.</span>
+          <span>Enter the numeric Booking ID to view its payment status, amount, and supported actions.</span>
         </div>
       )}
     </div>

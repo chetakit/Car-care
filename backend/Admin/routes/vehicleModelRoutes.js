@@ -3,7 +3,7 @@ const vehicleModelController = require("../controllers/vehicleModelController");
 const {
   authenticateToken,
   requireAdmin,
-} = require("../middleware/authMiddleware");
+} = require("../../Auth/middleware/authMiddleware");
 const vehicleModelValidator = require("../validators/vehicleModelValidator");
 
 const router = express.Router();

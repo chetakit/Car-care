@@ -3,28 +3,15 @@ import AdminModal from '../components/AdminModal.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
+import { formatDate, formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
 
 const BOOKING_PAGE_SIZE = 10
 const WALLET_TRANSACTION_PAGE_SIZE = 10
 
-function formatDate(value) {
-  if (!value) return '—'
-  const date = String(value).slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return String(value)
-  const [year, month, day] = date.split('-')
-  return `${day}/${month}/${year}`
-}
-
-function formatDateTime(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? String(value).replace('T', ' ').replace(/\.000Z$/, '')
-    : new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(date)
+function isValidUserId(value) {
+  const id = String(value ?? '')
+  return /^[1-9]\d*$/.test(id) && Number.isSafeInteger(Number(id))
 }
 
 function vehicleLabel(vehicle) {
@@ -34,7 +21,7 @@ function vehicleLabel(vehicle) {
   ].filter(Boolean).join(' · ') || 'Vehicle details unavailable'
 }
 
-function CustomersPage() {
+function CustomersPage({ onNavigate }) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -248,7 +235,7 @@ function CustomersPage() {
         description="Search and review customer accounts and their related records."
         eyebrow="PEOPLE"
         title="Customers"
-        action={<button className="admin-secondary-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
+        action={<button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
       />
       <form className="admin-filter-bar admin-customer-filters" onSubmit={applyFilters}>
         <input
@@ -277,7 +264,15 @@ function CustomersPage() {
             <p>{data?.pagination?.total ?? 0} customers · ordered by name (A–Z)</p>
           </div>
         </div>
-        <RequestState empty={!rows.length} error={error} loading={loading} onRetry={refresh} />
+        <RequestState
+          empty={!rows.length}
+          emptyDescription="Try a different name, email, phone number, or account status."
+          emptyTitle="No customer accounts match"
+          error={error}
+          loading={loading}
+          loadingMessage="Loading customer accounts…"
+          onRetry={refresh}
+        />
         {!loading && !error && rows.length > 0 && (
           <>
             <DataTable
@@ -290,16 +285,26 @@ function CustomersPage() {
                 { key: 'status', label: 'Account status', render: (row) => <StatusBadge value={row.status} /> },
                 {
                   key: 'actions',
-                  label: 'Details',
+                  label: 'Actions',
                   render: (row) => (
-                    <button
-                      className="admin-customer-view-button"
-                      disabled={customerLoading}
-                      onClick={() => openDetails(row)}
-                      type="button"
-                    >
-                      View details
-                    </button>
+                    <div className="admin-row-actions">
+                      <button
+                        className="admin-customer-view-button"
+                        disabled={customerLoading}
+                        onClick={() => openDetails(row)}
+                        type="button"
+                      >
+                        View details
+                      </button>
+                      <button
+                        className="admin-inline-button"
+                        disabled={customerLoading || !isValidUserId(row.user_id)}
+                        onClick={() => onNavigate('wallet', { user_id: String(row.user_id) })}
+                        type="button"
+                      >
+                        View Wallet
+                      </button>
+                    </div>
                   ),
                 },
               ]}
@@ -323,11 +328,18 @@ function CustomersPage() {
           title={`Customer #${selectedCustomer.user_id}`}
         >
           <div className="admin-customer-detail">
-            {customerLoading ? (
-              <RequestState loading />
-            ) : displayedCustomer && (
-              <section className="admin-customer-detail-section">
-                <h3>Customer information</h3>
+            <nav aria-label="Customer record sections" className="admin-customer-section-nav">
+              <a href="#admin-customer-information">Account</a>
+              <a href="#admin-customer-vehicles">Vehicles</a>
+              <a href="#admin-customer-bookings">Bookings</a>
+              <a href="#admin-customer-wallet">Wallet</a>
+              <a href="#admin-customer-transactions">Transactions</a>
+            </nav>
+
+            <section className="admin-customer-detail-section" id="admin-customer-information">
+              <h3>Customer information</h3>
+              <RequestState loading={customerLoading} loadingMessage="Loading customer information…" />
+              {!customerLoading && displayedCustomer && (
                 <dl className="admin-customer-detail-grid">
                   <div><dt>Full name</dt><dd>{displayedCustomer.full_name || '—'}</dd></div>
                   <div><dt>Account status</dt><dd><StatusBadge value={displayedCustomer.status} /></dd></div>
@@ -335,15 +347,24 @@ function CustomersPage() {
                   <div><dt>Phone</dt><dd>{displayedCustomer.phone || '—'}</dd></div>
                   <div><dt>Registered</dt><dd>{formatDateTime(displayedCustomer.created_at)}</dd></div>
                 </dl>
-              </section>
-            )}
+              )}
+            </section>
 
-            <section className="admin-customer-detail-section">
-              <h3>Registered vehicles</h3>
+            <section className="admin-customer-detail-section" id="admin-customer-vehicles">
+              <h3>Vehicles in loaded bookings</h3>
               <p className="admin-customer-section-note">
-                The current Admin API has no customer vehicle-list endpoint. Vehicles below are only those in the currently loaded page of this customer’s booking records.
+                This is a partial list from the currently loaded Booking search page, not a complete vehicle list. The Admin API has no customer vehicle-list endpoint.
               </p>
-              <RequestState empty={!uniqueVehicles.size} error={bookingsError} loading={bookingsLoading} />
+              {bookingsError && (
+                <p className="admin-customer-section-note">Vehicle information is unavailable because booking history could not be loaded.</p>
+              )}
+              <RequestState
+                empty={!uniqueVehicles.size && !bookingsError}
+                emptyDescription="No vehicles were returned in the currently loaded booking results."
+                emptyTitle="No vehicle details on this page"
+                loading={bookingsLoading}
+                loadingMessage="Loading vehicles from booking records…"
+              />
               {!bookingsLoading && !bookingsError && uniqueVehicles.size > 0 && (
                 <div className="admin-customer-record-list">
                   {[...uniqueVehicles.values()].map((vehicle) => (
@@ -359,9 +380,19 @@ function CustomersPage() {
               )}
             </section>
 
-            <section className="admin-customer-detail-section">
+            <section className="admin-customer-detail-section" id="admin-customer-bookings">
               <h3>Booking history</h3>
-              <RequestState empty={!bookingRows.length} error={bookingsError} loading={bookingsLoading} />
+              <p className="admin-customer-section-note">
+                Results come from the current page of the Admin booking search; pagination may include other matching customers and is not a complete customer-only history.
+              </p>
+              <RequestState
+                empty={!bookingRows.length}
+                emptyDescription="No matching booking records were returned on this search page."
+                emptyTitle="No bookings on this page"
+                error={bookingsError}
+                loading={bookingsLoading}
+                loadingMessage="Loading booking history…"
+              />
               {!bookingsLoading && !bookingsError && bookingRows.length > 0 && (
                 <>
                   <div className="admin-customer-record-list">
@@ -399,14 +430,18 @@ function CustomersPage() {
                   <Pagination onPageChange={changeBookingPage} pagination={bookingPagination} />
                 </>
               )}
-              {!bookingsError && bookingPagination?.total === 0 && !bookingsLoading && (
-                <p className="admin-customer-section-note">No bookings found for this customer.</p>
-              )}
             </section>
 
-            <section className="admin-customer-detail-section">
+            <section className="admin-customer-detail-section" id="admin-customer-wallet">
               <h3>Wallet balance</h3>
-              <RequestState error={walletError} loading={walletLoading} />
+              <RequestState
+                empty={!wallet && !walletError}
+                emptyDescription="No wallet record was returned for this customer."
+                emptyTitle="Wallet balance unavailable"
+                error={walletError}
+                loading={walletLoading}
+                loadingMessage="Loading wallet balance…"
+              />
               {!walletLoading && !walletError && wallet && (
                 <div className="admin-customer-wallet">
                   <span>Available balance</span>
@@ -415,12 +450,15 @@ function CustomersPage() {
               )}
             </section>
 
-            <section className="admin-customer-detail-section">
+            <section className="admin-customer-detail-section" id="admin-customer-transactions">
               <h3>Wallet transaction history</h3>
               <RequestState
                 empty={!transactions.length}
+                emptyDescription="No wallet transactions were returned for this customer."
+                emptyTitle="No wallet transactions"
                 error={transactionsError}
                 loading={transactionsLoading}
+                loadingMessage="Loading wallet transactions…"
               />
               {!transactionsLoading && !transactionsError && transactions.length > 0 && (
                 <>
@@ -437,9 +475,6 @@ function CustomersPage() {
                   </div>
                   <Pagination onPageChange={(nextPage) => changeTransactionPage(nextPage)} pagination={transactionPagination} />
                 </>
-              )}
-              {!transactionsError && transactionPagination?.total === 0 && !transactionsLoading && (
-                <p className="admin-customer-section-note">No Wallet transactions found.</p>
               )}
             </section>
           </div>

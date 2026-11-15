@@ -3,7 +3,7 @@ const serviceController = require("../controllers/serviceController");
 const {
   authenticateToken,
   requireAdmin,
-} = require("../middleware/authMiddleware");
+} = require("../../Auth/middleware/authMiddleware");
 const serviceValidator = require("../validators/serviceValidator");
 
 const router = express.Router();

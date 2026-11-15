@@ -1,0 +1,261 @@
+.dashboard-main {
+  min-height: calc(100vh - 82px);
+  padding: 60px 0 84px;
+  background: #f7f9f8;
+}
+
+.dashboard-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--customer-line);
+}
+
+.dashboard-heading h1 {
+  margin: 11px 0 7px;
+  color: var(--customer-ink);
+  font-size: clamp(34px, 4.5vw, 48px);
+  font-weight: 650;
+  letter-spacing: -1.8px;
+  line-height: 1.12;
+}
+
+.dashboard-heading p {
+  color: var(--customer-muted);
+  font-size: 14px;
+}
+
+.dashboard-heading .customer-button {
+  flex: 0 0 auto;
+}
+
+.dashboard-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 48px;
+  padding-top: 37px;
+}
+
+.dashboard-section {
+  min-width: 0;
+}
+
+.dashboard-section + .dashboard-section {
+  padding-left: 38px;
+  border-left: 1px solid var(--customer-line);
+}
+
+.dashboard-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.dashboard-section-heading h2 {
+  margin: 7px 0 0;
+  color: var(--customer-ink);
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.65px;
+  line-height: 1.25;
+}
+
+.dashboard-section-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0;
+  color: var(--customer-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-section-link:hover,
+.dashboard-state-empty a:hover,
+.dashboard-upcoming > a:hover,
+.dashboard-more-vehicles a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dashboard-state {
+  display: flex;
+  min-height: 142px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  color: var(--customer-muted);
+  font-size: 13px;
+}
+
+.dashboard-state:has(.customer-loader) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.dashboard-state-error {
+  color: #80534d;
+}
+
+.dashboard-state button {
+  padding: 8px 0;
+  border: 0;
+  color: var(--customer-teal-dark);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-state-empty p {
+  max-width: 390px;
+}
+
+.dashboard-state-empty a,
+.dashboard-upcoming > a {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 0;
+  color: var(--customer-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-vehicle-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-vehicle-list li {
+  display: flex;
+  min-height: 67px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border-top: 1px solid var(--customer-line);
+}
+
+.dashboard-vehicle-list li > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.dashboard-vehicle-list strong {
+  overflow: hidden;
+  color: var(--customer-ink);
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-vehicle-list li > div span,
+.dashboard-license-plate,
+.dashboard-more-vehicles > span {
+  color: var(--customer-muted);
+  font-size: 12px;
+}
+
+.dashboard-license-plate {
+  flex: 0 0 auto;
+  color: #465653;
+}
+
+.dashboard-vehicle-list .dashboard-more-vehicles {
+  min-height: 48px;
+}
+
+.dashboard-more-vehicles a {
+  color: var(--customer-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-upcoming {
+  min-height: 142px;
+  padding: 15px 0 12px 18px;
+  border-left: 2px solid var(--customer-teal);
+}
+
+.dashboard-upcoming-date {
+  color: var(--customer-ink);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.35px;
+}
+
+.dashboard-upcoming-time {
+  margin-top: 3px;
+  color: var(--customer-teal-dark);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.dashboard-upcoming-details {
+  display: grid;
+  gap: 3px;
+  margin: 13px 0 8px;
+  color: var(--customer-muted);
+  font-size: 12px;
+}
+
+.customer-dashboard a:focus-visible,
+.customer-dashboard button:focus-visible {
+  outline: 2px solid var(--customer-teal);
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .dashboard-main {
+    padding: 42px 0 64px;
+  }
+
+  .dashboard-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 22px;
+    padding-bottom: 28px;
+  }
+
+  .dashboard-sections {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-top: 28px;
+  }
+
+  .dashboard-section + .dashboard-section {
+    padding: 27px 0 0;
+    border-top: 1px solid var(--customer-line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .dashboard-vehicle-list li {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 11px 0;
+  }
+
+  .dashboard-license-plate {
+    font-size: 11px;
+  }
+}

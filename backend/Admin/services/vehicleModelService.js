@@ -214,7 +214,16 @@ function validateYearRange(start, end) {
   }
 }
 
-async function list({ page, limit, offset, search, brand_id, vehicle_type_id, status }) {
+async function list({
+  page,
+  limit,
+  offset,
+  search,
+  brand_id,
+  vehicle_type_id,
+  status,
+  requireActiveVehicleType = false,
+}) {
   const conditions = [];
   const values = [];
 
@@ -234,12 +243,19 @@ async function list({ page, limit, offset, search, brand_id, vehicle_type_id, st
     conditions.push("vm.status = ?");
     values.push(status);
   }
+  if (requireActiveVehicleType) {
+    conditions.push("vt.status = 'ACTIVE'");
+  }
 
   const whereClause = conditions.length
     ? ` WHERE ${conditions.join(" AND ")}`
     : "";
+  const countFrom = requireActiveVehicleType
+    ? `FROM vehicle_models vm
+      INNER JOIN vehicle_types vt ON vt.vehicle_type_id = vm.vehicle_type_id`
+    : "FROM vehicle_models vm";
   const [countRows] = await pool.execute(
-    `SELECT COUNT(*) AS total FROM vehicle_models vm${whereClause}`,
+    `SELECT COUNT(*) AS total ${countFrom}${whereClause}`,
     values,
   );
   const total = Number(countRows[0].total);

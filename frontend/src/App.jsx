@@ -1,32 +1,227 @@
 import { useEffect, useState } from 'react'
 import AdminApp from './Admin/AdminApp.jsx'
+import { AuthProvider } from './auth/AuthContext.jsx'
+import LoginPage from './auth/LoginPage.jsx'
+import RegistrationPage from './auth/RegistrationPage.jsx'
+import useAuth from './auth/useAuth.js'
+import CustomerBookingPage from './Customer/CustomerBookingPage.jsx'
+import CustomerDashboardPage from './Customer/CustomerDashboardPage.jsx'
+import CustomerLanding from './Customer/CustomerLanding.jsx'
+import CustomerNotFoundPage from './Customer/CustomerNotFoundPage.jsx'
+import CustomerPaymentPage from './Customer/CustomerPaymentPage.jsx'
+import MyBookingsPage from './Customer/MyBookingsPage.jsx'
+import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 
 function isAdminPath(pathname) {
   return pathname === '/admin' || pathname.startsWith('/admin/')
 }
 
-function MainFrontendPlaceholder() {
+function isCustomerPath(pathname) {
+  return pathname === '/customer' || pathname.startsWith('/customer/')
+}
+
+function normalizePath(pathname) {
+  return pathname.replace(/\/+$/, '') || '/'
+}
+
+function getCustomerReturnPath(value) {
+  if (
+    typeof value !== 'string' ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\')
+  ) {
+    return null
+  }
+
+  let url
+  try {
+    url = new URL(value, window.location.origin)
+  } catch {
+    return null
+  }
+  if (url.origin !== window.location.origin) return null
+
+  const path = normalizePath(url.pathname)
+  const isCustomerRoute =
+    path === '/customer' ||
+    path === '/customer/booking' ||
+    path === '/customer/vehicles' ||
+    path === '/customer/bookings' ||
+    /^\/customer\/payment\/\d+$/.test(path)
+
+  return isCustomerRoute ? `${path}${url.search}${url.hash}` : null
+}
+
+function navigateTo(path, replace = false, state = {}) {
+  if (`${window.location.pathname}${window.location.search}` !== path) {
+    if (replace) {
+      window.history.replaceState(state, '', path)
+    } else {
+      window.history.pushState(state, '', path)
+    }
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+}
+
+function navigateAuthLink(event, path) {
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return
+  }
+  event.preventDefault()
+  const currentState = window.history.state
+  navigateTo(
+    path,
+    false,
+    currentState && typeof currentState === 'object' ? currentState : {},
+  )
+}
+
+function SessionLoading({ message }) {
   return (
-    <main>
-      <h1>Car Care</h1>
-      <p>The main frontend will appear here.</p>
+    <main aria-live="polite" className="app-session-page">
+      <div className="app-session-state">
+        <span className="app-session-spinner" />
+        <span>{message}</span>
+      </div>
     </main>
   )
 }
 
-function App() {
+function AppContent() {
+  const { authStatus, user, logout } = useAuth()
   const [pathname, setPathname] = useState(() => window.location.pathname)
+  const currentPath = normalizePath(pathname)
+
+  function logoutAdminFromHome() {
+    const logoutRequest = logout()
+    navigateTo('/login', true)
+    return logoutRequest
+  }
 
   useEffect(() => {
     function syncPathname() {
       setPathname(window.location.pathname)
     }
-
     window.addEventListener('popstate', syncPathname)
     return () => window.removeEventListener('popstate', syncPathname)
   }, [])
 
-  return isAdminPath(pathname) ? <AdminApp /> : <MainFrontendPlaceholder />
+  useEffect(() => {
+    if (authStatus === 'checking') return
+
+    if (authStatus !== 'authenticated') {
+      const isGuestLandingPath = currentPath === '/'
+      if (
+        !isGuestLandingPath &&
+        currentPath !== '/login' &&
+        currentPath !== '/register'
+      ) {
+        const destination = getCustomerReturnPath(
+          `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        )
+        navigateTo('/login', true, destination ? { customerReturnTo: destination } : {})
+      }
+      return
+    }
+
+    if (currentPath === '/' || currentPath === '/login') {
+      const destination =
+        currentPath === '/login'
+          ? getCustomerReturnPath(window.history.state?.customerReturnTo)
+          : null
+      navigateTo(
+        user?.role === 'ADMIN'
+          ? '/'
+          : destination || '/customer',
+        true,
+      )
+    } else if (user?.role === 'ADMIN') {
+      if (currentPath === '/admin') {
+        navigateTo('/admin/dashboard', true)
+      } else if (!isAdminPath(currentPath)) {
+        navigateTo('/admin/dashboard', true)
+      }
+    } else if (user?.role === 'CUSTOMER' && !isCustomerPath(currentPath)) {
+      navigateTo('/customer', true)
+    }
+  }, [authStatus, currentPath, user])
+
+  if (authStatus === 'checking') {
+    return <SessionLoading message="Verifying your session…" />
+  }
+  if (authStatus !== 'authenticated') {
+    if (currentPath === '/login') {
+      return (
+        <LoginPage
+          onNavigate={navigateAuthLink}
+          registrationSuccess={window.history.state?.registrationSuccess === true}
+        />
+      )
+    }
+    if (currentPath === '/register') {
+      return <RegistrationPage onNavigate={navigateAuthLink} />
+    }
+    if (currentPath === '/') {
+      return <CustomerLanding user={null} />
+    }
+    return <SessionLoading message="Redirecting to sign in…" />
+  }
+
+  if (user?.role === 'ADMIN') {
+    if (currentPath === '/') {
+      return <CustomerLanding onLogout={logoutAdminFromHome} user={user} />
+    }
+    return isAdminPath(currentPath)
+      ? <AdminApp onLogout={logout} user={user} />
+      : <SessionLoading message="Opening the Admin workspace…" />
+  }
+  if (user?.role === 'CUSTOMER') {
+    if (!isCustomerPath(currentPath)) {
+      return <SessionLoading message="Opening your Customer account…" />
+    }
+    if (currentPath === '/customer') {
+      return <CustomerDashboardPage onLogout={logout} user={user} />
+    }
+    if (currentPath === '/customer/vehicles') {
+      return <MyVehiclesPage onLogout={logout} user={user} />
+    }
+    if (currentPath === '/customer/bookings') {
+      return <MyBookingsPage onLogout={logout} user={user} />
+    }
+    const paymentRoute = /^\/customer\/payment\/([^/]+)$/.exec(currentPath)
+    if (paymentRoute) {
+      return (
+        <CustomerPaymentPage
+          bookingId={paymentRoute[1]}
+          initialBooking={window.history.state?.customerBooking}
+          key={paymentRoute[1]}
+          onLogout={logout}
+          user={user}
+        />
+      )
+    }
+    if (currentPath === '/customer/booking') {
+      return <CustomerBookingPage onLogout={logout} user={user} />
+    }
+    return <CustomerNotFoundPage onLogout={logout} user={user} />
+  }
+
+  return <SessionLoading message="Checking account access…" />
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
 }
 
 export default App

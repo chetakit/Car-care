@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './components/AdminLayout.jsx'
-import AdminLogin from './components/AdminLogin.jsx'
-import { AdminAuthProvider } from './auth/AdminAuthContext.jsx'
-import useAdminAuth from './auth/useAdminAuth.js'
 import BookingsPage from './pages/BookingsPage.jsx'
 import CouponsPage from './pages/CouponsPage.jsx'
 import CustomersPage from './pages/CustomersPage.jsx'
@@ -47,8 +44,12 @@ function navigateTo(path) {
   }
 }
 
-function AdminContent() {
-  const { authStatus, user, logout } = useAdminAuth()
+function getAdminPagePath(page, query) {
+  const search = new URLSearchParams(query).toString()
+  return `/admin/${page}${search ? `?${search}` : ''}`
+}
+
+function AdminContent({ user, onLogout }) {
   const [activePage, setActivePage] = useState(
     () => getPageFromPath(window.location.pathname) ?? 'dashboard',
   )
@@ -69,76 +70,38 @@ function AdminContent() {
   }, [])
 
   useEffect(() => {
-    if (authStatus === 'authenticated' && window.location.pathname.replace(/\/+$/, '') === '/admin') {
-      navigateTo('/admin/dashboard')
-    }
-  }, [authStatus])
-
-  useEffect(() => {
-    if (
-      authStatus !== 'authenticated' &&
-      authStatus !== 'checking' &&
-      window.location.pathname.startsWith('/admin') &&
-      window.location.pathname.replace(/\/+$/, '') !== '/admin'
-    ) {
-      navigateTo('/admin')
-    }
-  }, [authStatus])
-
-  useEffect(() => {
-    if (authStatus !== 'authenticated') return
     if (!getPageFromPath(window.location.pathname)) {
       navigateTo(`/admin/${activePage}`)
     }
-  }, [activePage, authStatus])
-
-  if (authStatus === 'checking') {
-    return (
-      <main className="admin-login-page">
-        <div className="admin-request-state" aria-live="polite">
-          <span className="admin-spinner" />
-          <span>Verifying administrator session…</span>
-        </div>
-      </main>
-    )
-  }
-  if (authStatus !== 'authenticated') return <AdminLogin />
+  }, [activePage])
 
   const activeItem = navigationItems.find((item) => item.id === activePage)
   const ActivePage = pages[activePage] ?? DashboardPage
+  function handleNavigate(page, query) {
+    setActivePage(page)
+    setSidebarOpen(false)
+    navigateTo(getAdminPagePath(page, query))
+  }
+
   return (
     <AdminLayout
       activePage={activePage}
       navigationItems={navigationItems}
       onCloseSidebar={() => setSidebarOpen(false)}
-      onLogout={() => {
-        navigateTo('/admin')
-        void logout()
-      }}
+      onLogout={() => void onLogout()}
       onMenuClick={() => setSidebarOpen((open) => !open)}
-      onNavigate={(page) => {
-        setActivePage(page)
-        setSidebarOpen(false)
-        navigateTo(`/admin/${page}`)
-      }}
+      onNavigate={handleNavigate}
       pageTitle={activeItem?.label ?? 'Dashboard'}
       sidebarOpen={sidebarOpen}
       user={user}
     >
-      <ActivePage onNavigate={(page) => {
-        setActivePage(page)
-        navigateTo(`/admin/${page}`)
-      }} />
+      <ActivePage onNavigate={handleNavigate} />
     </AdminLayout>
   )
 }
 
-function AdminApp() {
-  return (
-    <AdminAuthProvider>
-      <AdminContent />
-    </AdminAuthProvider>
-  )
+function AdminApp({ user, onLogout }) {
+  return <AdminContent onLogout={onLogout} user={user} />
 }
 
 export default AdminApp

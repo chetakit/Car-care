@@ -1,4 +1,8 @@
 :root {
+  --car-care-accent: #327b72;
+  --car-care-accent-dark: #28665f;
+  --car-care-accent-rgb: 50 123 114;
+
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
@@ -17,7 +21,7 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;

@@ -3,7 +3,7 @@ const couponController = require("../controllers/couponController");
 const {
   authenticateToken,
   requireAdmin,
-} = require("../middleware/authMiddleware");
+} = require("../../Auth/middleware/authMiddleware");
 const couponValidator = require("../validators/couponValidator");
 
 const router = express.Router();

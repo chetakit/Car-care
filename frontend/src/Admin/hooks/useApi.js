@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { createApiClient } from '../api/client.js'
-import useAdminAuth from '../auth/useAdminAuth.js'
+import useAuth from '../../auth/useAuth.js'
 
 export default function useApi() {
-  const { token, clearSession } = useAdminAuth()
+  const { token, handleUnauthorized } = useAuth()
   return useMemo(
-    () => createApiClient(token, clearSession),
-    [clearSession, token],
+    () => createApiClient(token, handleUnauthorized),
+    [handleUnauthorized, token],
   )
 }

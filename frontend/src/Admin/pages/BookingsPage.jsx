@@ -1,18 +1,24 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminModal from '../components/AdminModal.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
+import { formatDate, formatDateTime } from '../utils/formatDate.js'
+import formatStatusLabel from '../utils/formatStatusLabel.js'
 import formatMoney from '../utils/formatMoney.js'
 
 const REFUNDS_PAGE_SIZE = 100
+const MAX_BOOKING_ID = 2147483647
+const BOOKING_STATUSES = ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
 
-function formatBookingDate(value) {
-  if (!value) return '—'
-  const date = String(value).slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return String(value)
-  const [year, month, day] = date.split('-')
-  return year && month && day ? `${day}/${month}/${year}` : value
+function isValidBookingId(value) {
+  const id = String(value ?? '')
+  return /^[1-9]\d*$/.test(id) && Number(id) <= MAX_BOOKING_ID
+}
+
+function getInitialBookingStatus() {
+  const status = new URLSearchParams(window.location.search).get('booking_status')
+  return BOOKING_STATUSES.includes(status) ? status : ''
 }
 
 function formatTime(value) {
@@ -20,19 +26,8 @@ function formatTime(value) {
   return String(value).slice(0, 5)
 }
 
-function formatDateTime(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? String(value).replace('T', ' ').replace(/\.000Z$/, '')
-    : new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(date)
-}
-
 function scheduleSummary(date, startTime, endTime) {
-  const day = formatBookingDate(date)
+  const day = formatDate(date)
   const start = formatTime(startTime)
   const end = formatTime(endTime)
   return [day, start && end ? `${start}–${end}` : start || end].filter(Boolean).join(' · ') || '—'
@@ -66,17 +61,22 @@ async function findBookingRefunds(api, userId, bookingId) {
   return matches
 }
 
-function BookingsPage() {
+function BookingsPage({ onNavigate }) {
+  const requestedBookingId = new URLSearchParams(window.location.search).get('booking_id') ?? ''
   const [filters, setFilters] = useState({
     search: '',
-    booking_status: '',
+    booking_status: getInitialBookingStatus(),
     payment_status: '',
     date_from: '',
     date_to: '',
     sort: 'newest',
   })
+  const [filterError, setFilterError] = useState('')
   const [page, setPage] = useState(1)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(() => {
+    const bookingStatus = getInitialBookingStatus()
+    return bookingStatus ? new URLSearchParams({ booking_status: bookingStatus }).toString() : ''
+  })
   const [selectedId, setSelectedId] = useState(null)
   const [detail, setDetail] = useState(null)
   const [history, setHistory] = useState([])
@@ -85,6 +85,7 @@ function BookingsPage() {
   const [detailError, setDetailError] = useState('')
   const [refundError, setRefundError] = useState('')
   const api = useApi()
+  const autoOpenAttempted = useRef(false)
   const params = new URLSearchParams({ page: String(page), limit: '20' })
   new URLSearchParams(query).forEach((value, key) => params.set(key, value))
   const { data, loading, error, refresh } = useRemoteData(`/api/admin/bookings?${params}`)
@@ -92,6 +93,11 @@ function BookingsPage() {
 
   function applyFilters(event) {
     event.preventDefault()
+    if (filters.date_from && filters.date_to && filters.date_to < filters.date_from) {
+      setFilterError('The “To” date must be the same as or later than the “From” date.')
+      return
+    }
+    setFilterError('')
     setPage(1)
     const values = new URLSearchParams()
     Object.entries(filters).forEach(([key, value]) => {
@@ -100,7 +106,7 @@ function BookingsPage() {
     setQuery(values.toString())
   }
 
-  async function openDetails(bookingId) {
+  const openDetails = useCallback(async (bookingId) => {
     if (detailLoading) return
     setSelectedId(bookingId)
     setDetail(null)
@@ -130,7 +136,13 @@ function BookingsPage() {
     } finally {
       setDetailLoading(false)
     }
-  }
+  }, [api, detailLoading])
+
+  useEffect(() => {
+    if (!isValidBookingId(requestedBookingId) || autoOpenAttempted.current) return
+    autoOpenAttempted.current = true
+    void openDetails(requestedBookingId)
+  }, [openDetails, requestedBookingId])
 
   function closeDetails() {
     if (detailLoading) return
@@ -158,27 +170,27 @@ function BookingsPage() {
         description="Search, filter and review bookings recorded in the system."
         eyebrow="OPERATIONS"
         title="Bookings"
-        action={<button className="admin-secondary-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
+        action={<button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
       />
       <form className="admin-filter-bar admin-booking-filters" onSubmit={applyFilters}>
         <input
           aria-label="Search bookings"
           maxLength="100"
-          onChange={(event) => setFilters({ ...filters, search: event.target.value })}
+          onChange={(event) => { setFilters({ ...filters, search: event.target.value }); setFilterError('') }}
           placeholder="Search ID, customer, email, phone or plate"
           value={filters.search}
         />
         <select
           aria-label="Booking status"
-          onChange={(event) => setFilters({ ...filters, booking_status: event.target.value })}
+          onChange={(event) => { setFilters({ ...filters, booking_status: event.target.value }); setFilterError('') }}
           value={filters.booking_status}
         >
           <option value="">All booking statuses</option>
-          {['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].map((value) => <option key={value}>{value}</option>)}
+          {BOOKING_STATUSES.map((value) => <option key={value} value={value}>{formatStatusLabel(value)}</option>)}
         </select>
         <select
           aria-label="Payment status"
-          onChange={(event) => setFilters({ ...filters, payment_status: event.target.value })}
+          onChange={(event) => { setFilters({ ...filters, payment_status: event.target.value }); setFilterError('') }}
           value={filters.payment_status}
         >
           <option value="">All payment statuses</option>
@@ -188,7 +200,7 @@ function BookingsPage() {
           From
           <input
             aria-label="Date from"
-            onChange={(event) => setFilters({ ...filters, date_from: event.target.value })}
+            onChange={(event) => { setFilters({ ...filters, date_from: event.target.value }); setFilterError('') }}
             type="date"
             value={filters.date_from}
           />
@@ -197,14 +209,14 @@ function BookingsPage() {
           To
           <input
             aria-label="Date to"
-            onChange={(event) => setFilters({ ...filters, date_to: event.target.value })}
+            onChange={(event) => { setFilters({ ...filters, date_to: event.target.value }); setFilterError('') }}
             type="date"
             value={filters.date_to}
           />
         </label>
         <select
           aria-label="Sort bookings"
-          onChange={(event) => setFilters({ ...filters, sort: event.target.value })}
+          onChange={(event) => { setFilters({ ...filters, sort: event.target.value }); setFilterError('') }}
           value={filters.sort}
         >
           <option value="newest">Newest first</option>
@@ -212,6 +224,7 @@ function BookingsPage() {
         </select>
         <button className="admin-primary-button" disabled={loading} type="submit">Search</button>
       </form>
+      {filterError && <div className="admin-alert admin-alert-error" role="alert">{filterError}</div>}
 
       <section className="admin-panel admin-data-panel admin-bookings-panel">
         <div className="admin-panel-heading">
@@ -220,7 +233,15 @@ function BookingsPage() {
             <p>{data?.pagination?.total ?? 0} bookings · select a Booking ID for full details</p>
           </div>
         </div>
-        <RequestState empty={!rows.length} error={error} loading={loading} onRetry={refresh} />
+        <RequestState
+          empty={!rows.length}
+          emptyDescription="Clear or broaden the search and date filters, then search again."
+          emptyTitle="No bookings match these filters"
+          error={error}
+          loading={loading}
+          loadingMessage="Loading booking records…"
+          onRetry={refresh}
+        />
         {!loading && !error && rows.length > 0 && (
           <>
             <DataTable
@@ -274,9 +295,24 @@ function BookingsPage() {
                 {
                   key: 'payment_status',
                   label: 'Payment',
-                  render: (row) => row.payment_status
-                    ? <StatusBadge value={row.payment_status} />
-                    : <span className="admin-booking-no-payment">Not created</span>,
+                  render: (row) => (
+                    <div className="admin-row-actions">
+                      {row.payment_status
+                        ? <StatusBadge value={row.payment_status} />
+                        : <span className="admin-booking-no-payment">Not created</span>}
+                      {isValidBookingId(row.booking_id) ? (
+                        <button
+                          className="admin-inline-button"
+                          onClick={() => onNavigate('payments', { booking_id: String(row.booking_id) })}
+                          type="button"
+                        >
+                          View Payment
+                        </button>
+                      ) : (
+                        <span className="admin-booking-no-payment">Unavailable</span>
+                      )}
+                    </div>
+                  ),
                 },
               ]}
               rows={rows}
@@ -306,6 +342,9 @@ function BookingsPage() {
                 <h3>Overview</h3>
                 <dl className="admin-booking-detail-grid">
                   <div><dt>Booking status</dt><dd><StatusBadge value={booking.booking_status} /></dd></div>
+                  <div><dt>Payment status</dt><dd>{payment?.payment_status
+                    ? <StatusBadge value={payment.payment_status} />
+                    : <span className="admin-booking-no-payment">Not created</span>}</dd></div>
                   <div><dt>Booking date</dt><dd>{scheduleSummary(booking.booking_date, booking.start_time, booking.end_time)}</dd></div>
                   <div><dt>Total</dt><dd>{formatMoney(booking.total_amount)}</dd></div>
                   <div><dt>Discount</dt><dd>{formatMoney(booking.discount_amount)}</dd></div>
@@ -338,7 +377,7 @@ function BookingsPage() {
               <section className="admin-booking-detail-section">
                 <h3>Schedule</h3>
                 <dl className="admin-booking-detail-grid">
-                  <div><dt>Date</dt><dd>{formatBookingDate(schedule?.schedule_date ?? booking.booking_date)}</dd></div>
+                  <div><dt>Date</dt><dd>{formatDate(schedule?.schedule_date ?? booking.booking_date)}</dd></div>
                   <div><dt>Time</dt><dd>{[
                     schedule?.start_time ?? booking.start_time,
                     schedule?.end_time ?? booking.end_time,

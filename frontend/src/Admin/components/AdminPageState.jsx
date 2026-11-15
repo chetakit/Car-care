@@ -1,3 +1,5 @@
+import formatStatusLabel from '../utils/formatStatusLabel.js'
+
 export function PageHeading({ eyebrow, title, description, action }) {
   return (
     <section className="admin-page-intro">
@@ -11,12 +13,20 @@ export function PageHeading({ eyebrow, title, description, action }) {
   )
 }
 
-export function RequestState({ loading, error, empty, onRetry }) {
+export function RequestState({
+  loading,
+  error,
+  empty,
+  onRetry,
+  loadingMessage = 'Loading data from the backend…',
+  emptyTitle = 'No records found',
+  emptyDescription = 'Try changing the search or filters.',
+}) {
   if (loading) {
     return (
       <div aria-live="polite" className="admin-request-state">
-        <span className="admin-spinner" />
-        <span>Loading data from the backend…</span>
+        <span aria-hidden="true" className="admin-spinner" />
+        <span>{loadingMessage}</span>
       </div>
     )
   }
@@ -33,12 +43,7 @@ export function RequestState({ loading, error, empty, onRetry }) {
     )
   }
   if (empty) {
-    return (
-      <div className="admin-request-state">
-        <strong>No records found</strong>
-        <span>Try changing the search or filters.</span>
-      </div>
-    )
+    return <div className="admin-request-state"><strong>{emptyTitle}</strong><span>{emptyDescription}</span></div>
   }
   return null
 }
@@ -46,7 +51,7 @@ export function RequestState({ loading, error, empty, onRetry }) {
 export function Pagination({ pagination, onPageChange }) {
   if (!pagination || pagination.totalPages <= 1) return null
   return (
-    <div className="admin-pagination">
+    <div aria-label="Pagination" className="admin-pagination">
       <span>
         Page {pagination.page} of {pagination.totalPages} · {pagination.total} records
       </span>
@@ -72,7 +77,23 @@ export function Pagination({ pagination, onPageChange }) {
 
 export function DataTable({ columns, rows, rowKey }) {
   return (
-    <div className="admin-table-wrap">
+    <div
+      aria-keyshortcuts="ArrowLeft ArrowRight"
+      aria-label="Data table; use the left and right arrow keys to view all columns"
+      className="admin-table-scroll-region admin-table-wrap"
+      role="region"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        event.preventDefault()
+        event.currentTarget.scrollBy({
+          left: event.key === 'ArrowRight' ? 80 : -80,
+          behavior: 'auto',
+        })
+      }}
+    >
+      <p className="admin-table-scroll-hint">Scroll horizontally to view all columns</p>
       <table className="admin-table">
         <thead>
           <tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr>
@@ -95,5 +116,5 @@ export function DataTable({ columns, rows, rowKey }) {
 
 export function StatusBadge({ value }) {
   const tone = String(value ?? '').toLowerCase().replaceAll('_', '-')
-  return <span className={`admin-status-badge status-${tone}`}>{value ?? '—'}</span>
+  return <span className={`admin-status-badge status-${tone}`}>{formatStatusLabel(value)}</span>
 }

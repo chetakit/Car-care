@@ -3,7 +3,7 @@ const dashboardController = require("../controllers/dashboardController");
 const {
   authenticateToken,
   requireAdmin,
-} = require("../middleware/authMiddleware");
+} = require("../../Auth/middleware/authMiddleware");
 
 const router = express.Router();
 

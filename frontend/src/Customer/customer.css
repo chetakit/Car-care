@@ -1,0 +1,1408 @@
+#root:has(.customer-home) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  text-align: left;
+}
+
+.customer-home {
+  --customer-ink: #1e2b2b;
+  --customer-muted: #647170;
+  --customer-teal: var(--car-care-accent);
+  --customer-teal-dark: var(--car-care-accent-dark);
+  --customer-pale: #f3f7f6;
+  --customer-line: #e4eae8;
+
+  min-height: 100vh;
+  overflow-x: clip;
+  color: var(--customer-ink);
+  background: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.customer-home *,
+.customer-home *::before,
+.customer-home *::after {
+  box-sizing: border-box;
+}
+
+.customer-container {
+  width: min(1180px, calc(100% - 64px));
+  margin: 0 auto;
+}
+
+.customer-home a {
+  text-decoration: none;
+}
+
+.customer-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgb(30 43 43 / 7%);
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 5px 18px rgb(22 46 43 / 4%);
+  backdrop-filter: blur(14px);
+}
+
+.customer-header-inner {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.customer-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 11px;
+}
+
+.customer-brand-mark {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--customer-teal);
+}
+
+.customer-brand-mark svg {
+  width: 25px;
+  height: 25px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.customer-brand-name {
+  color: var(--customer-ink);
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.5px;
+}
+
+.customer-nav {
+  display: flex;
+  align-items: center;
+  gap: 37px;
+  margin-left: auto;
+}
+
+.customer-nav a,
+.customer-footer-nav a {
+  color: #5e6b69;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color 160ms ease;
+}
+
+.customer-nav a:hover,
+.customer-footer-nav a:hover {
+  color: var(--customer-teal);
+}
+
+.customer-nav-book {
+  display: none;
+}
+
+.customer-guest-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+
+.customer-login-link {
+  padding: 8px 10px;
+  color: #52615f;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.customer-login-link:hover {
+  color: var(--customer-teal-dark);
+}
+
+.customer-register-link {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  border: 1px solid var(--customer-teal);
+  border-radius: 6px;
+  color: #fff;
+  background: var(--customer-teal);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.customer-register-link:hover {
+  border-color: var(--customer-teal-dark);
+  background: var(--customer-teal-dark);
+}
+
+.customer-account {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.customer-account-trigger {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 3px 4px 3px 7px;
+  border: 0;
+  border-radius: 24px;
+  color: var(--customer-ink);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.customer-account-trigger:hover,
+.customer-account-trigger[aria-expanded='true'] {
+  background: var(--customer-pale);
+}
+
+.customer-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--customer-teal-dark);
+  background: #dcece8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.customer-account-name {
+  max-width: 150px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-chevron {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  transition: transform 160ms ease;
+}
+
+.customer-account-trigger[aria-expanded='true'] .customer-chevron {
+  transform: rotate(180deg);
+}
+
+.customer-account-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 120;
+  width: 240px;
+  padding: 8px;
+  border: 1px solid var(--customer-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgb(22 46 43 / 12%);
+  animation: customer-menu-in 150ms ease-out;
+}
+
+.customer-account-summary {
+  display: grid;
+  gap: 2px;
+  padding: 10px 11px 12px;
+  border-bottom: 1px solid var(--customer-line);
+}
+
+.customer-account-summary strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-account-summary span {
+  overflow: hidden;
+  color: var(--customer-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-account-menu button {
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 7px;
+  color: #a94747;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.customer-account-menu a {
+  display: block;
+  width: 100%;
+  padding: 10px 11px;
+  border-radius: 7px;
+  color: var(--customer-teal-dark);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.customer-account-menu a:hover {
+  background: #eaf4f1;
+}
+
+.customer-account-menu button:hover {
+  background: #fff4f3;
+}
+
+.customer-menu-toggle {
+  display: none;
+}
+
+.customer-hero {
+  position: relative;
+  padding: 78px 0 88px;
+  background:
+    radial-gradient(ellipse at 86% 13%, rgb(219 238 234 / 48%), transparent 31%),
+    linear-gradient(180deg, #fff 0%, #fbfcfc 100%);
+}
+
+.customer-hero-grid {
+  display: grid;
+  min-height: 438px;
+  align-items: center;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  gap: 60px;
+}
+
+.customer-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 510px;
+  padding: 10px 0;
+}
+
+.customer-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--customer-teal);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 1.55px;
+}
+
+.customer-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #51a297;
+  box-shadow: 0 0 0 4px rgb(81 162 151 / 13%);
+}
+
+.customer-hero h1 {
+  max-width: 540px;
+  margin: 23px 0 18px;
+  color: var(--customer-ink);
+  font-size: clamp(42px, 5.1vw, 66px);
+  font-weight: 650;
+  letter-spacing: -3.2px;
+  line-height: 1.05;
+}
+
+.customer-hero h1 span {
+  display: block;
+  color: var(--customer-teal);
+}
+
+.customer-hero-copy > p:not(.customer-booking-notice) {
+  max-width: 440px;
+  color: var(--customer-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.customer-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 25px;
+  margin-top: 30px;
+}
+
+.customer-button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 19px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.customer-button:hover {
+  transform: translateY(-2px);
+}
+
+.customer-button-primary {
+  color: #fff;
+  background: var(--customer-teal);
+  box-shadow: 0 8px 18px rgb(var(--car-care-accent-rgb) / 20%);
+}
+
+.customer-button-primary:hover {
+  background: var(--customer-teal-dark);
+  box-shadow: 0 11px 23px rgb(var(--car-care-accent-rgb) / 26%);
+}
+
+.customer-arrow {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  transition: transform 160ms ease;
+}
+
+.customer-button:hover .customer-arrow,
+.customer-text-link:hover .customer-arrow {
+  transform: translateX(3px);
+}
+
+.customer-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--customer-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.customer-text-link .customer-arrow {
+  color: var(--customer-teal);
+}
+
+.customer-booking-notice {
+  max-width: 390px;
+  margin: 15px 0 0 !important;
+  padding: 10px 12px;
+  border-left: 3px solid var(--customer-teal);
+  border-radius: 0 5px 5px 0;
+  color: var(--customer-teal-dark) !important;
+  background: #eaf4f1;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.customer-booking-notice-light {
+  border-left-color: #9dd1c8;
+  color: #d3eee8 !important;
+  background: rgb(255 255 255 / 9%);
+}
+
+.customer-hero-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 35px;
+  color: #687674;
+  font-size: 11px;
+}
+
+.customer-note-check {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--customer-teal);
+  background: #e4f0ed;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.customer-hero-visual {
+  position: relative;
+  min-width: 0;
+  padding: 0 0 22px 18px;
+}
+
+.customer-hero-image-wrap {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  aspect-ratio: 1.25;
+  border-radius: 24px 24px 24px 68px;
+  background: #e3e9e7;
+  box-shadow: 0 28px 65px rgb(25 49 46 / 17%);
+}
+
+.customer-hero-image-wrap::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgb(17 35 33 / 9%), transparent 48%, rgb(16 28 26 / 12%));
+  content: '';
+  pointer-events: none;
+}
+
+.customer-hero-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 54%;
+  transition: transform 650ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.customer-hero-image-fallback {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--customer-ink);
+  background: #e3e9e7;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.customer-hero-image-fallback .customer-brand-mark {
+  width: 44px;
+  height: 44px;
+  flex-basis: 44px;
+}
+
+.customer-hero-visual:hover .customer-hero-image {
+  transform: scale(1.035);
+}
+
+.customer-image-caption {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  min-width: 250px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 17px;
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 95%);
+  box-shadow: 0 13px 28px rgb(23 45 42 / 12%);
+  backdrop-filter: blur(10px);
+}
+
+.customer-caption-icon .customer-brand-mark {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-radius: 10px;
+}
+
+.customer-caption-icon .customer-brand-mark svg {
+  width: 22px;
+  height: 22px;
+}
+
+.customer-image-caption strong,
+.customer-image-caption small {
+  display: block;
+}
+
+.customer-image-caption strong {
+  font-size: 11px;
+}
+
+.customer-image-caption small {
+  margin-top: 2px;
+  color: var(--customer-muted);
+  font-size: 10px;
+}
+
+.customer-hero-orbit {
+  position: absolute;
+  top: -25px;
+  right: -25px;
+  width: 96px;
+  height: 96px;
+  border: 1px solid rgb(var(--car-care-accent-rgb) / 17%);
+  border-radius: 50%;
+}
+
+.customer-services {
+  padding: 82px 0 91px;
+  background: #f7f9f8;
+}
+
+.customer-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 30px;
+}
+
+.customer-section-heading h2,
+.customer-promo h2 {
+  margin: 10px 0 7px;
+  color: var(--customer-ink);
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 650;
+  letter-spacing: -1.3px;
+  line-height: 1.2;
+}
+
+.customer-section-heading p {
+  color: var(--customer-muted);
+  font-size: 13px;
+}
+
+.customer-pricing-note {
+  max-width: 720px;
+  margin: -10px 0 23px;
+  color: #566461;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.customer-section-index {
+  padding-bottom: 3px;
+  color: #9aa5a2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  white-space: nowrap;
+}
+
+.customer-section-cta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 5px;
+  color: var(--customer-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.customer-section-cta .customer-arrow {
+  width: 15px;
+  height: 15px;
+}
+
+.customer-service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.customer-service-card {
+  position: relative;
+  display: flex;
+  min-height: 252px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 26px 24px 23px;
+  border: 1px solid var(--customer-line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgb(24 48 45 / 3%);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.customer-service-card:hover {
+  transform: translateY(-4px);
+  border-color: #c5dcd6;
+  box-shadow: 0 15px 30px rgb(24 48 45 / 8%);
+}
+
+.customer-service-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--customer-teal);
+  background: #eaf4f1;
+}
+
+.customer-service-mark svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.customer-service-label {
+  margin-top: 18px;
+  color: #566461;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 1.35px;
+}
+
+.customer-service-card h3 {
+  margin: 5px 0 7px;
+  color: var(--customer-ink);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+  line-height: 1.35;
+}
+
+.customer-service-card p {
+  color: var(--customer-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.customer-service-duration {
+  margin-top: auto;
+  padding-top: 16px;
+  color: var(--customer-teal-dark);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.customer-services-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 27px;
+  padding-top: 20px;
+  border-top: 1px solid var(--customer-line);
+}
+
+.customer-services-action p {
+  color: var(--customer-muted);
+  font-size: 12px;
+}
+
+.customer-catalog-message {
+  display: flex;
+  min-height: 116px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 25px;
+  border: 1px dashed #d7e2df;
+  border-radius: 10px;
+  color: var(--customer-muted);
+  background: #fbfcfc;
+  font-size: 12px;
+  text-align: center;
+}
+
+.customer-catalog-error {
+  flex-wrap: wrap;
+  border-color: #f0d7d4;
+  color: #88534d;
+}
+
+.customer-catalog-message button {
+  padding: 7px 11px;
+  border: 1px solid #cfe0dc;
+  border-radius: 5px;
+  color: var(--customer-teal-dark);
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  transition: background-color 150ms ease;
+}
+
+.customer-catalog-message button:hover {
+  background: #eaf4f1;
+}
+
+.customer-loader {
+  width: 17px;
+  height: 17px;
+  border: 2px solid #d5e5e1;
+  border-top-color: var(--customer-teal);
+  border-radius: 50%;
+  animation: customer-spin 700ms linear infinite;
+}
+
+.customer-benefits {
+  padding: 84px 0 90px;
+  background: #fff;
+}
+
+.customer-benefits-heading {
+  margin-bottom: 31px;
+}
+
+.customer-benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 19px;
+}
+
+.customer-benefit-card {
+  min-height: 225px;
+  padding: 26px 25px;
+  border: 1px solid var(--customer-line);
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(24 48 45 / 4%);
+}
+
+.customer-benefit-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--customer-teal);
+  background: #eaf4f1;
+}
+
+.customer-benefit-mark svg {
+  width: 25px;
+  height: 25px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.customer-benefit-card h3 {
+  margin: 20px 0 8px;
+  color: var(--customer-ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.25px;
+}
+
+.customer-benefit-card p {
+  max-width: 310px;
+  color: var(--customer-muted);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.customer-promo {
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(ellipse at 83% 50%, rgb(101 165 153 / 26%), transparent 34%),
+    linear-gradient(112deg, #1d3432, #244744 63%, #285951);
+}
+
+.customer-promo-inner {
+  position: relative;
+  display: flex;
+  min-height: 300px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 45px;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.customer-promo-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+}
+
+.customer-eyebrow-light {
+  color: #9dd1c8;
+}
+
+.customer-promo h2 {
+  max-width: 520px;
+  margin: 11px 0 10px;
+  color: #fff;
+  font-size: clamp(30px, 3.6vw, 43px);
+}
+
+.customer-promo-copy p {
+  max-width: 430px;
+  color: rgb(255 255 255 / 72%);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.customer-button-light {
+  margin-top: 21px;
+  color: #21423e;
+  background: #fff;
+}
+
+.customer-button-light:hover {
+  background: #edf6f3;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 12%);
+}
+
+.customer-promo-art {
+  position: relative;
+  display: flex;
+  width: min(32%, 300px);
+  height: 210px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(198 232 224 / 21%);
+  border-radius: 50%;
+  color: rgb(207 237 230 / 70%);
+  transform: rotate(-8deg);
+}
+
+.customer-promo-art::before,
+.customer-promo-art::after {
+  position: absolute;
+  inset: 13px -20px;
+  border: 1px solid rgb(198 232 224 / 12%);
+  border-radius: 50%;
+  content: '';
+}
+
+.customer-promo-art::after {
+  inset: 30px -39px;
+}
+
+.customer-promo-art .customer-brand-mark {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 11px;
+  border: 1px solid rgb(255 255 255 / 25%);
+  background: rgb(255 255 255 / 10%);
+}
+
+.customer-promo-art > span:not(.customer-brand-mark) {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.4px;
+  line-height: 1.8;
+}
+
+.customer-footer {
+  --customer-footer-accent: #c4b38d;
+  --customer-footer-muted: #aab8b3;
+
+  padding-top: 43px;
+  color: #f3f5f2;
+  background: #121d1b;
+}
+
+.customer-footer-inner {
+  padding-bottom: 19px;
+}
+
+.customer-footer-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 64px;
+  padding-bottom: 38px;
+}
+
+.customer-footer-brand {
+  gap: 10px;
+}
+
+.customer-footer-brand .customer-brand-mark {
+  border: 1px solid rgb(196 179 141 / 55%);
+  border-radius: 9px;
+  color: #fff;
+  background: rgb(255 255 255 / 7%);
+}
+
+.customer-footer-brand .customer-brand-name {
+  color: #fff;
+  font-size: 15px;
+}
+
+.customer-footer-tagline {
+  margin: 18px 0 5px;
+  color: var(--customer-footer-accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.customer-footer-description {
+  max-width: 380px;
+  margin: 0;
+  color: var(--customer-footer-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.customer-footer-social {
+  width: min(100%, 280px);
+  justify-self: end;
+  padding-top: 5px;
+}
+
+.customer-footer-social h2 {
+  margin: 0;
+  color: var(--customer-footer-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.customer-footer-social p {
+  margin: 12px 0 0;
+  color: var(--customer-footer-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.customer-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgb(226 236 233 / 13%);
+  color: var(--customer-footer-muted);
+  font-size: 11px;
+}
+
+.customer-footer-bottom-note {
+  color: #869691;
+  white-space: nowrap;
+}
+
+.customer-home [id] {
+  scroll-margin-top: 94px;
+}
+
+.customer-home button:focus-visible,
+.customer-home a:focus-visible {
+  outline: 3px solid rgb(var(--car-care-accent-rgb) / 35%);
+  outline-offset: 3px;
+}
+
+@keyframes customer-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes customer-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 960px) {
+  .customer-container {
+    width: min(760px, calc(100% - 48px));
+  }
+
+  .customer-header-inner {
+    gap: 21px;
+  }
+
+  .customer-nav {
+    gap: 23px;
+  }
+
+  .customer-hero {
+    padding: 62px 0 72px;
+  }
+
+  .customer-hero-grid {
+    min-height: 390px;
+    grid-template-columns: minmax(0, 0.9fr) minmax(330px, 1.1fr);
+    gap: 34px;
+  }
+
+  .customer-hero h1 {
+    font-size: clamp(42px, 5.5vw, 56px);
+    letter-spacing: -2.5px;
+  }
+
+  .customer-image-caption {
+    min-width: 225px;
+    padding: 11px 13px;
+  }
+
+  .customer-services {
+    padding: 70px 0 76px;
+  }
+
+  .customer-benefits {
+    padding: 70px 0 76px;
+  }
+
+  .customer-benefit-card {
+    padding: 23px 20px;
+  }
+}
+
+@media (max-width: 700px) {
+  .customer-container {
+    width: calc(100% - 36px);
+  }
+
+  .customer-header-inner {
+    position: relative;
+    min-height: 70px;
+    gap: 12px;
+  }
+
+  .customer-brand-mark {
+    width: 35px;
+    height: 35px;
+    flex-basis: 35px;
+  }
+
+  .customer-brand-name {
+    font-size: 16px;
+  }
+
+  .customer-menu-toggle {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-left: auto;
+    border: 1px solid var(--customer-line);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  .customer-menu-toggle span {
+    width: 15px;
+    height: 1.5px;
+    border-radius: 2px;
+    background: var(--customer-ink);
+    transition: transform 160ms ease;
+  }
+
+  .customer-menu-toggle.is-open span:first-child {
+    transform: translateY(3.25px) rotate(45deg);
+  }
+
+  .customer-menu-toggle.is-open span:last-child {
+    transform: translateY(-3.25px) rotate(-45deg);
+  }
+
+  .customer-nav {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: -18px;
+    left: -18px;
+    display: none;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 18px 14px;
+    border-bottom: 1px solid var(--customer-line);
+    background: #fff;
+    box-shadow: 0 12px 18px rgb(20 45 42 / 6%);
+  }
+
+  .customer-nav.is-open {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .customer-nav a {
+    padding: 12px 3px;
+  }
+
+  .customer-nav .customer-nav-book {
+    display: block;
+    margin-top: 4px;
+    border-top: 1px solid var(--customer-line);
+    color: var(--customer-teal-dark);
+    font-weight: 750;
+  }
+
+  .customer-account-trigger {
+    min-height: 39px;
+    gap: 6px;
+    padding: 2px;
+  }
+
+  .customer-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .customer-account-name {
+    max-width: 86px;
+    font-size: 11px;
+  }
+
+  .customer-account-menu {
+    right: 0;
+    width: 220px;
+  }
+
+  .customer-hero {
+    padding: 53px 0 62px;
+  }
+
+  .customer-hero-grid {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 37px;
+  }
+
+  .customer-hero-copy {
+    max-width: 560px;
+  }
+
+  .customer-hero h1 {
+    margin: 19px 0 13px;
+    font-size: clamp(43px, 10.4vw, 61px);
+    letter-spacing: -2.5px;
+  }
+
+  .customer-hero-copy > p:not(.customer-booking-notice) {
+    max-width: 490px;
+    font-size: 14px;
+  }
+
+  .customer-hero-actions {
+    gap: 18px;
+    margin-top: 23px;
+  }
+
+  .customer-hero-note {
+    margin-top: 23px;
+  }
+
+  .customer-hero-visual {
+    padding: 0 0 19px 10px;
+  }
+
+  .customer-hero-image-wrap {
+    aspect-ratio: 1.28;
+    border-radius: 18px 18px 18px 48px;
+  }
+
+  .customer-image-caption {
+    right: 0;
+    min-width: 0;
+    max-width: calc(100% - 16px);
+    gap: 9px;
+    padding: 10px 12px;
+  }
+
+  .customer-image-caption strong {
+    font-size: 10px;
+  }
+
+  .customer-image-caption small {
+    font-size: 9px;
+  }
+
+  .customer-hero-orbit {
+    top: -17px;
+    right: -10px;
+    width: 68px;
+    height: 68px;
+  }
+
+  .customer-services {
+    padding: 60px 0 64px;
+  }
+
+  .customer-section-heading {
+    align-items: flex-start;
+    margin-bottom: 22px;
+  }
+
+  .customer-section-cta {
+    padding-top: 7px;
+    font-size: 11px;
+  }
+
+  .customer-section-heading h2 {
+    font-size: 31px;
+    letter-spacing: -1px;
+  }
+
+  .customer-section-heading p {
+    max-width: 370px;
+    font-size: 12px;
+  }
+
+  .customer-section-index {
+    display: none;
+  }
+
+  .customer-service-grid {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+
+  .customer-service-card {
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .customer-services-action {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .customer-service-label {
+    margin-top: 14px;
+  }
+
+  .customer-service-duration {
+    padding-top: 10px;
+  }
+
+  .customer-promo-inner {
+    min-height: 0;
+    padding-top: 47px;
+    padding-bottom: 47px;
+  }
+
+  .customer-promo-art {
+    position: absolute;
+    right: -75px;
+    width: 205px;
+    height: 170px;
+    opacity: 0.4;
+  }
+
+  .customer-promo-copy {
+    max-width: 470px;
+  }
+
+  .customer-promo h2 {
+    max-width: 430px;
+    font-size: 34px;
+    letter-spacing: -1px;
+  }
+
+  .customer-promo-copy p {
+    max-width: 370px;
+  }
+
+  .customer-benefits {
+    padding: 60px 0 65px;
+  }
+
+  .customer-benefit-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .customer-benefit-card {
+    min-height: 0;
+    padding: 21px;
+  }
+
+  .customer-benefit-card h3 {
+    margin-top: 15px;
+  }
+
+  .customer-footer-inner {
+    padding-bottom: 18px;
+  }
+
+  .customer-footer-main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+    padding-bottom: 28px;
+  }
+
+  .customer-footer-social {
+    justify-self: start;
+    padding-top: 0;
+  }
+
+  .customer-footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 390px) {
+  .customer-container {
+    width: calc(100% - 28px);
+  }
+
+  .customer-header-inner {
+    gap: 8px;
+  }
+
+  .customer-account-name {
+    max-width: 68px;
+  }
+
+  .customer-hero h1 {
+    font-size: 41px;
+  }
+
+  .customer-hero-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-home *,
+  .customer-home *::before,
+  .customer-home *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

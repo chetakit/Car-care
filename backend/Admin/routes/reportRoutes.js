@@ -3,7 +3,7 @@ const reportController = require("../controllers/reportController");
 const {
   authenticateToken,
   requireAdmin,
-} = require("../middleware/authMiddleware");
+} = require("../../Auth/middleware/authMiddleware");
 const reportValidator = require("../validators/reportValidator");
 
 const router = express.Router();

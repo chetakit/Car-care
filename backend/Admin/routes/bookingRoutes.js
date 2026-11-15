@@ -3,7 +3,7 @@ const bookingController = require("../controllers/bookingController");
 const {
   authenticateToken,
   requireAdmin,
-} = require("../middleware/authMiddleware");
+} = require("../../Auth/middleware/authMiddleware");
 const bookingValidator = require("../validators/bookingValidator");
 
 const router = express.Router();
