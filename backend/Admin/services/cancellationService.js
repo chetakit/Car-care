@@ -117,7 +117,7 @@ async function lockBooking(connection, bookingId, user) {
 
 async function lockPaidPayment(connection, bookingId) {
   const [rows] = await connection.execute(
-    `SELECT payment_id, booking_id, amount, payment_status
+    `SELECT payment_id, booking_id, amount, payment_method, payment_status
     FROM payments
     WHERE booking_id = ?
     FOR UPDATE`,
@@ -127,6 +127,11 @@ async function lockPaidPayment(connection, bookingId) {
   if (!payment || payment.payment_status !== "PAID") {
     throw new CancellationValidationError(
       "A paid payment is required to cancel this booking.",
+    );
+  }
+  if (payment.payment_method !== "WALLET") {
+    throw new CancellationValidationError(
+      "Only verified Wallet payments can be refunded.",
     );
   }
   return payment;
@@ -148,22 +153,36 @@ async function assertNoExistingRefund(connection, paymentId, bookingId) {
   }
 }
 
-async function lockOrCreateWallet(connection, userId) {
-  await connection.execute(
-    `INSERT INTO wallets (user_id, balance)
-    VALUES (?, 0.00)
-    ON DUPLICATE KEY UPDATE wallet_id = LAST_INSERT_ID(wallet_id)`,
-    [userId],
+async function lockPaidWallet(connection, booking, payment) {
+  const [debits] = await connection.execute(
+    `SELECT wt.wallet_id, wt.amount
+    FROM wallet_transactions wt
+    INNER JOIN wallets w ON w.wallet_id = wt.wallet_id
+    WHERE wt.booking_id = ? AND wt.transaction_type = 'DEBIT'
+      AND wt.refund_id IS NULL AND w.user_id = ?
+    FOR UPDATE`,
+    [booking.booking_id, booking.user_id],
   );
+  if (
+    debits.length !== 1 ||
+    decimalToCents(debits[0].amount) !== decimalToCents(payment.amount)
+  ) {
+    throw new CancellationValidationError(
+      "A matching Wallet debit is required to refund this payment.",
+    );
+  }
+
   const [rows] = await connection.execute(
     `SELECT wallet_id, balance
     FROM wallets
-    WHERE user_id = ?
+    WHERE wallet_id = ? AND user_id = ?
     FOR UPDATE`,
-    [userId],
+    [debits[0].wallet_id, booking.user_id],
   );
   if (!rows[0]) {
-    throw new Error("Wallet could not be retrieved after creation.");
+    throw new CancellationValidationError(
+      "The Wallet used for this payment could not be found.",
+    );
   }
   return rows[0];
 }
@@ -174,7 +193,7 @@ async function cancel(bookingId, { reason }, user) {
     const payment = await lockPaidPayment(connection, bookingId);
     await assertNoExistingRefund(connection, payment.payment_id, bookingId);
     const { cancellationFee, refundAmount } = calculateRefund(payment.amount);
-    const wallet = await lockOrCreateWallet(connection, booking.user_id);
+    const wallet = await lockPaidWallet(connection, booking, payment);
 
     const [refundResult] = await connection.execute(
       `INSERT INTO refunds (

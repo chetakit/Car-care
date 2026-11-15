@@ -21,6 +21,12 @@ const PAYMENT_METHOD_LABELS = {
   WALLET: 'Car Care Wallet',
 }
 
+const BOOKING_PAYMENT_STATUS_LABELS = {
+  PENDING: 'รอชำระเงิน',
+  PAID: 'ชำระแล้ว',
+  FAILED: 'ชำระไม่สำเร็จ',
+}
+
 function humanize(value) {
   return String(value ?? '')
     .trim()
@@ -37,6 +43,15 @@ export function formatCustomerBookingStatus(value) {
 export function formatCustomerPaymentStatus(value) {
   const status = String(value ?? '').trim().toUpperCase()
   return PAYMENT_STATUS_LABELS[status] || humanize(status) || 'Not paid'
+}
+
+export function formatCustomerBookingPaymentStatus(payment) {
+  if (!payment) return 'ยังไม่มีรายการชำระเงิน'
+  const status = String(payment.payment_status ?? '').trim().toUpperCase()
+  const label = BOOKING_PAYMENT_STATUS_LABELS[status] || 'ไม่ทราบสถานะการชำระเงิน'
+  return String(payment.payment_method ?? '').trim().toUpperCase() === 'SIMULATED'
+    ? `${label} (จำลอง — ไม่ใช่การชำระเงินจริง)`
+    : label
 }
 
 export function formatCustomerPaymentMethod(value) {

@@ -98,7 +98,9 @@ function createDatabase(options = {}) {
       updated_at: "2026-11-14 10:00:00",
       ...wallet,
     })),
-    walletTransactions: [],
+    walletTransactions: (options.walletTransactions || []).map((row) => ({ ...row })),
+    refunds: (options.refunds || []).map((row) => ({ ...row })),
+    bookingHistory: [],
     queries: [],
     poolQueries: [],
     commits: 0,
@@ -108,25 +110,34 @@ function createDatabase(options = {}) {
     paymentStatusUpdates: 0,
     nextPaymentId: 900,
     nextWalletTransactionId: 1200,
+    nextRefundId: 1400,
     failOn: options.failOn,
   };
 
   function snapshot() {
     return {
+      booking: state.booking && { ...state.booking },
       payments: state.payments.map((row) => ({ ...row })),
       wallets: state.wallets.map((row) => ({ ...row })),
       walletTransactions: state.walletTransactions.map((row) => ({ ...row })),
+      refunds: state.refunds.map((row) => ({ ...row })),
+      bookingHistory: state.bookingHistory.map((row) => ({ ...row })),
       nextPaymentId: state.nextPaymentId,
       nextWalletTransactionId: state.nextWalletTransactionId,
+      nextRefundId: state.nextRefundId,
     };
   }
 
   function restore(saved) {
+    state.booking = saved.booking;
     state.payments = saved.payments;
     state.wallets = saved.wallets;
     state.walletTransactions = saved.walletTransactions;
+    state.refunds = saved.refunds;
+    state.bookingHistory = saved.bookingHistory;
     state.nextPaymentId = saved.nextPaymentId;
     state.nextWalletTransactionId = saved.nextWalletTransactionId;
+    state.nextRefundId = saved.nextRefundId;
   }
 
   let transactionTail = Promise.resolve();
@@ -154,6 +165,23 @@ function createDatabase(options = {}) {
       return [rowsOf(
         state.payments.find((payment) => payment.transaction_ref === values[0]),
       )];
+    }
+
+    if (
+      normalized.includes("FROM WALLET_TRANSACTIONS WT INNER JOIN WALLETS W") &&
+      normalized.includes("TRANSACTION_TYPE = 'DEBIT'")
+    ) {
+      return [state.walletTransactions.filter((transaction) => {
+        const wallet = state.wallets.find(
+          (row) => Number(row.wallet_id) === Number(transaction.wallet_id),
+        );
+        return (
+          Number(transaction.booking_id) === Number(values[0]) &&
+          transaction.transaction_type === "DEBIT" &&
+          transaction.refund_id == null &&
+          wallet && Number(wallet.user_id) === Number(values[1])
+        );
+      }).map((row) => ({ ...row }))];
     }
 
     if (
@@ -226,9 +254,29 @@ function createDatabase(options = {}) {
     ) {
       return [rowsOf(
         state.wallets.find(
-          (wallet) => Number(wallet.wallet_id) === Number(values[0]),
+          (wallet) => Number(wallet.wallet_id) === Number(values[0]) &&
+            (values[1] === undefined || Number(wallet.user_id) === Number(values[1])),
         ),
       )];
+    }
+
+    if (normalized.startsWith("SELECT BALANCE FROM WALLETS")) {
+      return [rowsOf(state.wallets.find(
+        (wallet) => Number(wallet.wallet_id) === Number(values[0]),
+      ))];
+    }
+
+    if (normalized.includes("FROM REFUNDS") && normalized.includes("FOR UPDATE")) {
+      return [rowsOf(state.refunds.find(
+        (refund) => Number(refund.payment_id) === Number(values[0]) ||
+          Number(refund.booking_id) === Number(values[1]),
+      ))];
+    }
+
+    if (normalized.includes("FROM REFUNDS") && normalized.includes("WHERE REFUND_ID = ?")) {
+      return [rowsOf(state.refunds.find(
+        (refund) => Number(refund.refund_id) === Number(values[0]),
+      ))];
     }
 
     if (normalized.startsWith("SELECT WALLET_ID, USER_ID, BALANCE")) {
@@ -252,19 +300,68 @@ function createDatabase(options = {}) {
       return [{ affectedRows: 1 }];
     }
 
+    if (normalized.startsWith("UPDATE WALLETS SET BALANCE = BALANCE + ?")) {
+      const wallet = state.wallets.find(
+        (row) => Number(row.wallet_id) === Number(values[1]),
+      );
+      if (!wallet) return [{ affectedRows: 0 }];
+      wallet.balance = fromCents(toCents(wallet.balance) + toCents(values[0]));
+      return [{ affectedRows: 1 }];
+    }
+
     if (normalized.startsWith("INSERT INTO WALLET_TRANSACTIONS")) {
       if (state.failOn === "walletTransactionInsert") {
         throw new Error("simulated wallet transaction insert failure");
       }
+      const credit = normalized.includes("'CREDIT'");
       state.walletTransactions.push({
         wallet_transaction_id: state.nextWalletTransactionId++,
         wallet_id: values[0],
-        booking_id: values[1],
-        transaction_type: "DEBIT",
+        refund_id: credit ? values[1] : null,
+        booking_id: credit ? null : values[1],
+        transaction_type: credit ? "CREDIT" : "DEBIT",
         amount: values[2],
         description: values[3],
       });
       return [{ insertId: state.nextWalletTransactionId - 1, affectedRows: 1 }];
+    }
+
+    if (normalized.startsWith("INSERT INTO REFUNDS")) {
+      const refund = {
+        refund_id: state.nextRefundId++,
+        payment_id: values[0],
+        booking_id: values[1],
+        refund_amount: values[2],
+        cancellation_fee: values[3],
+        refund_reason: values[4],
+        refund_status: "REFUND_PENDING",
+      };
+      state.refunds.push(refund);
+      return [{ insertId: refund.refund_id, affectedRows: 1 }];
+    }
+
+    if (normalized.startsWith("UPDATE REFUNDS SET REFUND_STATUS")) {
+      const refund = state.refunds.find(
+        (row) => Number(row.refund_id) === Number(values[0]) &&
+          row.refund_status === "REFUND_PENDING",
+      );
+      if (!refund) return [{ affectedRows: 0 }];
+      refund.refund_status = "REFUNDED";
+      return [{ affectedRows: 1 }];
+    }
+
+    if (normalized.startsWith("UPDATE BOOKINGS SET BOOKING_STATUS")) {
+      if (!state.booking || Number(state.booking.booking_id) !== Number(values[0]) ||
+          state.booking.booking_status !== "CONFIRMED") {
+        return [{ affectedRows: 0 }];
+      }
+      state.booking.booking_status = "CANCELLED";
+      return [{ affectedRows: 1 }];
+    }
+
+    if (normalized.startsWith("INSERT INTO BOOKING_STATUS_HISTORY")) {
+      state.bookingHistory.push({ booking_id: values[0], changed_by: values[1], reason: values[2] });
+      return [{ affectedRows: 1 }];
     }
 
     if (normalized.startsWith("INSERT INTO PAYMENTS")) {
@@ -519,6 +616,121 @@ test("Simulated payments can be marked PAID or FAILED and duplicate results are 
       );
       assert.equal(database.state.paymentStatusUpdates, 1);
       assert.equal(database.state.commits, 2);
+    });
+  }
+});
+
+test("A simulated paid booking cannot be cancelled for wallet credit", async () => {
+  const database = createDatabase();
+  useDatabase(database);
+
+  await withServer(async (port) => {
+    const token = createToken();
+    assert.equal((await sendRequest(port, "POST", "/api/payments/77", token, {
+      payment_method: "SIMULATED",
+    })).statusCode, 201);
+    assert.equal((await sendRequest(port, "POST", "/api/payments/77/simulate", token, {
+      payment_status: "PAID",
+    })).statusCode, 200);
+    const response = await sendRequest(port, "POST", "/api/cancellations/77", token);
+    assert.equal(response.statusCode, 400);
+    assert.equal(database.state.booking.booking_status, "CONFIRMED");
+    assert.equal(database.state.wallets[0].balance, "100.00");
+    assert.equal(database.state.refunds.length, 0);
+    assert.equal(database.state.walletTransactions.length, 0);
+  });
+});
+
+test("Cancellation rejects unverified methods and wallet payments without a matching debit", async () => {
+  const debit = {
+    wallet_transaction_id: 1,
+    wallet_id: 501,
+    booking_id: 77,
+    transaction_type: "DEBIT",
+    amount: "25.00",
+    refund_id: null,
+  };
+  const cases = [
+    { method: "CASH", debits: [debit] },
+    { method: "BANK_TRANSFER", debits: [debit] },
+    { method: "WALLET", debits: [] },
+    { method: "WALLET", debits: [{ ...debit, amount: "24.99" }] },
+    { method: "WALLET", debits: [{ ...debit, wallet_id: 502 }] },
+    { method: "WALLET", debits: [debit, { ...debit, wallet_transaction_id: 2 }] },
+    { method: "WALLET", debits: [{ ...debit, refund_id: 5 }] },
+  ];
+
+  for (const { method, debits } of cases) {
+    const database = createDatabase({
+      payments: [{ payment_method: method, payment_status: "PAID" }],
+      wallets: [
+        { wallet_id: 501, user_id: 101, balance: "100.00" },
+        { wallet_id: 502, user_id: 202, balance: "100.00" },
+      ],
+      walletTransactions: debits,
+    });
+    useDatabase(database);
+    await withServer(async (port) => {
+      const response = await sendRequest(
+        port, "POST", "/api/cancellations/77", createToken(),
+      );
+      assert.equal(response.statusCode, 400, JSON.stringify({ method, debits }));
+      assert.equal(database.state.booking.booking_status, "CONFIRMED");
+      assert.equal(database.state.wallets[0].balance, "100.00");
+      assert.equal(database.state.wallets[1].balance, "100.00");
+      assert.equal(database.state.refunds.length, 0);
+      assert.equal(database.state.walletTransactions.length, debits.length);
+    });
+  }
+});
+
+test("A wallet payment refunds its original wallet only once", async () => {
+  const database = createDatabase();
+  useDatabase(database);
+
+  await withServer(async (port) => {
+    const token = createToken();
+    const paid = await sendRequest(port, "POST", "/api/payments/77/wallet", token);
+    assert.equal(paid.statusCode, 200);
+    assert.equal(database.state.wallets[0].balance, "75.00");
+
+    const responses = await Promise.all([
+      sendRequest(port, "POST", "/api/cancellations/77", token, { reason: "Changed plans" }),
+      sendRequest(port, "POST", "/api/cancellations/77", token, { reason: "Changed plans" }),
+    ]);
+    assert.deepEqual(responses.map((response) => response.statusCode).sort(), [200, 409]);
+    assert.equal(database.state.wallets[0].balance, "95.00");
+    assert.equal(database.state.booking.booking_status, "CANCELLED");
+    assert.equal(database.state.refunds.length, 1);
+    assert.equal(database.state.refunds[0].refund_amount, "20.00");
+    assert.equal(database.state.refunds[0].cancellation_fee, "5.00");
+    assert.equal(database.state.refunds[0].refund_status, "REFUNDED");
+    assert.equal(database.state.walletTransactions.filter(
+      (row) => row.transaction_type === "CREDIT" && row.refund_id === database.state.refunds[0].refund_id,
+    ).length, 1);
+    assert.equal(database.state.bookingHistory.length, 1);
+  });
+});
+
+test("Wallet refund rejects an existing refund and rolls back a failed credit", async () => {
+  for (const existingRefund of [true, false]) {
+    const database = createDatabase();
+    useDatabase(database);
+    await withServer(async (port) => {
+      const token = createToken();
+      assert.equal((await sendRequest(port, "POST", "/api/payments/77/wallet", token)).statusCode, 200);
+      if (existingRefund) {
+        database.state.refunds.push({ refund_id: 50, booking_id: 77, payment_id: 900 });
+      } else {
+        database.state.failOn = "walletTransactionInsert";
+      }
+      const response = await sendRequest(port, "POST", "/api/cancellations/77", token);
+      assert.equal(response.statusCode, existingRefund ? 409 : 500);
+      assert.equal(database.state.wallets[0].balance, "75.00");
+      assert.equal(database.state.booking.booking_status, "CONFIRMED");
+      assert.equal(database.state.refunds.length, existingRefund ? 1 : 0);
+      assert.equal(database.state.walletTransactions.length, 1);
+      assert.equal(database.state.bookingHistory.length, 0);
     });
   }
 });

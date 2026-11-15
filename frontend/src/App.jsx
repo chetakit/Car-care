@@ -9,8 +9,10 @@ import CustomerDashboardPage from './Customer/CustomerDashboardPage.jsx'
 import CustomerLanding from './Customer/CustomerLanding.jsx'
 import CustomerNotFoundPage from './Customer/CustomerNotFoundPage.jsx'
 import CustomerPaymentPage from './Customer/CustomerPaymentPage.jsx'
+import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
+import ServicesPage from './Customer/ServicesPage.jsx'
 // [STAFF] หน้าพนักงาน (Staff & Service Management)
 import StaffApp from './Staff/StaffApp.jsx'
 
@@ -55,6 +57,7 @@ function getCustomerReturnPath(value) {
     path === '/customer/booking' ||
     path === '/customer/vehicles' ||
     path === '/customer/bookings' ||
+    path === '/customer/wallet' ||
     /^\/customer\/payment\/\d+$/.test(path)
 
   return isCustomerRoute ? `${path}${url.search}${url.hash}` : null
@@ -124,9 +127,9 @@ function AppContent() {
     if (authStatus === 'checking') return
 
     if (authStatus !== 'authenticated') {
-      const isGuestLandingPath = currentPath === '/'
+      const isPublicPath = currentPath === '/' || currentPath === '/services'
       if (
-        !isGuestLandingPath &&
+        !isPublicPath &&
         currentPath !== '/login' &&
         currentPath !== '/register'
       ) {
@@ -149,12 +152,12 @@ function AppContent() {
         window.history.state?.customerReturnTo,
       )
       navigateTo(destination || '/', true)
-    } else if (currentPath === '/') {
+    } else if (currentPath === '/' || currentPath === '/services') {
       return
     } else if (user?.role === 'ADMIN') {
       if (currentPath === '/admin') {
         navigateTo('/admin/dashboard', true)
-      } else if (!isAdminPath(currentPath)) {
+      } else if (!isAdminPath(currentPath) && currentPath !== '/customer/booking') {
         navigateTo('/admin/dashboard', true)
       }
     } else if (user?.role === 'CUSTOMER' && !isCustomerPath(currentPath)) {
@@ -164,6 +167,14 @@ function AppContent() {
 
   if (authStatus === 'checking') {
     return <SessionLoading message="Verifying your session…" />
+  }
+  if (currentPath === '/services') {
+    return (
+      <ServicesPage
+        onLogout={user?.role === 'ADMIN' ? logoutAdminFromHome : logout}
+        user={user}
+      />
+    )
   }
   if (authStatus !== 'authenticated') {
     if (currentPath === '/login') {
@@ -190,6 +201,10 @@ function AppContent() {
       : <SessionLoading message="Opening the Staff workspace…" />
   }
 
+  if (currentPath === '/customer/booking') {
+    return <CustomerBookingPage onLogout={logout} user={user} />
+  }
+
   if (user?.role === 'ADMIN') {
     if (currentPath === '/') {
       return <CustomerLanding onLogout={logoutAdminFromHome} user={user} />
@@ -214,6 +229,9 @@ function AppContent() {
     if (currentPath === '/customer/bookings') {
       return <MyBookingsPage onLogout={logout} user={user} />
     }
+    if (currentPath === '/customer/wallet') {
+      return <CustomerWalletPage onLogout={logout} user={user} />
+    }
     const paymentRoute = /^\/customer\/payment\/([^/]+)$/.exec(currentPath)
     if (paymentRoute) {
       return (
@@ -225,9 +243,6 @@ function AppContent() {
           user={user}
         />
       )
-    }
-    if (currentPath === '/customer/booking') {
-      return <CustomerBookingPage onLogout={logout} user={user} />
     }
     return <CustomerNotFoundPage onLogout={logout} user={user} />
   }

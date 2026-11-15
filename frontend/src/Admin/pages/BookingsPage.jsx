@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminModal from '../components/AdminModal.jsx'
-import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
+import { DataTable, PageHeading, Pagination, PaymentStatusBadge, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDate, formatDateTime } from '../utils/formatDate.js'
@@ -343,7 +343,7 @@ function BookingsPage({ onNavigate }) {
                 <dl className="admin-booking-detail-grid">
                   <div><dt>Booking status</dt><dd><StatusBadge value={booking.booking_status} /></dd></div>
                   <div><dt>Payment status</dt><dd>{payment?.payment_status
-                    ? <StatusBadge value={payment.payment_status} />
+                    ? <PaymentStatusBadge payment={payment} />
                     : <span className="admin-booking-no-payment">Not created</span>}</dd></div>
                   <div><dt>Booking date</dt><dd>{scheduleSummary(booking.booking_date, booking.start_time, booking.end_time)}</dd></div>
                   <div><dt>Total</dt><dd>{formatMoney(booking.total_amount)}</dd></div>
@@ -410,7 +410,7 @@ function BookingsPage({ onNavigate }) {
                     <div><dt>Payment ID</dt><dd>{payment.payment_id}</dd></div>
                     <div><dt>Amount</dt><dd>{formatMoney(payment.amount)}</dd></div>
                     <div><dt>Method</dt><dd>{payment.payment_method || '—'}</dd></div>
-                    <div><dt>Status</dt><dd><StatusBadge value={payment.payment_status} /></dd></div>
+                    <div><dt>Status</dt><dd><PaymentStatusBadge payment={payment} /></dd></div>
                     <div><dt>Paid at</dt><dd>{formatDateTime(payment.paid_at)}</dd></div>
                     <div className="admin-booking-detail-wide"><dt>Transaction reference</dt><dd>{payment.transaction_ref || '—'}</dd></div>
                   </dl>

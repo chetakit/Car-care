@@ -118,3 +118,12 @@ export function StatusBadge({ value }) {
   const tone = String(value ?? '').toLowerCase().replaceAll('_', '-')
   return <span className={`admin-status-badge status-${tone}`}>{formatStatusLabel(value)}</span>
 }
+
+export function PaymentStatusBadge({ payment }) {
+  return (
+    <>
+      <StatusBadge value={payment.payment_status} />
+      {payment.payment_method === 'SIMULATED' && <span> (Demo — not a real payment)</span>}
+    </>
+  )
+}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminAccountMenu from '../Admin/components/AdminAccountMenu.jsx'
+import './customer-theme.css'
 
 export function BrandMark() {
   return (
@@ -23,9 +24,12 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   const initials = displayName.slice(0, 1).toUpperCase()
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isPublicLanding = currentPath === '/'
+  const isBookingPage = currentPath === '/customer/booking'
+  const isCustomer = user?.role === 'CUSTOMER'
+  const useLandingNavigation = landingPage || isCustomer
   const profileTriggerRef = useRef(null)
   const homeHref = '/'
-  const servicesHref = isPublicLanding ? '#services' : '/#services'
+  const servicesHref = '/services'
   const aboutHref = isPublicLanding ? '#about' : '/#about'
   const howItWorksHref = isPublicLanding ? '#how-it-works' : '/#how-it-works'
   const contactHref = isPublicLanding ? '#contact' : '/#contact'
@@ -57,7 +61,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   }
 
   return (
-    <header className={`customer-header${landingPage ? ' customer-header-landing' : ''}`}>
+    <header className={`customer-header${useLandingNavigation ? ' customer-header-landing' : ''}${isCustomer ? ' customer-header-customer' : ''}`}>
       <div className="customer-container customer-header-inner">
         <a aria-label="Car Care home" className="customer-brand" href={homeHref}>
           <BrandMark />
@@ -81,7 +85,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
           className={`customer-nav${mobileNavOpen ? ' is-open' : ''}`}
           id="customer-main-navigation"
         >
-          {landingPage ? (
+          {useLandingNavigation ? (
             <>
               <a href={homeHref} onClick={closeMobileNav}>Home</a>
               <a href={servicesHref} onClick={closeMobileNav}>Our Services</a>
@@ -102,7 +106,12 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
               {user?.role === 'CUSTOMER' ? (
                 <>
                   <a href={homeHref} onClick={closeMobileNav}>Home</a>
-                  <a href="/customer/booking" onClick={closeMobileNav}>Book a Service</a>
+                  <a
+                    href="/customer/booking"
+                    onClick={closeMobileNav}
+                  >
+                    Book a Service
+                  </a>
                 </>
               ) : (
                 <>
@@ -111,7 +120,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
                   <a href={aboutHref} onClick={closeMobileNav}>About</a>
                 </>
               )}
-              {user?.role !== 'CUSTOMER' && isPublicLanding && bookingAvailable && (
+              {user?.role !== 'CUSTOMER' && (isPublicLanding || isBookingPage) && bookingAvailable && (
                 <a
                   className="customer-nav-book"
                   href="/customer/booking"
@@ -155,6 +164,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
                   </div>
                   <a href="/customer/vehicles">My Vehicles</a>
                   <a href="/customer/bookings">My Bookings</a>
+                  {user.role === 'CUSTOMER' && <a href="/customer/wallet">My Wallet</a>}
                   <button
                     onClick={() => {
                       setProfileOpen(false)

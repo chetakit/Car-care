@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PageHeading, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
+import { PageHeading, PaymentStatusBadge, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import { formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
@@ -248,7 +248,7 @@ function PaymentsPage() {
                 <div><dt>Payment ID</dt><dd>{payment.payment_id}</dd></div>
                 <div><dt>Amount</dt><dd>{formatMoney(payment.amount)}</dd></div>
                 <div><dt>Payment method</dt><dd>{payment.payment_method ?? '—'}</dd></div>
-                <div><dt>Payment status</dt><dd><StatusBadge value={payment.payment_status} /></dd></div>
+                <div><dt>Payment status</dt><dd><PaymentStatusBadge payment={payment} /></dd></div>
                 <div><dt>Paid at</dt><dd>{formatDateTime(payment.paid_at)}</dd></div>
                 <div className="admin-payment-reference"><dt>Transaction reference</dt><dd>{payment.transaction_ref || '—'}</dd></div>
               </dl>
@@ -276,7 +276,11 @@ function PaymentsPage() {
                 <p className="admin-payment-guidance">Payment unsuccessful. The backend does not allow this payment to be replaced or retried with Wallet.</p>
               )}
               {payment.payment_status === 'PAID' && (
-                <p className="admin-payment-guidance">Payment received.</p>
+                <p className="admin-payment-guidance">
+                  {payment.payment_method === 'SIMULATED'
+                    ? 'Demo payment marked paid; no real payment was verified.'
+                    : 'Payment received.'}
+                </p>
               )}
               {payment.payment_status === 'PENDING' && !['SIMULATED', 'WALLET'].includes(payment.payment_method) && (
                 <p className="admin-payment-guidance">Awaiting payment. The backend does not allow this payment method to be changed to Wallet.</p>
