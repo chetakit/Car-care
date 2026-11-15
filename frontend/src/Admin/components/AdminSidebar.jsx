@@ -10,11 +10,7 @@ function AdminSidebar({
       <a
         aria-label="Car Care Admin home"
         className="admin-brand"
-        href="/admin/dashboard"
-        onClick={(event) => {
-          event.preventDefault()
-          onNavigate('dashboard')
-        }}
+        href="/"
       >
         <span className="admin-brand-mark">C</span>
         <span className="admin-brand-copy">

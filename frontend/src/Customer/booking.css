@@ -1204,3 +1204,140 @@
     flex-direction: column;
   }
 }
+
+.customer-booking-page {
+  --customer-teal: #d72d37;
+  --customer-teal-dark: #b8242d;
+  --customer-pale: #f9eeee;
+  --customer-line: #dfe1df;
+  --customer-ink: #1b1e1f;
+  --customer-muted: #626a69;
+  --car-care-accent-rgb: 215 45 55;
+}
+
+.customer-booking-page .customer-header {
+  border-bottom-color: rgb(255 255 255 / 9%);
+  background: rgb(17 19 20 / 96%);
+  box-shadow: none;
+}
+
+.customer-booking-page .customer-header .customer-brand-name,
+.customer-booking-page .customer-header .customer-account-trigger {
+  color: #f7f7f6;
+}
+
+.customer-booking-page .customer-header .customer-brand-mark {
+  border-radius: 9px;
+  background: #d72d37;
+}
+
+.customer-booking-page .customer-header .customer-nav a,
+.customer-booking-page .customer-header .customer-login-link {
+  color: #d3d6d5;
+}
+
+.customer-booking-page .customer-header .customer-nav a:hover,
+.customer-booking-page .customer-header .customer-login-link:hover {
+  color: #ff777d;
+}
+
+.customer-booking-page .customer-header .customer-register-link {
+  border-color: #d72d37;
+  background: #c62832;
+}
+
+.customer-booking-page .customer-header .customer-register-link:hover {
+  border-color: #a91f28;
+  background: #a91f28;
+}
+
+.customer-booking-page .customer-header .customer-menu-toggle {
+  border-color: rgb(255 255 255 / 18%);
+  background: #191c1d;
+}
+
+.customer-booking-page .customer-header .customer-menu-toggle span {
+  background: #fff;
+}
+
+.customer-booking-page .customer-header .customer-account-trigger:hover,
+.customer-booking-page .customer-header .customer-account-trigger[aria-expanded='true'] {
+  background: rgb(255 255 255 / 10%);
+}
+
+.customer-booking-page .customer-avatar {
+  color: #b8242d;
+  background: #fbecee;
+}
+
+.customer-booking-page .booking-main {
+  background: #f3f3f0;
+}
+
+.customer-booking-page .booking-heading-mark,
+.customer-booking-page .booking-card-icon {
+  border-color: #f0cdd0;
+  color: #c62832;
+  background: #fff0f1;
+}
+
+.customer-booking-page .booking-heading-mark .customer-brand-mark {
+  color: #c62832;
+  background: transparent;
+}
+
+.customer-booking-page .booking-vehicle-card:hover:not(.is-unavailable),
+.customer-booking-page .booking-service-card:hover:not(.is-unavailable),
+.customer-booking-page .booking-date-option:hover,
+.customer-booking-page .booking-slot:hover {
+  border-color: #e8bfc2;
+}
+
+.customer-booking-page .booking-vehicle-card.is-selected,
+.customer-booking-page .booking-service-card.is-selected,
+.customer-booking-page .booking-date-option.is-selected,
+.customer-booking-page .booking-slot.is-selected {
+  background: #fff5f5;
+}
+
+.customer-booking-page .booking-total-bar,
+.customer-booking-page .booking-summary-total {
+  background: #f5f5f2;
+}
+
+.customer-booking-page .booking-range-buttons button:hover:not(:disabled) {
+  background: #fff0f1;
+}
+
+.customer-booking-page .booking-panel-actions {
+  background: #fafaf8;
+}
+
+.customer-booking-page .booking-secondary-button:hover,
+.customer-booking-page .booking-secondary-link:hover {
+  background: #f4f4f1;
+}
+
+.customer-booking-page .booking-security-note span {
+  background: #c62832;
+}
+
+.customer-booking-page .booking-success {
+  border-color: #dfe1df;
+}
+
+.customer-booking-page .booking-success-mark {
+  background: #c62832;
+}
+
+@media (max-width: 700px) {
+  .customer-booking-page .customer-header .customer-nav {
+    border-bottom-color: rgb(255 255 255 / 12%);
+    background: #171a1b;
+    box-shadow: 0 12px 18px rgb(0 0 0 / 18%);
+  }
+
+  .customer-booking-page .customer-header .customer-nav a {
+    color: #e2e4e3;
+  }
+}

@@ -131,17 +131,13 @@ function AppContent() {
       return
     }
 
-    if (currentPath === '/' || currentPath === '/login') {
-      const destination =
-        currentPath === '/login'
-          ? getCustomerReturnPath(window.history.state?.customerReturnTo)
-          : null
-      navigateTo(
-        user?.role === 'ADMIN'
-          ? '/'
-          : destination || '/customer',
-        true,
+    if (currentPath === '/login') {
+      const destination = getCustomerReturnPath(
+        window.history.state?.customerReturnTo,
       )
+      navigateTo(destination || '/', true)
+    } else if (currentPath === '/') {
+      return
     } else if (user?.role === 'ADMIN') {
       if (currentPath === '/admin') {
         navigateTo('/admin/dashboard', true)
@@ -183,6 +179,9 @@ function AppContent() {
       : <SessionLoading message="Opening the Admin workspace…" />
   }
   if (user?.role === 'CUSTOMER') {
+    if (currentPath === '/') {
+      return <CustomerLanding onLogout={logout} user={user} />
+    }
     if (!isCustomerPath(currentPath)) {
       return <SessionLoading message="Opening your Customer account…" />
     }

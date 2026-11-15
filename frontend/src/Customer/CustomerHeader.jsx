@@ -12,7 +12,7 @@ export function BrandMark() {
   )
 }
 
-function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
+function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage = false }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const profileRef = useRef(null)
@@ -24,17 +24,11 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isPublicLanding = currentPath === '/'
   const profileTriggerRef = useRef(null)
-  const homeHref = isAdmin
-    ? isPublicLanding
-      ? '#home'
-      : '/#home'
-    : user
-      ? '/customer#dashboard-home'
-      : isPublicLanding
-        ? '#home'
-        : '/#home'
+  const homeHref = '/'
   const servicesHref = isPublicLanding ? '#services' : '/#services'
   const aboutHref = isPublicLanding ? '#about' : '/#about'
+  const howItWorksHref = isPublicLanding ? '#how-it-works' : '/#how-it-works'
+  const contactHref = isPublicLanding ? '#contact' : '/#contact'
 
   useEffect(() => {
     if (!profileOpen) return undefined
@@ -63,7 +57,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
   }
 
   return (
-    <header className="customer-header">
+    <header className={`customer-header${landingPage ? ' customer-header-landing' : ''}`}>
       <div className="customer-container customer-header-inner">
         <a aria-label="Car Care home" className="customer-brand" href={homeHref}>
           <BrandMark />
@@ -87,17 +81,37 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
           className={`customer-nav${mobileNavOpen ? ' is-open' : ''}`}
           id="customer-main-navigation"
         >
-          {user?.role === 'CUSTOMER' ? (
+          {landingPage ? (
             <>
               <a href={homeHref} onClick={closeMobileNav}>Home</a>
-              <a href="/customer/booking" onClick={closeMobileNav}>Book a Service</a>
+              <a href={servicesHref} onClick={closeMobileNav}>Our Services</a>
+              <a href={howItWorksHref} onClick={closeMobileNav}>How It Works</a>
+              <a href={contactHref} onClick={closeMobileNav}>Contact</a>
+              {bookingAvailable && (
+                <a
+                  className="customer-nav-book"
+                  href="/customer/booking"
+                  onClick={closeMobileNav}
+                >
+                  Book a Service
+                </a>
+              )}
             </>
           ) : (
             <>
-              <a href={homeHref} onClick={closeMobileNav}>Home</a>
-              <a href={servicesHref} onClick={closeMobileNav}>Services</a>
-              <a href={aboutHref} onClick={closeMobileNav}>About</a>
-              {isPublicLanding && bookingAvailable && (
+              {user?.role === 'CUSTOMER' ? (
+                <>
+                  <a href={homeHref} onClick={closeMobileNav}>Home</a>
+                  <a href="/customer/booking" onClick={closeMobileNav}>Book a Service</a>
+                </>
+              ) : (
+                <>
+                  <a href={homeHref} onClick={closeMobileNav}>Home</a>
+                  <a href={servicesHref} onClick={closeMobileNav}>Services</a>
+                  <a href={aboutHref} onClick={closeMobileNav}>About</a>
+                </>
+              )}
+              {user?.role !== 'CUSTOMER' && isPublicLanding && bookingAvailable && (
                 <a
                   className="customer-nav-book"
                   href="/customer/booking"
