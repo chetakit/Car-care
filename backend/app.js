@@ -25,6 +25,8 @@ const reportRoutes = require("./Admin/routes/reportRoutes");
 const paymentRoutes = require("./Admin/routes/paymentRoutes");
 const cancellationRoutes = require("./Admin/routes/cancellationRoutes");
 const walletRoutes = require("./Admin/routes/walletRoutes");
+// [STAFF] Staff & Service Management
+const staffBookingRoutes = require("./Staff/routes/staffBookingRoutes");
 
 const app = express();
 
@@ -54,6 +56,8 @@ app.use("/api/admin/reports", reportRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/cancellations", cancellationRoutes);
 app.use("/api/wallet", walletRoutes);
+// [STAFF] ต้องรัน database/migrations/2026-11-15_staff_service.sql ก่อนใช้
+app.use("/api/staff/bookings", staffBookingRoutes);
 
 app.get("/", (req, res) => {
   res.json({

@@ -85,9 +85,38 @@ function requireCustomerOrAdmin(req, res, next) {
   return next();
 }
 
+// [STAFF] ใช้กับ /api/staff/* — อนุญาต STAFF และ ADMIN (เผื่อแอดมินต้องช่วยดูคิว)
+function requireStaff(req, res, next) {
+  if (!req.user || (req.user.role !== "STAFF" && req.user.role !== "ADMIN")) {
+    return res.status(403).json({
+      status: "error",
+      message: "Staff access required.",
+    });
+  }
+
+  return next();
+}
+
+// [STAFF] ใช้กับ /api/auth/me และ /api/auth/logout ให้ทุก role ที่ล็อกอินได้
+function requireAnySignedInRole(req, res, next) {
+  if (
+    !req.user ||
+    !["CUSTOMER", "ADMIN", "STAFF"].includes(req.user.role)
+  ) {
+    return res.status(403).json({
+      status: "error",
+      message: "Signed-in account required.",
+    });
+  }
+
+  return next();
+}
+
 module.exports = {
   authenticateToken,
   requireAdmin,
   requireCustomer,
   requireCustomerOrAdmin,
+  requireStaff, // [STAFF]
+  requireAnySignedInRole, // [STAFF]
 };

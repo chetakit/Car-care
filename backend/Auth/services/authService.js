@@ -3,7 +3,8 @@ const jwt = require("jsonwebtoken");
 const pool = require("../../shared/config/db");
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
-const ALLOWED_LOGIN_ROLES = new Set(["ADMIN", "CUSTOMER"]);
+// [STAFF] เพิ่ม "STAFF" เพื่อให้พนักงานล็อกอินได้ (Staff & Service Management)
+const ALLOWED_LOGIN_ROLES = new Set(["ADMIN", "CUSTOMER", "STAFF"]);
 
 class AuthenticationError extends Error {}
 

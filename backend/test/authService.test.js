@@ -147,12 +147,14 @@ test("login rejects inactive accounts", async () => {
   );
 });
 
-test("login rejects roles outside ADMIN and CUSTOMER", async () => {
+// [STAFF] เดิมเทสต์นี้คาดว่า STAFF ล็อกอินไม่ได้ — ตอนนี้ STAFF ล็อกอินได้แล้ว
+//         จึงเปลี่ยนเป็นทดสอบ role ที่ไม่รู้จักแทน และเพิ่มเทสต์ STAFF ด้านล่าง
+test("login rejects roles outside ADMIN, CUSTOMER and STAFF", async () => {
   const user = {
     user_id: 33,
-    email: "staff@example.test",
+    email: "unknown-role@example.test",
     password_hash: passwordHash,
-    role: "STAFF",
+    role: "GUEST",
     status: "ACTIVE",
   };
   mockUser(user);
@@ -161,6 +163,21 @@ test("login rejects roles outside ADMIN and CUSTOMER", async () => {
     authService.login(user.email, testPassword),
     authService.AuthenticationError,
   );
+});
+
+test("login accepts active STAFF accounts", async () => {
+  const user = {
+    user_id: 34,
+    full_name: "Staff Member",
+    email: "staff@example.test",
+    password_hash: passwordHash,
+    role: "STAFF",
+    status: "ACTIVE",
+  };
+  mockUser(user);
+
+  const result = await authService.login(user.email, testPassword);
+  assert.equal(result.user.role, "STAFF");
 });
 
 after(() => {
