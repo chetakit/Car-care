@@ -107,6 +107,9 @@ const modelsWithActiveStatus = [
 function installCatalogQueries({ fail = false, expectFilters = null } = {}) {
   pool.execute = async (sql, values) => {
     if (fail) throw new Error("private database query detail");
+    if (sql.includes("SELECT role, status FROM users")) {
+      return [[{ role: "ADMIN", status: "ACTIVE" }]];
+    }
     assert.match(sql, /status = \?/);
     if (sql.includes("FROM vehicle_types")) {
       assert.equal(values[0], "ACTIVE");

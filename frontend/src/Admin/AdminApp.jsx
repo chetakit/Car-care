@@ -7,13 +7,22 @@ import DashboardPage from './pages/DashboardPage.jsx'
 import PaymentsPage from './pages/PaymentsPage.jsx'
 import ReportsPage from './pages/ReportsPage.jsx'
 import ServicesPage from './pages/ServicesPage.jsx'
+import StaffPage from './pages/StaffPage.jsx'
 import WalletPage from './pages/WalletPage.jsx'
 import './styles/admin.css'
 
 const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { id: 'bookings', label: 'Bookings', icon: 'calendar' },
-  { id: 'customers', label: 'Customers', icon: 'users' },
+  {
+    id: 'members',
+    label: 'Members',
+    icon: 'users',
+    children: [
+      { id: 'staff', label: 'Staff' },
+      { id: 'customers', label: 'Customer' },
+    ],
+  },
   { id: 'services', label: 'Services & pricing', icon: 'tool' },
   { id: 'coupons', label: 'Coupons', icon: 'tag' },
   { id: 'payments', label: 'Payments', icon: 'credit-card' },
@@ -30,6 +39,7 @@ const pages = {
   payments: PaymentsPage,
   wallet: WalletPage,
   reports: ReportsPage,
+  staff: StaffPage,
 }
 
 function getPageFromPath(pathname) {
@@ -75,7 +85,9 @@ function AdminContent({ user, onLogout }) {
     }
   }, [activePage])
 
-  const activeItem = navigationItems.find((item) => item.id === activePage)
+  const activeItem = navigationItems
+    .flatMap((item) => item.children ?? [item])
+    .find((item) => item.id === activePage)
   const ActivePage = pages[activePage] ?? DashboardPage
   function handleNavigate(page, query) {
     setActivePage(page)
@@ -95,7 +107,10 @@ function AdminContent({ user, onLogout }) {
       sidebarOpen={sidebarOpen}
       user={user}
     >
-      <ActivePage onNavigate={handleNavigate} />
+      <ActivePage
+        onNavigate={handleNavigate}
+        user={activePage === 'staff' || activePage === 'customers' ? user : undefined}
+      />
     </AdminLayout>
   )
 }

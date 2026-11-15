@@ -3,6 +3,7 @@ const pool = require("../../shared/config/db");
 class UserNotFoundError extends Error {}
 class DuplicateUserEmailError extends Error {}
 class SelfRoleChangeError extends Error {}
+class InvalidRoleTransitionError extends Error {}
 class SelfDeactivationError extends Error {}
 
 const USER_COLUMNS =
@@ -13,6 +14,11 @@ const PATCH_COLUMNS = Object.freeze({
   phone: "phone",
 });
 const ROLES = new Set(["ADMIN", "CUSTOMER", "STAFF"]);
+const ROLE_TRANSITIONS = Object.freeze({
+  ADMIN: ["STAFF", "CUSTOMER"],
+  STAFF: ["ADMIN", "CUSTOMER"],
+  CUSTOMER: ["ADMIN", "STAFF"],
+});
 const STATUSES = new Set(["ACTIVE", "INACTIVE"]);
 
 function isDuplicateEntryError(error) {
@@ -125,12 +131,23 @@ async function updateRole(userId, role, authenticatedUserId) {
     throw new SelfRoleChangeError();
   }
 
-  const [result] = await pool.execute(
-    "UPDATE users SET role = ? WHERE user_id = ?",
-    [role, userId],
-  );
-  if (result.affectedRows === 0 && !(await findById(userId))) {
+  const user = await findById(userId);
+  if (!user) {
     throw new UserNotFoundError();
+  }
+  if (!ROLE_TRANSITIONS[user.role]?.includes(role)) {
+    throw new InvalidRoleTransitionError();
+  }
+
+  const [result] = await pool.execute(
+    "UPDATE users SET role = ? WHERE user_id = ? AND role = ?",
+    [role, userId, user.role],
+  );
+  if (result.affectedRows === 0) {
+    if (!(await findById(userId))) {
+      throw new UserNotFoundError();
+    }
+    throw new InvalidRoleTransitionError();
   }
   return getById(userId);
 }
@@ -160,6 +177,7 @@ module.exports = {
   UserNotFoundError,
   DuplicateUserEmailError,
   SelfRoleChangeError,
+  InvalidRoleTransitionError,
   SelfDeactivationError,
   ROLES,
   STATUSES,

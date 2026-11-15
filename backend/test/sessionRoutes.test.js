@@ -73,7 +73,7 @@ function databaseUser(role, overrides = {}) {
   };
 }
 
-for (const role of ["ADMIN", "CUSTOMER"]) {
+for (const role of ["ADMIN", "STAFF", "CUSTOMER"]) {
   test(`/api/auth/me returns safe database profile for ${role}`, async () => {
     const user = databaseUser(role);
     pool.execute = async (sql, values) => {
@@ -138,7 +138,7 @@ test("session endpoint rejects inactive accounts", async () => {
   });
 });
 
-for (const role of ["ADMIN", "CUSTOMER"]) {
+for (const role of ["ADMIN", "STAFF", "CUSTOMER"]) {
   test(`/api/auth/logout accepts authenticated ${role} sessions`, async () => {
     await withServer(async (port) => {
       const response = await sendRequest(
@@ -183,12 +183,17 @@ test("shared session endpoints reject invalid and expired tokens", async () => {
 });
 
 test("legacy Admin session endpoints remain Admin-only", async () => {
+  pool.execute = async (sql, values) => {
+    assert.match(sql, /SELECT role, status FROM users WHERE user_id = \? LIMIT 1/);
+    const role = values[0] === 9 ? "ADMIN" : "CUSTOMER";
+    return [[{ role, status: "ACTIVE" }]];
+  };
   await withServer(async (port) => {
     const customerResponse = await sendRequest(
       port,
       "GET",
       "/api/admin/auth/me",
-      createToken("CUSTOMER"),
+      createToken("CUSTOMER", 10),
     );
     const adminResponse = await sendRequest(
       port,

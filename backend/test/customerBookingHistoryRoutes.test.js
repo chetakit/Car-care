@@ -264,6 +264,10 @@ test("Invalid IDs, filters, and client-supplied identity are rejected", async ()
 
 test("An empty booking list is safe, and the Admin booking route remains available", async () => {
   pool.execute = async (sql, values) => {
+    if (sql.includes("SELECT role, status FROM users")) {
+      assert.deepEqual(values, [50]);
+      return [[{ role: "ADMIN", status: "ACTIVE" }]];
+    }
     if (
       sql.includes("COUNT(*)") &&
       sql.includes("WHERE b.user_id = ?")

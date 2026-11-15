@@ -25,6 +25,8 @@ const reportRoutes = require("./Admin/routes/reportRoutes");
 const paymentRoutes = require("./Admin/routes/paymentRoutes");
 const cancellationRoutes = require("./Admin/routes/cancellationRoutes");
 const walletRoutes = require("./Admin/routes/walletRoutes");
+// [STAFF] ระบบพนักงาน: คิวงาน, รับรถ, เปลี่ยนสถานะ, หมายเหตุ, No-show, ประวัติ
+const staffBookingRoutes = require("./Staff/routes/staffBookingRoutes");
 
 const app = express();
 
@@ -50,6 +52,7 @@ app.use("/api/admin/services", serviceRoutes);
 app.use("/api/admin/users", userRoutes);
 app.use("/api/admin/coupons", couponRoutes);
 app.use("/api/admin/bookings", bookingRoutes);
+app.use("/api/staff/bookings", staffBookingRoutes);
 app.use("/api/admin/reports", reportRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/cancellations", cancellationRoutes);

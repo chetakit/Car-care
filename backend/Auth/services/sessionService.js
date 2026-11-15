@@ -1,6 +1,6 @@
 const pool = require("../../shared/config/db");
 
-const SESSION_ROLES = new Set(["ADMIN", "CUSTOMER"]);
+const SESSION_ROLES = new Set(["ADMIN", "STAFF", "CUSTOMER"]);
 
 class InvalidSessionError extends Error {}
 

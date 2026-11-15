@@ -3,7 +3,7 @@ const authController = require("../controllers/authController");
 const sessionController = require("../controllers/sessionController");
 const {
   authenticateToken,
-  requireCustomerOrAdmin,
+  requireSupportedSessionRole,
 } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -11,13 +11,13 @@ const router = express.Router();
 router.get(
   "/me",
   authenticateToken,
-  requireCustomerOrAdmin,
+  requireSupportedSessionRole,
   sessionController.me,
 );
 router.post(
   "/logout",
   authenticateToken,
-  requireCustomerOrAdmin,
+  requireSupportedSessionRole,
   authController.logout,
 );
 

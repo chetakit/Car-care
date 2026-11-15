@@ -8,6 +8,7 @@ import formatMoney from '../utils/formatMoney.js'
 
 const BOOKING_PAGE_SIZE = 10
 const WALLET_TRANSACTION_PAGE_SIZE = 10
+const ROLE_OPTIONS = ['ADMIN', 'STAFF', 'CUSTOMER']
 
 function isValidUserId(value) {
   const id = String(value ?? '')
@@ -21,7 +22,7 @@ function vehicleLabel(vehicle) {
   ].filter(Boolean).join(' · ') || 'Vehicle details unavailable'
 }
 
-function CustomersPage({ onNavigate }) {
+function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -43,13 +44,20 @@ function CustomersPage({ onNavigate }) {
   const [transactionPagination, setTransactionPagination] = useState(null)
   const [transactionsError, setTransactionsError] = useState('')
   const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [roleChangeError, setRoleChangeError] = useState('')
+  const [roleChangeMessage, setRoleChangeMessage] = useState('')
+  const [roleChanging, setRoleChanging] = useState(false)
+  const [selectedRoleUser, setSelectedRoleUser] = useState(null)
+  const [newRole, setNewRole] = useState('')
   const requestId = useRef(0)
   const api = useApi()
+  const memberType = role === 'STAFF' ? 'Staff' : 'Customer'
+  const memberCountLabel = role === 'STAFF' ? 'staff' : 'customers'
 
   const params = new URLSearchParams({
     page: String(page),
     limit: '20',
-    role: 'CUSTOMER',
+    role,
   })
   if (appliedSearch) params.set('search', appliedSearch)
   if (appliedStatus) params.set('status', appliedStatus)
@@ -61,6 +69,52 @@ function CustomersPage({ onNavigate }) {
     setPage(1)
     setAppliedSearch(search.trim())
     setAppliedStatus(status)
+  }
+
+  function openRoleChange(row) {
+    if (
+      user?.role !== 'ADMIN' ||
+      Number(row.user_id) === Number(user?.user_id)
+    ) return
+    setSelectedRoleUser(row)
+    setNewRole(ROLE_OPTIONS.find((value) => value !== row.role) || '')
+    setRoleChangeError('')
+    setRoleChangeMessage('')
+  }
+
+  async function changeRole(event) {
+    event.preventDefault()
+    if (
+      user?.role !== 'ADMIN' ||
+      !selectedRoleUser ||
+      Number(selectedRoleUser.user_id) === Number(user?.user_id) ||
+      !ROLE_OPTIONS.includes(newRole) ||
+      newRole === selectedRoleUser.role
+    ) return
+    const name =
+      selectedRoleUser.full_name ||
+      selectedRoleUser.email ||
+      `User #${selectedRoleUser.user_id}`
+    if (!window.confirm(
+      `Change ${name}'s role from ${selectedRoleUser.role} to ${newRole}?`,
+    )) return
+
+    setRoleChanging(true)
+    setRoleChangeError('')
+    setRoleChangeMessage('')
+    try {
+      await api(`/api/admin/users/${selectedRoleUser.user_id}/role`, {
+        method: 'PATCH',
+        body: { role: newRole },
+      })
+      setRoleChangeMessage(`${name}'s role is now ${newRole}.`)
+      setSelectedRoleUser(null)
+      refresh()
+    } catch (requestError) {
+      setRoleChangeError(requestError.message)
+    } finally {
+      setRoleChanging(false)
+    }
   }
 
   async function loadBookingHistory(userId, email, currentPage, activeRequestId) {
@@ -232,14 +286,14 @@ function CustomersPage({ onNavigate }) {
   return (
     <div className="admin-customers-page">
       <PageHeading
-        description="Search and review customer accounts and their related records."
+        description={`Search and review ${memberType.toLowerCase()} accounts and their related records.`}
         eyebrow="PEOPLE"
-        title="Customers"
+        title={memberType}
         action={<button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
       />
       <form className="admin-filter-bar admin-customer-filters" onSubmit={applyFilters}>
         <input
-          aria-label="Search customers"
+          aria-label={`Search ${memberCountLabel}`}
           maxLength="100"
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, email or phone"
@@ -260,27 +314,30 @@ function CustomersPage({ onNavigate }) {
       <section className="admin-panel admin-data-panel admin-customers-panel">
         <div className="admin-panel-heading">
           <div>
-            <h3>Customer accounts</h3>
-            <p>{data?.pagination?.total ?? 0} customers · ordered by name (A–Z)</p>
+            <h3>{memberType} accounts</h3>
+            <p>{data?.pagination?.total ?? 0} {memberCountLabel} · ordered by name (A–Z)</p>
           </div>
         </div>
+        {roleChangeError && !selectedRoleUser && <div className="admin-alert admin-alert-error" role="alert">{roleChangeError}</div>}
+        {roleChangeMessage && <div className="admin-alert admin-alert-success" role="status">{roleChangeMessage}</div>}
         <RequestState
           empty={!rows.length}
           emptyDescription="Try a different name, email, phone number, or account status."
-          emptyTitle="No customer accounts match"
+          emptyTitle={`No ${memberType.toLowerCase()} accounts match`}
           error={error}
           loading={loading}
-          loadingMessage="Loading customer accounts…"
+          loadingMessage={`Loading ${memberCountLabel} accounts…`}
           onRetry={refresh}
         />
         {!loading && !error && rows.length > 0 && (
           <>
             <DataTable
               columns={[
-                { key: 'user_id', label: 'Customer ID', render: (row) => `#${row.user_id}` },
+                { key: 'user_id', label: 'User ID', render: (row) => `#${row.user_id}` },
                 { key: 'full_name', label: 'Full name' },
                 { key: 'email', label: 'Email' },
                 { key: 'phone', label: 'Phone' },
+                { key: 'role', label: 'Role' },
                 { key: 'created_at', label: 'Registered', render: (row) => formatDate(row.created_at) },
                 { key: 'status', label: 'Account status', render: (row) => <StatusBadge value={row.status} /> },
                 {
@@ -304,6 +361,17 @@ function CustomersPage({ onNavigate }) {
                       >
                         View Wallet
                       </button>
+                      {user?.role === 'ADMIN' && (
+                        <button
+                          aria-label={`Change role for ${row.full_name || row.email || `user ${row.user_id}`}`}
+                          className="admin-inline-button"
+                          disabled={roleChanging || !isValidUserId(row.user_id) || Number(row.user_id) === Number(user?.user_id)}
+                          onClick={() => openRoleChange(row)}
+                          type="button"
+                        >
+                          Change Role
+                        </button>
+                      )}
                     </div>
                   ),
                 },
@@ -318,17 +386,17 @@ function CustomersPage({ onNavigate }) {
 
       {selectedCustomer && (
         <AdminModal
-          description={`Customer account and related records for ${displayedCustomer?.full_name || `#${selectedCustomer.user_id}`}.`}
+          description={`Member account and related records for ${displayedCustomer?.full_name || `#${selectedCustomer.user_id}`}.`}
           error={customerError}
           onClose={closeDetails}
           onSubmit={handleModalSubmit}
           open
           submitLabel="Close"
           submitting={false}
-          title={`Customer #${selectedCustomer.user_id}`}
+          title={`Member #${selectedCustomer.user_id}`}
         >
           <div className="admin-customer-detail">
-            <nav aria-label="Customer record sections" className="admin-customer-section-nav">
+            <nav aria-label="Member record sections" className="admin-customer-section-nav">
               <a href="#admin-customer-information">Account</a>
               <a href="#admin-customer-vehicles">Vehicles</a>
               <a href="#admin-customer-bookings">Bookings</a>
@@ -337,12 +405,13 @@ function CustomersPage({ onNavigate }) {
             </nav>
 
             <section className="admin-customer-detail-section" id="admin-customer-information">
-              <h3>Customer information</h3>
-              <RequestState loading={customerLoading} loadingMessage="Loading customer information…" />
+              <h3>Member information</h3>
+              <RequestState loading={customerLoading} loadingMessage="Loading member information…" />
               {!customerLoading && displayedCustomer && (
                 <dl className="admin-customer-detail-grid">
                   <div><dt>Full name</dt><dd>{displayedCustomer.full_name || '—'}</dd></div>
                   <div><dt>Account status</dt><dd><StatusBadge value={displayedCustomer.status} /></dd></div>
+                  <div><dt>Role</dt><dd>{displayedCustomer.role}</dd></div>
                   <div><dt>Email</dt><dd>{displayedCustomer.email || '—'}</dd></div>
                   <div><dt>Phone</dt><dd>{displayedCustomer.phone || '—'}</dd></div>
                   <div><dt>Registered</dt><dd>{formatDateTime(displayedCustomer.created_at)}</dd></div>
@@ -353,7 +422,7 @@ function CustomersPage({ onNavigate }) {
             <section className="admin-customer-detail-section" id="admin-customer-vehicles">
               <h3>Vehicles in loaded bookings</h3>
               <p className="admin-customer-section-note">
-                This is a partial list from the currently loaded Booking search page, not a complete vehicle list. The Admin API has no customer vehicle-list endpoint.
+                This is a partial list from the currently loaded Booking search page, not a complete vehicle list. The Admin API has no member-specific vehicle-list endpoint.
               </p>
               {bookingsError && (
                 <p className="admin-customer-section-note">Vehicle information is unavailable because booking history could not be loaded.</p>
@@ -383,7 +452,7 @@ function CustomersPage({ onNavigate }) {
             <section className="admin-customer-detail-section" id="admin-customer-bookings">
               <h3>Booking history</h3>
               <p className="admin-customer-section-note">
-                Results come from the current page of the Admin booking search; pagination may include other matching customers and is not a complete customer-only history.
+                Results come from the current page of the Admin booking search; pagination may include other matching members and is not a complete member-only history.
               </p>
               <RequestState
                 empty={!bookingRows.length}
@@ -436,7 +505,7 @@ function CustomersPage({ onNavigate }) {
               <h3>Wallet balance</h3>
               <RequestState
                 empty={!wallet && !walletError}
-                emptyDescription="No wallet record was returned for this customer."
+                emptyDescription="No wallet record was returned for this member."
                 emptyTitle="Wallet balance unavailable"
                 error={walletError}
                 loading={walletLoading}
@@ -454,7 +523,7 @@ function CustomersPage({ onNavigate }) {
               <h3>Wallet transaction history</h3>
               <RequestState
                 empty={!transactions.length}
-                emptyDescription="No wallet transactions were returned for this customer."
+                emptyDescription="No wallet transactions were returned for this member."
                 emptyTitle="No wallet transactions"
                 error={transactionsError}
                 loading={transactionsLoading}
@@ -478,6 +547,35 @@ function CustomersPage({ onNavigate }) {
               )}
             </section>
           </div>
+        </AdminModal>
+      )}
+
+      {selectedRoleUser && (
+        <AdminModal
+          description={`Choose a new role for ${selectedRoleUser.full_name || selectedRoleUser.email || `User #${selectedRoleUser.user_id}`}. Their current role is ${selectedRoleUser.role}.`}
+          error={roleChangeError}
+          onClose={() => {
+            if (!roleChanging) setSelectedRoleUser(null)
+          }}
+          onSubmit={changeRole}
+          open
+          submitLabel="Save role"
+          submitting={roleChanging}
+          title="Change Role"
+        >
+          <label className="admin-form-field">
+            <span>New role</span>
+            <select
+              onChange={(event) => setNewRole(event.target.value)}
+              value={newRole}
+            >
+              {ROLE_OPTIONS.map((value) => (
+                <option disabled={value === selectedRoleUser.role} key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
         </AdminModal>
       )}
     </div>

@@ -148,6 +148,26 @@
   opacity: 0.75;
 }
 
+.admin-nav-toggle[aria-expanded='true'] .admin-nav-chevron {
+  transform: rotate(90deg);
+}
+
+.admin-subnavigation {
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 2px;
+}
+
+.admin-subnavigation[hidden] {
+  display: none;
+}
+
+.admin-nav-subitem {
+  min-height: 38px;
+  padding-left: 43px;
+  font-size: 12px;
+}
+
 .admin-sidebar-footer {
   display: flex;
   align-items: center;
@@ -1052,6 +1072,7 @@
 .admin-alert-success { border-color: #cde5d8; color: #32634a; background: #f5fbf7; }
 .admin-inline-button { padding: 3px 5px; border: 0; color: var(--car-care-accent-dark); background: transparent; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .admin-inline-button:disabled { cursor: not-allowed; opacity: 0.5; }
+
 .admin-filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 9px; margin: 0 0 15px; }
 .admin-filter-bar > input { min-width: min(180px, 100%); flex: 1 1 190px; }
 .admin-filter-bar > select { min-width: min(145px, 100%); }
@@ -1934,6 +1955,7 @@
 }
 
 @media (max-width: 760px) {
+  .admin-nav-subitem { min-height: 44px; }
   .admin-user-copy { display: none; }
   .admin-header-actions { gap: 9px; }
   .admin-logout-button { min-height: 44px; padding-inline: 8px; font-size: 11px; }

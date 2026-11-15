@@ -147,7 +147,7 @@ function validateRole(req, res, next) {
     !Object.hasOwn(body, "role") ||
     !ROLES.has(body.role)
   ) {
-    return sendValidationError(res, "role must be ADMIN, CUSTOMER, or STAFF.");
+    return sendValidationError(res, "role must be ADMIN, STAFF, or CUSTOMER.");
   }
   return next();
 }
