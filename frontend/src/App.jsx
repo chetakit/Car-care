@@ -9,6 +9,7 @@ import CustomerDashboardPage from './Customer/CustomerDashboardPage.jsx'
 import CustomerLanding from './Customer/CustomerLanding.jsx'
 import CustomerNotFoundPage from './Customer/CustomerNotFoundPage.jsx'
 import CustomerPaymentPage from './Customer/CustomerPaymentPage.jsx'
+import CustomerProfilePage from './Customer/CustomerProfilePage.jsx'
 import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
@@ -57,8 +58,10 @@ function getCustomerReturnPath(value) {
   const isCustomerRoute =
     path === '/customer' ||
     path === '/customer/booking' ||
+    path === '/customer/profile' ||
     path === '/customer/vehicles' ||
     path === '/customer/bookings' ||
+    /^\/customer\/vehicles\/\d+\/bookings$/.test(path) ||
     path === '/customer/wallet' ||
     /^\/customer\/payment\/\d+$/.test(path)
 
@@ -110,6 +113,8 @@ function AppContent() {
   const { authStatus, user, logout } = useAuth()
   const [pathname, setPathname] = useState(() => window.location.pathname)
   const currentPath = normalizePath(pathname)
+  const vehicleHistoryRoute =
+    /^\/customer\/vehicles\/(\d+)\/bookings$/.exec(currentPath)
 
   function logoutAdminFromHome() {
     const logoutRequest = logout()
@@ -233,8 +238,21 @@ function AppContent() {
     if (currentPath === '/customer/vehicles') {
       return <MyVehiclesPage onLogout={logout} user={user} />
     }
+    if (currentPath === '/customer/profile') {
+      return <CustomerProfilePage onLogout={logout} user={user} />
+    }
     if (currentPath === '/customer/bookings') {
-      return <MyBookingsPage onLogout={logout} user={user} />
+      return <MyBookingsPage key="all-bookings" onLogout={logout} user={user} />
+    }
+    if (vehicleHistoryRoute) {
+      return (
+        <MyBookingsPage
+          key={`vehicle-${vehicleHistoryRoute[1]}`}
+          onLogout={logout}
+          user={user}
+          vehicleId={vehicleHistoryRoute[1]}
+        />
+      )
     }
     if (currentPath === '/customer/wallet') {
       return <CustomerWalletPage onLogout={logout} user={user} />
