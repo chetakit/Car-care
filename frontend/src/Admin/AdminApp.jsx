@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage.jsx'
 import PaymentsPage from './pages/PaymentsPage.jsx'
 import ReportsPage from './pages/ReportsPage.jsx'
 import ServicesPage from './pages/ServicesPage.jsx'
+import SchedulesPage from './pages/SchedulesPage.jsx'
 import StaffPage from './pages/StaffPage.jsx'
 import WalletPage from './pages/WalletPage.jsx'
 import './styles/admin.css'
@@ -14,6 +15,7 @@ import './styles/admin.css'
 const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { id: 'bookings', label: 'Bookings', icon: 'calendar' },
+  { id: 'schedules', label: 'Queue capacity', icon: 'calendar' },
   {
     id: 'members',
     label: 'Members',
@@ -35,6 +37,7 @@ const pages = {
   bookings: BookingsPage,
   customers: CustomersPage,
   services: ServicesPage,
+  schedules: SchedulesPage,
   coupons: CouponsPage,
   payments: PaymentsPage,
   wallet: WalletPage,
