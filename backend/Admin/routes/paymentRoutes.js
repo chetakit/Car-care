@@ -3,10 +3,20 @@ const paymentController = require("../controllers/paymentController");
 const {
   authenticateToken,
   requireCustomerOrAdmin,
+  requireCurrentStaffOrAdmin,
 } = require("../../Auth/middleware/authMiddleware");
 const paymentValidator = require("../validators/paymentValidator");
 
 const router = express.Router();
+
+router.post(
+  "/:bookingId/verify",
+  authenticateToken,
+  requireCurrentStaffOrAdmin,
+  paymentValidator.parseBookingId,
+  paymentValidator.validateVerification,
+  paymentController.verify,
+);
 
 router.use(authenticateToken, requireCustomerOrAdmin);
 

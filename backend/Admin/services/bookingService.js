@@ -102,6 +102,7 @@ async function list({ page, limit, offset, search, booking_status, payment_statu
       b.end_time,
       b.booking_status,
       p.payment_status,
+      p.payment_method,
       b.total_amount,
       b.discount_amount,
       b.final_amount

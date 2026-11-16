@@ -30,6 +30,9 @@ function paymentActionConfirmation(operation, booking, paymentMethod) {
   if (operation === 'wallet') {
     return `Pay ${formatMoney(booking.final_amount)} from the customer's Wallet for booking #${booking.booking_id}? This will deduct the Wallet balance.`
   }
+  if (operation === 'verify-transfer') {
+    return `Confirm that the bank transfer for ${formatMoney(booking.final_amount)} has been independently verified for booking #${booking.booking_id}?`
+  }
   return `Simulate this payment as ${operation === 'simulate-paid' ? 'PAID' : 'FAILED'}?`
 }
 
@@ -41,6 +44,7 @@ function PaymentsPage() {
   const [payment, setPayment] = useState(null)
   const [walletBalance, setWalletBalance] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('SIMULATED')
+  const [transferReference, setTransferReference] = useState('')
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState('')
   const [error, setError] = useState('')
@@ -74,6 +78,7 @@ function PaymentsPage() {
       setLookupComplete(false)
       setPaymentLookupComplete(false)
       setNotice('')
+      setTransferReference('')
       return
     }
 
@@ -164,6 +169,16 @@ function PaymentsPage() {
           body: { payment_status: operation === 'simulate-paid' ? 'PAID' : 'FAILED' },
         })
         setPayment(response.data)
+      } else if (operation === 'verify-transfer') {
+        response = await api(`/api/payments/${searchedBookingId}/verify`, {
+          method: 'POST',
+          body: {
+            payment_method: 'BANK_TRANSFER',
+            amount: String(payment.amount),
+            transfer_reference: transferReference.trim(),
+          },
+        })
+        setPayment(response.data)
       } else {
         response = await api(`/api/payments/${searchedBookingId}/wallet`, { method: 'POST' })
         setPayment(response.data?.payment ?? null)
@@ -174,6 +189,8 @@ function PaymentsPage() {
       setNotice(
         operation === 'wallet'
           ? 'Wallet payment completed successfully.'
+          : operation === 'verify-transfer'
+            ? 'Bank transfer verified.'
           : operation.startsWith('simulate-')
             ? `Payment status updated to ${operation === 'simulate-paid' ? 'PAID' : 'FAILED'}.`
             : 'Payment created successfully.',
@@ -272,6 +289,16 @@ function PaymentsPage() {
                   </button>
                 </div>
               )}
+              {payment.payment_status === 'PENDING' && payment.payment_method === 'BANK_TRANSFER' &&
+                ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'].includes(booking.booking_status) && (
+                  <div className="admin-payment-create">
+                    <label htmlFor="transfer-reference">Bank transfer reference (check with the bank before confirming)</label>
+                    <input id="transfer-reference" maxLength="128" onChange={(event) => setTransferReference(event.target.value)} value={transferReference} />
+                    <button className="admin-primary-button" disabled={Boolean(action) || !transferReference.trim()} onClick={() => runAction('verify-transfer')} type="button">
+                      {action === 'verify-transfer' ? 'Verifying…' : 'Verify transfer'}
+                    </button>
+                  </div>
+                )}
               {payment.payment_status === 'FAILED' && (
                 <p className="admin-payment-guidance">Payment unsuccessful. The backend does not allow this payment to be replaced or retried with Wallet.</p>
               )}
@@ -279,11 +306,15 @@ function PaymentsPage() {
                 <p className="admin-payment-guidance">
                   {payment.payment_method === 'SIMULATED'
                     ? 'Demo payment marked paid; no real payment was verified.'
-                    : 'Payment received.'}
+                    : 'Paid status recorded. Historical cash and transfer payments may require reconciliation.'}
                 </p>
               )}
               {payment.payment_status === 'PENDING' && !['SIMULATED', 'WALLET'].includes(payment.payment_method) && (
-                <p className="admin-payment-guidance">Awaiting payment. The backend does not allow this payment method to be changed to Wallet.</p>
+                <p className="admin-payment-guidance">
+                  {payment.payment_method === 'CASH'
+                    ? 'Awaiting cash confirmation by Staff. This payment cannot be changed to Wallet.'
+                    : 'Awaiting payment verification. This payment cannot be changed to Wallet.'}
+                </p>
               )}
             </>
           ) : paymentLookupComplete ? (

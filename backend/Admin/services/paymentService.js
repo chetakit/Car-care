@@ -4,6 +4,7 @@ const pool = require("../../shared/config/db");
 class PaymentNotFoundError extends Error {}
 class PaymentConflictError extends Error {}
 class PaymentValidationError extends Error {}
+class PaymentForbiddenError extends Error {}
 
 function isDuplicateEntryError(error) {
   return error.code === "ER_DUP_ENTRY" || error.errno === 1062;
@@ -84,7 +85,7 @@ async function withTransaction(operation) {
     }
     if (isDuplicateEntryError(error)) {
       throw new PaymentConflictError(
-        "A payment already exists for this booking.",
+        "A payment or verification already exists, or the transfer reference is already used.",
       );
     }
     throw error;
@@ -128,7 +129,65 @@ async function getLockedPayment(connection, bookingId) {
     FOR UPDATE`,
     [bookingId],
   );
+  if (rows.length > 1) {
+    throw new PaymentConflictError("Multiple payments exist for this booking.");
+  }
   return rows[0] || null;
+}
+
+async function verify(bookingId, { payment_method, amount, transfer_reference }, user) {
+  if (
+    (payment_method === "CASH" && user.role !== "STAFF") ||
+    (payment_method === "BANK_TRANSFER" && !["STAFF", "ADMIN"].includes(user.role)) ||
+    !["CASH", "BANK_TRANSFER"].includes(payment_method)
+  ) {
+    throw new PaymentForbiddenError("This role cannot verify the selected payment method.");
+  }
+  return withTransaction(async (connection) => {
+    const [bookings] = await connection.execute(
+      `SELECT booking_id, user_id, final_amount, booking_status
+      FROM bookings WHERE booking_id = ? FOR UPDATE`,
+      [bookingId],
+    );
+    const booking = bookings[0];
+    if (!booking) throw new PaymentNotFoundError();
+    if (!["CONFIRMED", "CHECKED_IN", "IN_SERVICE"].includes(booking.booking_status)) {
+      throw new PaymentConflictError("This booking cannot accept a payment verification.");
+    }
+
+    const payment = await getLockedPayment(connection, bookingId);
+    if (!payment) throw new PaymentNotFoundError();
+    if (payment.payment_status !== "PENDING" || payment.payment_method !== payment_method) {
+      throw new PaymentConflictError("Only a matching pending payment can be verified.");
+    }
+    const expected = validateBookingAmount(booking.final_amount);
+    if (decimalToCents(expected) !== decimalToCents(payment.amount) ||
+        decimalToCents(expected) !== decimalToCents(amount)) {
+      throw new PaymentConflictError("The payment and confirmed amount must match the booking total.");
+    }
+    await connection.execute(
+      `INSERT INTO payment_verifications
+        (payment_id, verified_by, payment_method, verified_amount, transfer_reference)
+      VALUES (?, ?, ?, ?, ?)`,
+      [payment.payment_id, user.user_id, payment_method, expected, transfer_reference],
+    );
+    const [result] = await connection.execute(
+      `UPDATE payments SET payment_status = 'PAID', paid_at = CURRENT_TIMESTAMP
+      WHERE payment_id = ? AND payment_status = 'PENDING' AND payment_method = ?`,
+      [payment.payment_id, payment_method],
+    );
+    if (result.affectedRows !== 1) {
+      throw new PaymentConflictError("Payment changed before verification could be completed.");
+    }
+    const [rows] = await connection.execute(
+      `SELECT payment_id, booking_id, amount, payment_method, payment_status,
+        transaction_ref, paid_at, created_at, updated_at
+      FROM payments WHERE payment_id = ?`,
+      [payment.payment_id],
+    );
+    if (!rows[0]) throw new Error("Verified payment could not be retrieved.");
+    return toPayment(rows[0]);
+  });
 }
 
 async function createWalletTransactionRef(connection) {
@@ -184,6 +243,11 @@ async function createForBooking(bookingId, { payment_method }, user) {
         "Payment is not allowed for cancelled or no-show bookings.",
       );
     }
+    if (booking.booking_status === "COMPLETED") {
+      throw new PaymentConflictError(
+        "A new pending payment cannot be created for a completed booking.",
+      );
+    }
     const amount = validateBookingAmount(booking.final_amount);
     const existingPayment = await getLockedPayment(connection, bookingId);
     if (existingPayment) {
@@ -213,7 +277,7 @@ async function createForBooking(bookingId, { payment_method }, user) {
 
 async function simulate(bookingId, { payment_status }, user) {
   return withTransaction(async (connection) => {
-    await getLockedBooking(connection, bookingId, user);
+    const booking = await getLockedBooking(connection, bookingId, user);
     const payment = await getLockedPayment(connection, bookingId);
     if (!payment) {
       throw new PaymentNotFoundError();
@@ -225,6 +289,11 @@ async function simulate(bookingId, { payment_status }, user) {
     }
     if (payment.payment_status === payment_status) {
       return toPayment(payment);
+    }
+    if (booking.booking_status === "COMPLETED") {
+      throw new PaymentConflictError(
+        "A simulated payment cannot change status for a completed booking.",
+      );
     }
     if (payment.payment_status !== "PENDING") {
       throw new PaymentConflictError(
@@ -414,8 +483,10 @@ module.exports = {
   PaymentNotFoundError,
   PaymentConflictError,
   PaymentValidationError,
+  PaymentForbiddenError,
   getByBookingId,
   createForBooking,
   simulate,
   payWithWallet,
+  verify,
 };

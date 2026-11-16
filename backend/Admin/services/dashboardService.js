@@ -1,4 +1,5 @@
 const pool = require("../../shared/config/db");
+const verifiedPaymentSql = require("../../shared/services/verifiedPaymentSql");
 
 function toNumber(value) {
   const number = Number(value);
@@ -35,36 +36,52 @@ async function getSummary() {
       FROM (
         SELECT
           COALESCE(SUM(CASE
-            WHEN paid_at >= CURRENT_DATE()
-              AND paid_at < CURRENT_DATE() + INTERVAL 1 DAY
-            THEN amount ELSE 0
+            WHEN p.paid_at >= CURRENT_DATE()
+              AND p.paid_at < CURRENT_DATE() + INTERVAL 1 DAY
+            THEN p.amount ELSE 0
           END), 0) AS todayGrossRevenue,
           COALESCE(SUM(CASE
-            WHEN paid_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-              AND paid_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
-            THEN amount ELSE 0
+            WHEN p.paid_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+              AND p.paid_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+            THEN p.amount ELSE 0
           END), 0) AS monthlyGrossRevenue
-        FROM payments
-        WHERE payment_status = 'PAID'
-          AND paid_at IS NOT NULL
+        FROM payments p
+        INNER JOIN bookings b ON b.booking_id = p.booking_id
+        WHERE ${verifiedPaymentSql}
       ) AS payments
       CROSS JOIN (
         SELECT
           COALESCE(SUM(CASE
-            WHEN processed_at >= CURRENT_DATE()
-              AND processed_at < CURRENT_DATE() + INTERVAL 1 DAY
-            THEN refund_amount ELSE 0
+            WHEN r.processed_at >= CURRENT_DATE()
+              AND r.processed_at < CURRENT_DATE() + INTERVAL 1 DAY
+            THEN r.refund_amount ELSE 0
           END), 0) AS todayRefunds,
           COALESCE(SUM(CASE
-            WHEN processed_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-              AND processed_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
-            THEN refund_amount ELSE 0
+            WHEN r.processed_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+              AND r.processed_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+            THEN r.refund_amount ELSE 0
           END), 0) AS monthlyRefunds
-        FROM refunds
-        WHERE refund_status = 'REFUNDED'
-          AND processed_at IS NOT NULL
+        FROM refunds r
+        INNER JOIN payments p ON p.payment_id = r.payment_id AND p.booking_id = r.booking_id
+        INNER JOIN bookings b ON b.booking_id = p.booking_id
+        WHERE r.refund_status = 'REFUNDED'
+          AND r.processed_at IS NOT NULL AND ${verifiedPaymentSql}
       ) AS refunds`,
-    ),
+    ).catch((error) => {
+      const message = error.sqlMessage || error.message || "";
+      if (
+        (error.code === "ER_NO_SUCH_TABLE" || error.errno === 1146) &&
+        /\bTable ['"`](?:[^'"`]+\.)?payment_verifications['"`] doesn't exist\b/i.test(message)
+      ) {
+        console.error("Admin dashboard revenue unavailable: payment_verifications is missing.", {
+          message,
+          code: error.code,
+          errno: error.errno,
+        });
+        return [[]];
+      }
+      throw error;
+    }),
     pool.execute(
       `SELECT
         b.booking_id,

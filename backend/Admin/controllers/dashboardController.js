@@ -7,8 +7,12 @@ async function getSummary(req, res) {
       status: "success",
       data: summary,
     });
-  } catch {
-    console.error("Admin dashboard summary request failed.");
+  } catch (error) {
+    console.error("Admin dashboard summary request failed.", {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+    });
     return res.status(500).json({
       status: "error",
       message: "Unable to retrieve dashboard summary.",

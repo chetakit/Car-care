@@ -298,7 +298,7 @@ function BookingsPage({ onNavigate }) {
                   render: (row) => (
                     <div className="admin-row-actions">
                       {row.payment_status
-                        ? <StatusBadge value={row.payment_status} />
+                        ? <PaymentStatusBadge payment={row} />
                         : <span className="admin-booking-no-payment">Not created</span>}
                       {isValidBookingId(row.booking_id) ? (
                         <button

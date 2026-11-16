@@ -188,6 +188,131 @@ test("status change rejects transitions outside the allowed flow", async () => {
   assert.equal(executed.length, 1);
 });
 
+function statusDatabase({ payment = null, debits = [], verifications = [], status = "IN_SERVICE" } = {}) {
+  const state = { status, commits: 0, rollbacks: 0, history: 0, queries: [] };
+  const connection = {
+    beginTransaction: async () => {},
+    commit: async () => { state.commits += 1; },
+    rollback: async () => { state.rollbacks += 1; },
+    release: () => {},
+    execute: async (sql, values) => {
+      state.queries.push({ sql, values });
+      if (sql.includes("FROM bookings") && sql.includes("FOR UPDATE")) {
+        return [[{ booking_id: 5, user_id: 8, final_amount: "25.00", booking_status: state.status }]];
+      }
+      if (sql.includes("FROM payments") && sql.includes("FOR UPDATE")) {
+        assert.deepEqual(values, ["25.00", 5]);
+        assert.match(sql, /amount = \? AND amount > 0/);
+        return [Array.isArray(payment) ? payment : payment ? [payment] : []];
+      }
+      if (sql.includes("FROM wallet_transactions")) {
+        assert.deepEqual(values, [payment.amount, 5, 8]);
+        assert.match(sql, /wt\.amount = \?/);
+        assert.match(sql, /wt\.booking_id = \?/);
+        assert.match(sql, /wt\.refund_id IS NULL AND w\.user_id = \?/);
+        assert.match(sql, /FOR UPDATE/);
+        return [debits];
+      }
+      if (sql.includes("FROM payment_verifications")) {
+        assert.deepEqual(values, [payment.payment_id, payment.payment_method, payment.amount]);
+        assert.match(sql, /FOR UPDATE/);
+        return [verifications];
+      }
+      if (sql.startsWith("UPDATE bookings")) {
+        assert.deepEqual(values, ["COMPLETED", 5, "IN_SERVICE"]);
+        state.status = "COMPLETED";
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes("INSERT INTO booking_status_history")) {
+        state.history += 1;
+        return [{ affectedRows: 1 }];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  pool.getConnection = async () => connection;
+  pool.execute = async (sql) => {
+    if (sql.includes("FROM bookings b")) {
+      return [[{ booking_id: 5, booking_status: state.status, payment_status: "PAID",
+        payment_method: "WALLET", final_amount: "25.00" }]];
+    }
+    if (sql.includes("FROM booking_services") || sql.includes("FROM vehicle_check_ins") ||
+        sql.includes("FROM booking_status_history") || sql.includes("FROM booking_notes")) return [[]];
+    throw new Error(`Unexpected detail query: ${sql}`);
+  };
+  return state;
+}
+
+test("completion requires a full verified Wallet payment and a matching owner debit", async () => {
+  const paid = { payment_id: 3, payment_status: "PAID", payment_method: "WALLET", amount: "25.00", amount_matches: 1, paid_at: "2026-11-15" };
+  const debit = { wallet_id: 3, amount_matches: 1 };
+  const cases = [
+    { name: "no payment", payment: null },
+    { name: "pending", payment: { ...paid, payment_status: "PENDING" } },
+    { name: "failed", payment: { ...paid, payment_status: "FAILED" } },
+    { name: "simulated paid", payment: { ...paid, payment_method: "SIMULATED" } },
+    { name: "unverified cash", payment: { ...paid, payment_method: "CASH" } },
+    { name: "unverified transfer", payment: { ...paid, payment_method: "BANK_TRANSFER" } },
+    { name: "missing paid timestamp", payment: { ...paid, paid_at: null } },
+    { name: "duplicate payments", payment: [paid, paid] },
+    { name: "wrong payment amount", payment: { ...paid, amount_matches: 0 } },
+    { name: "missing debit", payment: paid },
+    { name: "wrong debit amount", payment: paid, debits: [{ ...debit, amount_matches: 0 }] },
+    { name: "duplicate debits", payment: paid, debits: [debit, debit] },
+  ];
+  await withServer(async (port) => {
+    for (const fixture of cases) {
+      const state = statusDatabase(fixture);
+      const response = await sendRequest(port, "PATCH", "/api/staff/bookings/5/status", createToken(), {
+        status: "COMPLETED", reason: "Service finished",
+      });
+      assert.equal(response.statusCode, 409, fixture.name);
+      assert.equal(state.status, "IN_SERVICE", fixture.name);
+      assert.equal(state.history, 0, fixture.name);
+      assert.equal(state.rollbacks, 1, fixture.name);
+      assert.equal(state.commits, 0, fixture.name);
+    }
+  });
+});
+
+test("verified Wallet payment permits completion once, with transactional history", async () => {
+  const state = statusDatabase({
+    payment: { payment_id: 3, payment_status: "PAID", payment_method: "WALLET", amount: "25.00", amount_matches: 1, paid_at: "2026-11-15" },
+    debits: [{ wallet_id: 3, amount_matches: 1 }],
+  });
+  await withServer(async (port) => {
+    const body = { status: "COMPLETED", reason: "Service finished" };
+    const response = await sendRequest(port, "PATCH", "/api/staff/bookings/5/status", createToken(), body);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.payload.data.booking.booking_status, "COMPLETED");
+    const duplicate = await sendRequest(port, "PATCH", "/api/staff/bookings/5/status", createToken(), body);
+    assert.equal(duplicate.statusCode, 409);
+  });
+  assert.equal(state.commits, 1);
+  assert.equal(state.rollbacks, 1);
+  assert.equal(state.history, 1);
+  assert.match(state.queries[0].sql, /FROM bookings[\s\S]*FOR UPDATE/);
+  assert.match(state.queries[1].sql, /FROM payments[\s\S]*FOR UPDATE/);
+});
+
+test("authorized cash and transfer verifications permit completion", async () => {
+  await withServer(async (port) => {
+    for (const method of ["CASH", "BANK_TRANSFER"]) {
+      const state = statusDatabase({
+        payment: { payment_id: 3, payment_status: "PAID", payment_method: method,
+          amount: "25.00", amount_matches: 1, paid_at: "2026-11-15" },
+        verifications: [{ payment_id: 3 }],
+      });
+      const response = await sendRequest(port, "PATCH", "/api/staff/bookings/5/status", createToken(), {
+        status: "COMPLETED", reason: "Service finished",
+      });
+      assert.equal(response.statusCode, 200);
+      assert.equal(state.commits, 1);
+      assert.equal(state.history, 1);
+    }
+  });
+});
+
 test("no-show is rejected before the appointment time", async () => {
   const connection = {
     beginTransaction: async () => {},

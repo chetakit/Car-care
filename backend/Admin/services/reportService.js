@@ -1,4 +1,5 @@
 const pool = require("../../shared/config/db");
+const verifiedPaymentSql = require("../../shared/services/verifiedPaymentSql");
 
 const BOOKING_STATUSES = [
   "CONFIRMED",
@@ -78,22 +79,22 @@ async function bookings({ date_from, date_to, group_by }) {
 }
 
 async function revenue({ date_from, date_to, group_by }) {
-  const filters = dateConditions("paid_at", date_from, date_to);
+  const filters = dateConditions("p.paid_at", date_from, date_to);
   const whereClause = filters.whereClause
-    ? `${filters.whereClause} AND payment_status = 'PAID' AND paid_at IS NOT NULL`
-    : " WHERE payment_status = 'PAID' AND paid_at IS NOT NULL";
+    ? `${filters.whereClause} AND ${verifiedPaymentSql}`
+    : ` WHERE ${verifiedPaymentSql}`;
   const [[totalRows], [trendRows]] = await Promise.all([
     pool.execute(
-      `SELECT COALESCE(SUM(amount), 0) AS totalRevenue,
+      `SELECT COALESCE(SUM(p.amount), 0) AS totalRevenue,
         COUNT(*) AS successfulPayments
-      FROM payments${whereClause}`,
+      FROM payments p INNER JOIN bookings b ON b.booking_id = p.booking_id${whereClause}`,
       filters.values,
     ),
     pool.execute(
-      `SELECT ${bucketExpression(group_by, "paid_at")} AS period,
-        COALESCE(SUM(amount), 0) AS revenue,
+      `SELECT ${bucketExpression(group_by, "p.paid_at")} AS period,
+        COALESCE(SUM(p.amount), 0) AS revenue,
         COUNT(*) AS successfulPayments
-      FROM payments${whereClause}
+      FROM payments p INNER JOIN bookings b ON b.booking_id = p.booking_id${whereClause}
       GROUP BY period
       ORDER BY period ASC`,
       filters.values,

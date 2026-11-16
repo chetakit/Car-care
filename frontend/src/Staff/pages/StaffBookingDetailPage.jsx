@@ -10,6 +10,7 @@ import {
   getStaffBooking,
   listStaffBookings,
   markBookingNoShow,
+  STAFF_MOCK,
 } from '../api/staffBookingApi.js'
 import { LoadState, StaffLink, StaffModal, StatusBadge } from '../components/StaffUi.jsx'
 import useStaffRequest from '../hooks/useStaffRequest.js'
@@ -172,7 +173,20 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
           </table>
           <p className="staff-muted staff-small">
             การชำระเงิน: {payment ? PAYMENT_LABEL[payment.payment_status] ?? payment.payment_status : 'ยังไม่มีรายการชำระ'}
+            {payment?.payment_method === 'SIMULATED' && ' (จำลอง — ไม่ใช่การชำระเงินจริง)'}
           </p>
+          {status === 'IN_SERVICE' && (
+            <p className="staff-muted staff-small">
+              การจองจะเสร็จสิ้นได้เมื่อมีการชำระเต็มจำนวนและตรวจสอบการชำระเงินแล้ว
+            </p>
+          )}
+          {!STAFF_MOCK && payment?.payment_status === 'PENDING' &&
+            ['CASH', 'BANK_TRANSFER'].includes(payment.payment_method) &&
+            ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'].includes(status) && (
+              <button className="staff-btn" onClick={() => setModal('payment')} type="button">
+                ตรวจสอบและยืนยันการชำระเงิน
+              </button>
+            )}
           {booking.notes && (
             <p className="staff-customer-note"><strong>หมายเหตุจากลูกค้า:</strong> {booking.notes}</p>
           )}
@@ -256,6 +270,17 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
           onSubmit={(reason) => runAction(() => markBookingNoShow(api, booking.booking_id, reason))}
         />
       )}
+      {modal === 'payment' && (
+        <PaymentVerificationModal
+          amount={booking.final_amount}
+          method={payment.payment_method}
+          onClose={() => setModal(null)}
+          onSubmit={(body) => runAction(async () => {
+            await api(`/api/payments/${booking.booking_id}/verify`, { method: 'POST', body })
+            return getStaffBooking(api, booking.booking_id)
+          })}
+        />
+      )}
     </>
   )
 }
@@ -278,6 +303,38 @@ function useSubmit(onSubmit) {
     }
   }
   return { error, setError, saving, submit }
+}
+
+function PaymentVerificationModal({ amount, method, onClose, onSubmit }) {
+  const [reference, setReference] = useState('')
+  const { error, saving, submit } = useSubmit(onSubmit)
+  const isTransfer = method === 'BANK_TRANSFER'
+  return (
+    <StaffModal onClose={onClose} title="ยืนยันการชำระเงิน">
+      <form className="staff-form" onSubmit={(event) => {
+        event.preventDefault()
+        submit({
+          payment_method: method,
+          amount: Number(amount).toFixed(2),
+          ...(isTransfer ? { transfer_reference: reference.trim() } : {}),
+        })
+      }}>
+        <p>การจองนี้มียอด {formatMoney(amount)} — {isTransfer ? 'ตรวจสอบยอดโอนและเลขอ้างอิงกับธนาคารก่อนยืนยัน' : 'ยืนยันว่าได้รับเงินสดครบจำนวนแล้ว'}</p>
+        {isTransfer && (
+          <label>เลขอ้างอิงการโอน *
+            <input maxLength={128} onChange={(event) => setReference(event.target.value)} required value={reference} />
+          </label>
+        )}
+        {error && <p className="staff-error" role="alert">{error}</p>}
+        <div className="staff-modal-actions">
+          <button className="staff-btn ghost" onClick={onClose} type="button">ยกเลิก</button>
+          <button className="staff-btn primary" disabled={saving || (isTransfer && !reference.trim())} type="submit">
+            {saving ? 'กำลังบันทึก…' : 'ยืนยัน'}
+          </button>
+        </div>
+      </form>
+    </StaffModal>
+  )
 }
 
 function NoteForm({ onSubmit }) {

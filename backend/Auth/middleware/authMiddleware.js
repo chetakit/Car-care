@@ -92,6 +92,26 @@ const requireAdmin = requireCurrentRole("ADMIN");
 const requireCurrentAdmin = requireAdmin;
 const requireCurrentStaff = requireCurrentRole("STAFF");
 
+async function requireCurrentStaffOrAdmin(req, res, next) {
+  try {
+    const [users] = await pool.execute(
+      "SELECT role, status FROM users WHERE user_id = ? LIMIT 1",
+      [req.user.user_id],
+    );
+    const user = users[0];
+    if (!user || user.status !== "ACTIVE" || user.role !== req.user.role) {
+      return res.status(401).json({ status: "error", message: "Invalid or expired token." });
+    }
+    if (!["STAFF", "ADMIN"].includes(user.role)) {
+      return res.status(403).json({ status: "error", message: "Staff or administrator access required." });
+    }
+    return next();
+  } catch {
+    console.error("Role-based authorization failed.");
+    return res.status(500).json({ status: "error", message: "Unable to authorize request." });
+  }
+}
+
 function requireSupportedSessionRole(req, res, next) {
   if (
     !req.user ||
@@ -135,6 +155,7 @@ module.exports = {
   requireAdmin,
   requireCurrentAdmin,
   requireCurrentStaff,
+  requireCurrentStaffOrAdmin,
   requireCustomer,
   requireCustomerOrAdmin,
   requireSupportedSessionRole,

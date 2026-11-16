@@ -52,7 +52,7 @@ async function withTransaction(operation) {
 // ล็อกแถวการจองไว้ระหว่างเปลี่ยนสถานะ กันพนักงาน 2 คนกดพร้อมกัน
 async function lockBooking(connection, bookingId) {
   const [rows] = await connection.execute(
-    `SELECT booking_id, booking_status,
+    `SELECT booking_id, user_id, final_amount, booking_status,
       TIMESTAMP(booking_date, start_time) <= NOW() AS appointment_started
     FROM bookings
     WHERE booking_id = ?
@@ -61,6 +61,57 @@ async function lockBooking(connection, bookingId) {
   );
   if (rows.length === 0) throw new StaffBookingNotFoundError();
   return rows[0];
+}
+
+async function assertVerifiedPayment(connection, booking) {
+  const [payments] = await connection.execute(
+    `SELECT payment_id, payment_status, payment_method, amount, paid_at,
+      (amount = ? AND amount > 0) AS amount_matches
+    FROM payments
+    WHERE booking_id = ?
+    FOR UPDATE`,
+    [booking.final_amount, booking.booking_id],
+  );
+  const payment = payments[0];
+  if (
+    payments.length !== 1 ||
+    payment.payment_status !== "PAID" ||
+    !payment.paid_at ||
+    !["WALLET", "CASH", "BANK_TRANSFER"].includes(payment.payment_method) ||
+    Number(payment.amount_matches) !== 1
+  ) {
+    throw new StaffBookingConflictError(
+      "A verified payment for the full booking amount is required to complete the booking.",
+    );
+  }
+
+  if (payment.payment_method !== "WALLET") {
+    const [verifications] = await connection.execute(
+      `SELECT payment_id FROM payment_verifications
+      WHERE payment_id = ? AND payment_method = ? AND verified_amount = ?
+      FOR UPDATE`,
+      [payment.payment_id, payment.payment_method, payment.amount],
+    );
+    if (verifications.length !== 1) {
+      throw new StaffBookingConflictError("An authorized payment verification is required to complete the booking.");
+    }
+    return;
+  }
+
+  const [debits] = await connection.execute(
+    `SELECT wt.wallet_id, (wt.amount = ?) AS amount_matches
+    FROM wallet_transactions wt
+    INNER JOIN wallets w ON w.wallet_id = wt.wallet_id
+    WHERE wt.booking_id = ? AND wt.transaction_type = 'DEBIT'
+      AND wt.refund_id IS NULL AND w.user_id = ?
+    FOR UPDATE`,
+    [payment.amount, booking.booking_id, booking.user_id],
+  );
+  if (debits.length !== 1 || Number(debits[0].amount_matches) !== 1) {
+    throw new StaffBookingConflictError(
+      "A matching debit from the customer's Wallet is required to complete the booking.",
+    );
+  }
 }
 
 async function insertStatusHistory(connection, { bookingId, oldStatus, newStatus, userId, reason }) {
@@ -366,6 +417,9 @@ async function changeStatus(bookingId, { status, reason }, user) {
       throw new StaffBookingConflictError(
         `Cannot change status from ${booking.booking_status} to ${status}.`,
       );
+    }
+    if (status === "COMPLETED") {
+      await assertVerifiedPayment(connection, booking);
     }
     await updateStatus(connection, bookingId, booking.booking_status, status);
     await insertStatusHistory(connection, {

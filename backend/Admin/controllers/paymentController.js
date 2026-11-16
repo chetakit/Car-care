@@ -1,6 +1,9 @@
 const paymentService = require("../services/paymentService");
 
 function handleError(res, error) {
+  if (error instanceof paymentService.PaymentForbiddenError) {
+    return res.status(403).json({ status: "error", message: error.message });
+  }
   if (error instanceof paymentService.PaymentNotFoundError) {
     return res.status(404).json({
       status: "error",
@@ -77,9 +80,19 @@ async function payWithWallet(req, res) {
   }
 }
 
+async function verify(req, res) {
+  try {
+    const data = await paymentService.verify(req.bookingId, req.paymentVerificationInput, req.user);
+    return res.status(200).json({ status: "success", data });
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
   getByBookingId,
   createForBooking,
   simulate,
   payWithWallet,
+  verify,
 };

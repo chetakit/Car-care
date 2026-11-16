@@ -559,6 +559,26 @@ test("Payment creation rejects zero-value, cancelled, no-show, and unavailable b
   }
 });
 
+test("completed bookings cannot acquire or change a pending simulated payment", async () => {
+  for (const existing of [false, true]) {
+    const database = createDatabase({
+      booking: { booking_status: "COMPLETED" },
+      payments: existing ? [{ payment_status: "PENDING" }] : [],
+    });
+    useDatabase(database);
+    await withServer(async (port) => {
+      const path = existing ? "/api/payments/77/simulate" : "/api/payments/77";
+      const body = existing ? { payment_status: "FAILED" } : { payment_method: "SIMULATED" };
+      const response = await sendRequest(port, "POST", path, createToken(), body);
+      assert.equal(response.statusCode, 409);
+      assert.equal(database.state.payments.length, existing ? 1 : 0);
+      if (existing) assert.equal(database.state.payments[0].payment_status, "PENDING");
+      assert.equal(database.state.paymentStatusUpdates, 0);
+      assert.equal(database.state.rollbacks, 1);
+    });
+  }
+});
+
 test("Customers cannot create payments for another customer's booking", async () => {
   const database = createDatabase({ booking: { user_id: 202 } });
   useDatabase(database);

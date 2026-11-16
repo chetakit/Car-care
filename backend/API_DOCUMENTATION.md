@@ -121,6 +121,8 @@ All `/api/admin/...` business routes require an ADMIN token. Collection lists re
 |---|---|---|---|
 | `GET /api/admin/dashboard/summary` | No parameters | `200`, `data` contains `totalCustomers`, `totalVehicles`, `todayBookings`, `bookingStatusSummary`, `todayGrossRevenue`, `todayRefunds`, `todayRevenue`, `monthlyGrossRevenue`, `monthlyRefunds`, `monthlyRevenue`, `recentBookings` | `401`, `403`, `500`. |
 
+Dashboard and revenue reports include only verified real payments with `PAID` status and a `paid_at` timestamp. Simulated, failed, pending, unverified, amount-mismatched, and duplicate booking payments are excluded. Dashboard refunds are counted only when linked to a payment meeting the same verification rules; Reports revenue remains gross, not net of refunds.
+
 ### Vehicle types, brands, and models
 
 | Resource and URL | Methods | Query/body |
@@ -188,7 +190,7 @@ Coupon fields returned: `coupon_id`, `coupon_code`, `description`, `discount_typ
 
 Booking list statuses: `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW`. Payment filter statuses: `PENDING`, `PAID`, `FAILED`. `date_from` must not be after `date_to`.
 
-Admin booking-list items include `booking_id`, `user_id`, customer name/email/phone, vehicle ID/plate/year/model/brand/type, booking date/times/status, `payment_status`, and total/discount/final amounts. Booking detail groups are `booking` (dates, times, status, notes, totals, timestamps), `customer` (`user_id`, name, email, phone), `vehicle` (vehicle fields and model/brand/type), `schedule` (schedule ID/date/times/capacity/status), `services`, `payment`, and `coupon`. History items contain `history_id`, old/new status, `changed_by`, `changed_by_name`, `reason`, and `created_at`.
+Admin booking-list items include `booking_id`, `user_id`, customer name/email/phone, vehicle ID/plate/year/model/brand/type, booking date/times/status, `payment_status`, `payment_method`, and total/discount/final amounts. Booking detail groups are `booking` (dates, times, status, notes, totals, timestamps), `customer` (`user_id`, name, email, phone), `vehicle` (vehicle fields and model/brand/type), `schedule` (schedule ID/date/times/capacity/status), `services`, `payment`, and `coupon`. History items contain `history_id`, old/new status, `changed_by`, `changed_by_name`, `reason`, and `created_at`.
 
 ## Shared payment, cancellation, and wallet APIs
 
@@ -200,12 +202,30 @@ These routes allow CUSTOMER or ADMIN tokens. Customers are limited to their own 
 | `POST /api/payments/:bookingId` | `{ "payment_method": "SIMULATED" }`; allowed: `CASH`, `BANK_TRANSFER`, `WALLET`, `SIMULATED`. Amount is derived from the booking. | `201`, `data: Payment` | `400`, `401`, `403`, `404`, `409` existing payment, `500`. |
 | `POST /api/payments/:bookingId/simulate` | `{ "payment_status": "PAID" }` or `FAILED`; only simulated payments can use this route | `200`, `data: Payment` | `400`, `401`, `403`, `404`, `409` payment state conflict, `500`. |
 | `POST /api/payments/:bookingId/wallet` | No body or `{}` | `200`, `data: { payment: Payment, wallet: { wallet_id, balance } }` | `400` invalid/insufficient balance or booking state, `401`, `403`, `404`, `409`, `500`. |
+| `POST /api/payments/:bookingId/verify` | ACTIVE STAFF confirms `{ "payment_method": "CASH", "amount": "25.00" }`; ACTIVE STAFF or ADMIN verifies `{ "payment_method": "BANK_TRANSFER", "amount": "25.00", "transfer_reference": "bank-reference" }`. The operator must independently verify receipt and the full amount. | `200`, `data: Payment`; locks the booking and pending payment, records the verifier and amount, and marks the payment `PAID` atomically. | `400` invalid input, `401`, `403`, `404`, `409` terminal/mismatched payment, booking state, or reused transfer reference, `500`. |
 | `POST /api/cancellations/:bookingId` | Optional `{ "reason": "..." }`; no refund amount is accepted. Only a `CONFIRMED` booking with a `PAID` Wallet payment and a matching debit from the booking owner's wallet can be cancelled. Other payment methods are not eligible for wallet refunds. | `200`, `data: { booking_id, booking_status, refund, wallet }` | `400` validation/payment requirement, `401`, `403`, `404`, `409` status/refund conflict, `500`. |
 | `GET /api/wallet` | Admin must provide `user_id`; Customer may omit it or provide only their own ID | `200`, `data: { wallet_id, user_id, balance, created_at, updated_at }`. Missing wallet is represented with `wallet_id: null` and balance `"0.00"`. | `400` missing/invalid Admin target, `401`, `403`, `500`. |
 | `GET /api/wallet/transactions` | `page` (default 1), `limit` (default 20, max 100), optional `transaction_type` (`CREDIT`/`DEBIT`); same `user_id` rules | Paginated transaction items | `400`, `401`, `403`, `500`. |
 | `GET /api/wallet/refunds` | `page` (default 1), `limit` (default 20, max 100); same `user_id` rules | Paginated refund items | `400`, `401`, `403`, `500`. |
 
 Payment responses include `payment_id`, `booking_id`, `amount`, `payment_method`, `payment_status`, `transaction_ref`, `paid_at`, `created_at`, and `updated_at`. Simulation is an implemented test/simulation path, not a payment-provider confirmation. On `/api/wallet/refunds`, `transaction_type` is accepted by the shared validator but is not applied as a filter.
+
+New pending payments cannot be created for `COMPLETED` bookings, and a pending simulated payment on an existing completed booking cannot change status. An existing terminal simulated result remains idempotent.
+
+Manual verification requires the reviewed `database/migrations/2026-11-15_payment_verifications.sql` migration. Its foreign-key types must be checked against the actual schema before applying it; without the table, verification and the verified-revenue queries fail rather than treating unverified payments as revenue. Verification is an authorized human attestation, not an automated bank integration. Existing `PAID` cash or bank-transfer records are not automatically verified; reconcile them separately against evidence. A failed or terminal payment cannot currently be retried or replaced, and pending cash/transfer payments cannot be switched to Wallet.
+
+For an authorized, read-only review of existing completed bookings with missing, pending, failed, or simulated payments, run the following against an approved database snapshot (this does not alter records):
+
+```sql
+SELECT b.booking_id, b.booking_status, p.payment_id, p.payment_method, p.payment_status
+FROM bookings b
+LEFT JOIN payments p ON p.booking_id = b.booking_id
+WHERE b.booking_status = 'COMPLETED'
+  AND (p.payment_id IS NULL OR p.payment_status IS NULL
+    OR p.payment_status IN ('PENDING', 'FAILED') OR p.payment_method = 'SIMULATED');
+```
+
+Reconcile each result with service and payment evidence before any separately approved correction. Also review historical `PAID` cash/transfer payments and existing transfer references; the new uniqueness constraint covers only verifications recorded in the new table.
 
 Cancellation credits the original wallet with the paid amount less a 20% fee. A `PAID` status alone is not proof of settlement: simulated, cash, and bank-transfer payments cannot currently be refunded through this endpoint.
 
@@ -327,3 +347,5 @@ All routes require a `Bearer` token whose current database role is `STAFF` (`req
 | `POST /api/staff/bookings/:id/notes` | `{ note }` | Adds a note without changing status; writes `booking_notes`. |
 
 Mutations return the updated booking detail. Errors: `400` invalid body, `403` role/cancel, `404` not found, `409` status not allowed.
+
+Completing an `IN_SERVICE` booking requires exactly one `PAID` payment matching its positive final amount. Wallet payments require exactly one matching debit from the booking owner's Wallet; cash and bank transfers require a matching authorized verification record. Simulated payments never qualify. The booking, payment, and relevant verification or debit are checked while locked within the status-change transaction. Existing inconsistent records are not automatically changed. `allowed_next_statuses` describes the structural transition; completion can still return `409` if payment is not verified.

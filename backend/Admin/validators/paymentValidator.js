@@ -89,9 +89,30 @@ function validateWalletPayment(req, res, next) {
   return next();
 }
 
+function validateVerification(req, res, next) {
+  const body = req.body;
+  if (!hasOnlyKeys(body, new Set(["payment_method", "amount", "transfer_reference"])) ||
+      !["CASH", "BANK_TRANSFER"].includes(body.payment_method) ||
+      typeof body.amount !== "string" ||
+      !/^\d{1,8}(?:\.\d{1,2})?$/.test(body.amount) ||
+      (body.payment_method === "CASH" && body.transfer_reference !== undefined) ||
+      (body.payment_method === "BANK_TRANSFER" &&
+        (typeof body.transfer_reference !== "string" ||
+          !body.transfer_reference.trim() || body.transfer_reference.trim().length > 128))) {
+    return sendValidationError(res, "Provide the payment method and amount; bank transfers also require a reference.");
+  }
+  req.paymentVerificationInput = {
+    payment_method: body.payment_method,
+    amount: body.amount,
+    transfer_reference: body.payment_method === "BANK_TRANSFER" ? body.transfer_reference.trim() : null,
+  };
+  return next();
+}
+
 module.exports = {
   parseBookingId,
   validateCreate,
   validateSimulation,
   validateWalletPayment,
+  validateVerification,
 };
