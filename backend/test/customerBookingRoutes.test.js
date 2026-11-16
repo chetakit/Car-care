@@ -600,6 +600,110 @@ test("Booking rejects service duration longer than the selected schedule", async
   });
 });
 
+test("Booking accepts one 30-minute service and preserves the schedule times", async () => {
+  const database = createDatabase({
+    services: [
+      { service_id: 3, service_name: "Wash", duration_minutes: 30, status: "ACTIVE" },
+    ],
+  });
+  pool.getConnection = async () => database.connection;
+
+  await withServer(async (port) => {
+    const response = await sendRequest(
+      port,
+      "POST",
+      "/api/customer/bookings",
+      createToken(),
+      { vehicle_id: 42, schedule_id: 7, service_ids: [3] },
+    );
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.payload.data.start_time, "09:00:00");
+    assert.equal(response.payload.data.end_time, "10:30:00");
+    assert.deepEqual(database.state.bookingInsert.values.slice(3, 6), [
+      "2026-11-20",
+      "09:00:00",
+      "10:30:00",
+    ]);
+    assert.deepEqual(database.state.serviceInsert.values, [
+      101, 3, "Wash", "19.99", 30,
+    ]);
+    assert.equal(database.state.committed, true);
+    assert.equal(database.state.rolledBack, false);
+  });
+});
+
+test("Booking accepts mixed service durations that exactly fill the schedule", async () => {
+  const database = createDatabase({
+    services: [
+      { service_id: 3, service_name: "Wash", duration_minutes: 30, status: "ACTIVE" },
+      { service_id: 5, service_name: "Polish", duration_minutes: 60, status: "ACTIVE" },
+    ],
+  });
+  pool.getConnection = async () => database.connection;
+
+  await withServer(async (port) => {
+    const response = await sendRequest(
+      port,
+      "POST",
+      "/api/customer/bookings",
+      createToken(),
+      { vehicle_id: 42, schedule_id: 7, service_ids: [3, 5] },
+    );
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.payload.data.start_time, "09:00:00");
+    assert.equal(response.payload.data.end_time, "10:30:00");
+    assert.deepEqual(database.state.bookingInsert.values.slice(3, 6), [
+      "2026-11-20",
+      "09:00:00",
+      "10:30:00",
+    ]);
+    assert.deepEqual(
+      response.payload.data.services.map((service) => service.duration_minutes),
+      [30, 60],
+    );
+    assert.equal(database.state.committed, true);
+    assert.equal(database.state.rolledBack, false);
+  });
+});
+
+test("Booking rejects mixed service durations over the schedule without inserting", async () => {
+  const database = createDatabase({
+    services: [
+      { service_id: 3, service_name: "Wash", duration_minutes: 30, status: "ACTIVE" },
+      { service_id: 5, service_name: "Polish", duration_minutes: 61, status: "ACTIVE" },
+    ],
+  });
+  pool.getConnection = async () => database.connection;
+
+  await withServer(async (port) => {
+    const response = await sendRequest(
+      port,
+      "POST",
+      "/api/customer/bookings",
+      createToken(),
+      { vehicle_id: 42, schedule_id: 7, service_ids: [3, 5] },
+    );
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(
+      response.payload.message,
+      "The selected services exceed the schedule duration.",
+    );
+    assert.equal(database.state.bookingInsert, null);
+    assert.equal(database.state.serviceInsert, null);
+    assert.equal(
+      database.state.queries.some(({ sql }) =>
+        sql.startsWith("INSERT INTO bookings"),
+      ),
+      false,
+    );
+    assert.equal(database.state.committed, false);
+    assert.equal(database.state.rolledBack, true);
+  });
+});
+
 test("Booking inserts are rolled back when booking service snapshots fail", async () => {
   const database = createDatabase({ failServiceInsert: true });
   pool.getConnection = async () => database.connection;
