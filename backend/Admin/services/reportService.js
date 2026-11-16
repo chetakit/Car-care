@@ -2,6 +2,7 @@ const pool = require("../../shared/config/db");
 const verifiedPaymentSql = require("../../shared/services/verifiedPaymentSql");
 
 const BOOKING_STATUSES = [
+  "PENDING_PAYMENT",
   "CONFIRMED",
   "CHECKED_IN",
   "IN_SERVICE",

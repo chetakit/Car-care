@@ -13,7 +13,7 @@ import './dashboard.css'
 
 const BUSINESS_TIME_ZONE = CUSTOMER_TIME_ZONE
 const BOOKING_PAGE_SIZE = 100
-const UPCOMING_STATUSES = new Set(['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'])
+const UPCOMING_STATUSES = new Set(['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'])
 
 function getBusinessClock(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {

@@ -4,6 +4,7 @@ class BookingNotFoundError extends Error {}
 class BookingValidationError extends Error {}
 
 const BOOKING_STATUSES = [
+  "PENDING_PAYMENT",
   "CONFIRMED",
   "CHECKED_IN",
   "IN_SERVICE",

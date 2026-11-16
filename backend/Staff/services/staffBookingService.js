@@ -7,6 +7,10 @@
 //                   (สร้างจาก database/migrations/2026-11-15_staff_service.sql)
 // =====================================================================
 const pool = require("../../shared/config/db");
+const {
+  CancellationConflictError,
+  recordNoShowForfeit,
+} = require("../../Admin/services/cancellationService");
 
 class StaffBookingNotFoundError extends Error {}
 class StaffBookingConflictError extends Error {} // 409: สถานะไม่อนุญาต
@@ -77,13 +81,16 @@ async function assertVerifiedPayment(connection, booking) {
     payments.length !== 1 ||
     payment.payment_status !== "PAID" ||
     !payment.paid_at ||
-    !["WALLET", "CASH", "BANK_TRANSFER"].includes(payment.payment_method) ||
+    !["WALLET", "CASH", "BANK_TRANSFER", "SIMULATED"].includes(payment.payment_method) ||
     Number(payment.amount_matches) !== 1
   ) {
     throw new StaffBookingConflictError(
       "A verified payment for the full booking amount is required to complete the booking.",
     );
   }
+
+  // SIMULATED คือการจ่ายออนไลน์จำลองของโปรเจกต์นี้ ถือว่าจ่ายแล้วเมื่อสถานะเป็น PAID
+  if (payment.payment_method === "SIMULATED") return;
 
   if (payment.payment_method !== "WALLET") {
     const [verifications] = await connection.execute(
@@ -144,7 +151,8 @@ const LIST_FROM = `
   LEFT JOIN payments p ON p.booking_id = b.booking_id`;
 
 async function list(query) {
-  const conditions = [];
+  // การจองที่ยังไม่ชำระเงินยังไม่ใช่คิวงานของร้าน
+  const conditions = ["b.booking_status <> 'PENDING_PAYMENT'"];
   const values = [];
 
   if (query.date) {
@@ -453,6 +461,15 @@ async function markNoShow(bookingId, reason, user) {
       userId: user.user_id,
       reason,
     });
+    // ไม่มาตามนัด = ริบเงิน 100% (บันทึกใน refunds: คืน 0 บาท, ค่าธรรมเนียมเต็มจำนวน)
+    try {
+      await recordNoShowForfeit(connection, bookingId, reason);
+    } catch (error) {
+      if (error instanceof CancellationConflictError) {
+        throw new StaffBookingConflictError(error.message);
+      }
+      throw error;
+    }
   });
   return getById(bookingId);
 }

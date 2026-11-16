@@ -1,5 +1,6 @@
 const { randomUUID } = require("crypto");
 const pool = require("../../shared/config/db");
+const { HOLD_EXPIRED_SQL } = require("../../shared/services/bookingPaymentHold");
 
 class PaymentNotFoundError extends Error {}
 class PaymentConflictError extends Error {}
@@ -106,7 +107,8 @@ async function withTransaction(operation) {
 
 async function getLockedBooking(connection, bookingId, user) {
   const [rows] = await connection.execute(
-    `SELECT booking_id, user_id, final_amount, booking_status
+    `SELECT booking_id, user_id, final_amount, booking_status,
+      ${HOLD_EXPIRED_SQL("bookings")} AS hold_expired
     FROM bookings
     WHERE booking_id = ?
     FOR UPDATE`,
@@ -118,6 +120,47 @@ async function getLockedBooking(connection, bookingId, user) {
   }
   assertBookingAccess(booking, user);
   return booking;
+}
+
+// Rejects payment for bookings that can no longer be paid.
+function assertPayable(booking) {
+  if (
+    booking.booking_status === "CANCELLED" ||
+    booking.booking_status === "NO_SHOW"
+  ) {
+    throw new PaymentValidationError(
+      "Payment is not allowed for cancelled or no-show bookings.",
+    );
+  }
+  if (
+    booking.booking_status === "PENDING_PAYMENT" &&
+    Number(booking.hold_expired) === 1
+  ) {
+    throw new PaymentConflictError(
+      "The payment window for this booking has expired. Please book again.",
+    );
+  }
+}
+
+// A booking becomes CONFIRMED only after its payment is PAID.
+async function confirmPaidBooking(connection, booking, user, paymentMethod) {
+  if (booking.booking_status !== "PENDING_PAYMENT") return;
+  const [result] = await connection.execute(
+    `UPDATE bookings SET booking_status = 'CONFIRMED'
+    WHERE booking_id = ? AND booking_status = 'PENDING_PAYMENT'`,
+    [booking.booking_id],
+  );
+  if (result.affectedRows !== 1) {
+    throw new PaymentConflictError(
+      "Booking status changed before payment could be completed.",
+    );
+  }
+  await connection.execute(
+    `INSERT INTO booking_status_history
+      (booking_id, old_status, new_status, changed_by, reason)
+    VALUES (?, 'PENDING_PAYMENT', 'CONFIRMED', ?, ?)`,
+    [booking.booking_id, user.user_id, `Paid by ${paymentMethod}.`],
+  );
 }
 
 async function getLockedPayment(connection, bookingId) {
@@ -145,15 +188,20 @@ async function verify(bookingId, { payment_method, amount, transfer_reference },
   }
   return withTransaction(async (connection) => {
     const [bookings] = await connection.execute(
-      `SELECT booking_id, user_id, final_amount, booking_status
+      `SELECT booking_id, user_id, final_amount, booking_status,
+        ${HOLD_EXPIRED_SQL("bookings")} AS hold_expired
       FROM bookings WHERE booking_id = ? FOR UPDATE`,
       [bookingId],
     );
     const booking = bookings[0];
     if (!booking) throw new PaymentNotFoundError();
-    if (!["CONFIRMED", "CHECKED_IN", "IN_SERVICE"].includes(booking.booking_status)) {
+    if (!["PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN", "IN_SERVICE"].includes(booking.booking_status)) {
       throw new PaymentConflictError("This booking cannot accept a payment verification.");
     }
+    if (booking.booking_status === "PENDING_PAYMENT" && payment_method === "CASH") {
+      throw new PaymentConflictError("Cash cannot confirm an unpaid booking.");
+    }
+    assertPayable(booking);
 
     const payment = await getLockedPayment(connection, bookingId);
     if (!payment) throw new PaymentNotFoundError();
@@ -179,6 +227,7 @@ async function verify(bookingId, { payment_method, amount, transfer_reference },
     if (result.affectedRows !== 1) {
       throw new PaymentConflictError("Payment changed before verification could be completed.");
     }
+    await confirmPaidBooking(connection, booking, user, payment_method);
     const [rows] = await connection.execute(
       `SELECT payment_id, booking_id, amount, payment_method, payment_status,
         transaction_ref, paid_at, created_at, updated_at
@@ -235,12 +284,10 @@ async function getByBookingId(bookingId, user) {
 async function createForBooking(bookingId, { payment_method }, user) {
   return withTransaction(async (connection) => {
     const booking = await getLockedBooking(connection, bookingId, user);
-    if (
-      booking.booking_status === "CANCELLED" ||
-      booking.booking_status === "NO_SHOW"
-    ) {
+    assertPayable(booking);
+    if (booking.booking_status === "PENDING_PAYMENT" && payment_method === "CASH") {
       throw new PaymentValidationError(
-        "Payment is not allowed for cancelled or no-show bookings.",
+        "A new booking must be paid online (SIMULATED, BANK_TRANSFER, or WALLET) before it is confirmed.",
       );
     }
     if (booking.booking_status === "COMPLETED") {
@@ -250,6 +297,31 @@ async function createForBooking(bookingId, { payment_method }, user) {
     }
     const amount = validateBookingAmount(booking.final_amount);
     const existingPayment = await getLockedPayment(connection, bookingId);
+    // A failed attempt on an unpaid booking can be retried while the hold lasts.
+    if (
+      existingPayment &&
+      existingPayment.payment_status === "FAILED" &&
+      booking.booking_status === "PENDING_PAYMENT"
+    ) {
+      const [retry] = await connection.execute(
+        `UPDATE payments
+        SET payment_method = ?, payment_status = 'PENDING', amount = ?,
+          transaction_ref = NULL, paid_at = NULL
+        WHERE payment_id = ? AND payment_status = 'FAILED'`,
+        [payment_method, amount, existingPayment.payment_id],
+      );
+      if (retry.affectedRows !== 1) {
+        throw new PaymentConflictError("Payment changed before it could be retried.");
+      }
+      const [retried] = await connection.execute(
+        `SELECT payment_id, booking_id, amount, payment_method, payment_status,
+          transaction_ref, paid_at, created_at, updated_at
+        FROM payments
+        WHERE payment_id = ?`,
+        [existingPayment.payment_id],
+      );
+      return toPayment(retried[0]);
+    }
     if (existingPayment) {
       throw new PaymentConflictError(
         "A payment already exists for this booking.",
@@ -300,6 +372,9 @@ async function simulate(bookingId, { payment_status }, user) {
         "A completed payment cannot change to another status.",
       );
     }
+    if (payment_status === "PAID") {
+      assertPayable(booking);
+    }
 
     const transactionRef = `SIM-${randomUUID()}`;
     await connection.execute(
@@ -310,6 +385,9 @@ async function simulate(bookingId, { payment_status }, user) {
       WHERE payment_id = ? AND payment_status = 'PENDING'`,
       [payment_status, transactionRef, payment_status, payment.payment_id],
     );
+    if (payment_status === "PAID") {
+      await confirmPaidBooking(connection, booking, user, "SIMULATED");
+    }
     const [rows] = await connection.execute(
       `SELECT payment_id, booking_id, amount, payment_method, payment_status,
         transaction_ref, paid_at, created_at, updated_at
@@ -327,14 +405,7 @@ async function simulate(bookingId, { payment_status }, user) {
 async function payWithWallet(bookingId, user) {
   return withTransaction(async (connection) => {
     const booking = await getLockedBooking(connection, bookingId, user);
-    if (
-      booking.booking_status === "CANCELLED" ||
-      booking.booking_status === "NO_SHOW"
-    ) {
-      throw new PaymentValidationError(
-        "Payment is not allowed for cancelled or no-show bookings.",
-      );
-    }
+    assertPayable(booking);
 
     const amount = validateBookingAmount(booking.final_amount);
     const amountCents = decimalToCents(amount);
@@ -344,7 +415,10 @@ async function payWithWallet(bookingId, user) {
         "This booking has already been paid.",
       );
     }
-    if (payment && payment.payment_status === "FAILED") {
+    const retryingFailed =
+      payment && payment.payment_status === "FAILED" &&
+      booking.booking_status === "PENDING_PAYMENT";
+    if (payment && payment.payment_status === "FAILED" && !retryingFailed) {
       throw new PaymentConflictError(
         "A failed payment cannot be replaced or retried with Wallet.",
       );
@@ -433,8 +507,8 @@ async function payWithWallet(bookingId, user) {
           payment_status = 'PAID',
           transaction_ref = ?,
           paid_at = CURRENT_TIMESTAMP
-        WHERE payment_id = ? AND payment_status = 'PENDING'`,
-        [amount, transactionRef, payment.payment_id],
+        WHERE payment_id = ? AND payment_status = ?`,
+        [amount, transactionRef, payment.payment_id, payment.payment_status],
       );
       if (paymentUpdate.affectedRows !== 1) {
         throw new PaymentConflictError(
@@ -457,6 +531,7 @@ async function payWithWallet(bookingId, user) {
       );
       paymentId = result.insertId;
     }
+    await confirmPaidBooking(connection, booking, user, "WALLET");
 
     const [paymentRows] = await connection.execute(
       `SELECT payment_id, booking_id, amount, payment_method, payment_status,

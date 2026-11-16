@@ -93,6 +93,28 @@ function PaymentPageIcon({ type }) {
   )
 }
 
+// Counts down the 15-minute payment hold from the seconds the server reported.
+function usePaymentCountdown(booking) {
+  const secondsAtLoad = booking?.booking_status === 'PENDING_PAYMENT' &&
+    Number.isFinite(Number(booking?.payment_seconds_left))
+    ? Number(booking.payment_seconds_left)
+    : null
+  const [loadedAt] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (secondsAtLoad === null) return undefined
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [secondsAtLoad])
+  if (secondsAtLoad === null) return null
+  return Math.max(0, secondsAtLoad - Math.floor((now - loadedAt) / 1000))
+}
+
+function formatCountdown(seconds) {
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+}
+
 function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
   const { token, handleUnauthorized } = useAuth()
   const api = useMemo(
@@ -259,11 +281,16 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
   const amount = booking?.final_amount ?? booking?.total_amount
   const amountCents = cents(amount)
   const walletCents = cents(walletBalance)
+  const secondsLeft = usePaymentCountdown(booking)
+  const holdExpired = secondsLeft === 0
   const bookingAllowsPayment =
-    booking && !['CANCELLED', 'NO_SHOW'].includes(booking.booking_status)
+    booking && !['CANCELLED', 'NO_SHOW'].includes(booking.booking_status) && !holdExpired
   const pendingPayment = payment?.payment_status === 'PENDING'
+  // A failed attempt can be retried while the booking still awaits payment.
+  const retryableFailure =
+    payment?.payment_status === 'FAILED' && booking?.booking_status === 'PENDING_PAYMENT'
   const canCreateDemo =
-    paymentState === 'ready' && !payment && bookingAllowsPayment
+    paymentState === 'ready' && (!payment || retryableFailure) && bookingAllowsPayment
   const canSimulate =
     paymentState === 'ready' &&
     payment?.payment_method === 'SIMULATED' &&
@@ -271,6 +298,7 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
     bookingAllowsPayment
   const walletPaymentCompatible =
     !payment ||
+    retryableFailure ||
     (pendingPayment && ['SIMULATED', 'WALLET'].includes(payment.payment_method))
   const canPayWithWallet =
     paymentState === 'ready' &&
@@ -337,6 +365,23 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                 Return to My Bookings
               </a>
             </section>
+          )}
+
+          {bookingState === 'ready' && booking && secondsLeft !== null && payment?.payment_status !== 'PAID' && (
+            <div className={`payment-countdown${holdExpired ? ' is-expired' : secondsLeft < 180 ? ' is-urgent' : ''}`} role="status">
+              {holdExpired ? (
+                <>
+                  <strong>Payment time is up</strong>
+                  <span>This slot has been released. Please book again.</span>
+                  <a href="/customer/booking">Book again</a>
+                </>
+              ) : (
+                <>
+                  <strong>{formatCountdown(secondsLeft)}</strong>
+                  <span>left to pay. Your slot is held until then.</span>
+                </>
+              )}
+            </div>
           )}
 
           {bookingState === 'ready' && booking && (
@@ -433,7 +478,9 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                 )}
                 {paymentState === 'ready' && payment?.payment_status === 'FAILED' && (
                   <div className="payment-inline-note">
-                    This payment attempt failed. The current API does not support retrying a failed payment.
+                    {retryableFailure
+                      ? 'This payment attempt failed. You can try again below before the 15-minute hold ends.'
+                      : 'This payment attempt failed.'}
                   </div>
                 )}
                 {paymentState === 'ready' &&

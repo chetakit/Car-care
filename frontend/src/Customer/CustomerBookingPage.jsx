@@ -58,6 +58,22 @@ function formatCents(cents) {
   return formatMoney(Number(cents) / 100)
 }
 
+function formatDuration(minutes) {
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (!hours) return `${rest} min`
+  return rest ? `${hours} h ${rest} min` : `${hours} h`
+}
+
+function centsToAmount(cents) {
+  return `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`
+}
+
+function amountToCents(value) {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(value ?? ''))
+  return match ? BigInt(match[1]) * 100n + BigInt((match[2] ?? '').padEnd(2, '0')) : null
+}
+
 function vehicleLabel(vehicle) {
   return [vehicle.brand_name, vehicle.model_name].filter(Boolean).join(' ') || 'Vehicle'
 }
@@ -142,6 +158,10 @@ function CustomerBookingPage({ user, onLogout }) {
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedScheduleId, setSelectedScheduleId] = useState('')
   const [submitError, setSubmitError] = useState('')
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [couponChecking, setCouponChecking] = useState(false)
+  const [couponError, setCouponError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [bookingResult, setBookingResult] = useState(null)
   const submissionInProgress = useRef(false)
@@ -263,6 +283,10 @@ function CustomerBookingPage({ user, onLogout }) {
       : 'loading'
   const servicePrices =
     priceResult.key === priceRequestKey ? priceResult.prices : {}
+  // Total time of the chosen services; long visits continue into the next slots.
+  const totalDurationMinutes = services
+    .filter((service) => selectedServiceIds.includes(String(service.service_id)))
+    .reduce((total, service) => total + (Number(service.duration_minutes) || 0), 0)
 
   useEffect(() => {
     if (step !== 3 || scheduleState === 'ready' || scheduleState === 'error') {
@@ -274,6 +298,8 @@ function CustomerBookingPage({ user, onLogout }) {
       from: scheduleRangeStart,
       to: rangeEnd,
     })
+    // Only offer start times with enough back-to-back slots for all services.
+    if (totalDurationMinutes > 0) query.set('duration_minutes', String(totalDurationMinutes))
 
     api(`/api/customer/schedules/availability?${query.toString()}`, {
       signal: controller.signal,
@@ -311,7 +337,7 @@ function CustomerBookingPage({ user, onLogout }) {
       })
 
     return () => controller.abort()
-  }, [api, rangeEnd, scheduleRangeStart, scheduleReload, scheduleState, step])
+  }, [api, rangeEnd, scheduleRangeStart, scheduleReload, scheduleState, step, totalDurationMinutes])
 
   const availableVehicles = vehicles.map((vehicle) => {
     const model = vehicleModels.find(
@@ -337,6 +363,45 @@ function CustomerBookingPage({ user, onLogout }) {
     (total, service) => total + (servicePrices[String(service.service_id)] ?? 0n),
     0n,
   )
+  // A coupon preview only counts while the subtotal it was checked against is unchanged.
+  const activeCoupon =
+    appliedCoupon && appliedCoupon.subtotalCents === totalCents ? appliedCoupon : null
+  const payableCents = activeCoupon ? activeCoupon.finalCents : totalCents
+
+  async function applyCoupon() {
+    const code = couponInput.trim()
+    if (!code || couponChecking || totalCents <= 0n) return
+    setCouponChecking(true)
+    setCouponError('')
+    try {
+      const query = new URLSearchParams({ code, subtotal: centsToAmount(totalCents) })
+      const response = await api(`/api/customer/coupons/preview?${query}`)
+      const discountCents = amountToCents(response.data?.discount_amount)
+      const finalCents = amountToCents(response.data?.final_amount)
+      if (discountCents === null || finalCents === null) {
+        throw new Error('The coupon response was incomplete.')
+      }
+      setAppliedCoupon({
+        code: response.data.coupon_code,
+        description: response.data.description,
+        subtotalCents: totalCents,
+        discountCents,
+        finalCents,
+      })
+      setCouponInput(response.data.coupon_code)
+    } catch (error) {
+      setAppliedCoupon(null)
+      setCouponError(error instanceof Error ? error.message : 'This coupon could not be checked.')
+    } finally {
+      setCouponChecking(false)
+    }
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null)
+    setCouponError('')
+  }
+
   const canContinue =
     (step === 1 && Boolean(selectedVehicle && vehicleTypeId)) ||
     (step === 2 &&
@@ -455,6 +520,7 @@ function CustomerBookingPage({ user, onLogout }) {
           vehicle_id: Number(selectedVehicle.vehicle_id),
           schedule_id: Number(selectedSchedule.schedule_id),
           service_ids: selectedServiceIds.map(Number),
+          ...(activeCoupon ? { coupon_code: activeCoupon.code } : {}),
         },
       })
       if (response.status !== 'success' || response.data?.booking_id == null) {
@@ -464,6 +530,10 @@ function CustomerBookingPage({ user, onLogout }) {
       setBookingResult({ bookingId: response.data.booking_id })
     } catch (error) {
       setSubmitError(getBookingErrorMessage(error))
+      if (error instanceof ApiError && /coupon/i.test(error.message)) {
+        setAppliedCoupon(null)
+        setCouponError(error.message)
+      }
       if (
         error instanceof ApiError &&
         error.status === 409 &&
@@ -514,9 +584,9 @@ function CustomerBookingPage({ user, onLogout }) {
           <header className="booking-heading">
             {bookingResult ? (
               <div>
-                <span className="customer-eyebrow">BOOKING CREATED</span>
-                <h1>Booking successful</h1>
-                <p>Reference #{bookingResult.bookingId}. Your booking is now in My Bookings.</p>
+                <span className="customer-eyebrow">AWAITING PAYMENT</span>
+                <h1>Booking created</h1>
+                <p>Reference #{bookingResult.bookingId}. Pay within 15 minutes to confirm it.</p>
               </div>
             ) : (
               <>
@@ -539,18 +609,21 @@ function CustomerBookingPage({ user, onLogout }) {
             >
               <span aria-hidden="true" className="booking-success-mark">✓</span>
               <div>
-                <h2 id="booking-success-title">Your appointment is in My Bookings.</h2>
+                <h2 id="booking-success-title">Your slot is held for 15 minutes.</h2>
                 <p>
-                  Payment is handled separately. Open your booking to review its details
-                  and continue to the available payment options.
+                  The booking is confirmed only after payment. If it is not paid within
+                  15 minutes, it is cancelled automatically and the slot is released.
                 </p>
                 <div className="booking-success-actions">
-                  <a className="customer-button customer-button-primary" href="/customer/bookings">
-                    View My Bookings
+                  <a
+                    className="customer-button customer-button-primary"
+                    href={`/customer/payment/${encodeURIComponent(bookingResult.bookingId)}`}
+                  >
+                    Pay now
                     <span aria-hidden="true">→</span>
                   </a>
-                  <a className="booking-secondary-link" href="/customer">
-                    Back to Customer home
+                  <a className="booking-secondary-link" href="/customer/bookings">
+                    View My Bookings
                   </a>
                 </div>
               </div>
@@ -600,7 +673,7 @@ function CustomerBookingPage({ user, onLogout }) {
                 <span className="booking-panel-kicker">STEP 0{step} / 04</span>
                 <h2 id="booking-panel-title">{STEPS[step - 1][1]}</h2>
               </div>
-              <span className="booking-panel-note">Your booking is confirmed after submission.</span>
+              <span className="booking-panel-note">Your booking is confirmed once it is paid.</span>
             </div>
 
             {step === 1 && (
@@ -744,6 +817,7 @@ function CustomerBookingPage({ user, onLogout }) {
                     <div className="booking-total-bar">
                       <span>
                         {selectedServiceIds.length} {selectedServiceIds.length === 1 ? 'service' : 'services'} selected
+                        {totalDurationMinutes > 0 && ` · about ${formatDuration(totalDurationMinutes)}`}
                       </span>
                       <strong>{formatCents(totalCents)}</strong>
                     </div>
@@ -848,6 +922,11 @@ function CustomerBookingPage({ user, onLogout }) {
                     <h3 className="booking-time-heading">
                       Available times · {selectedDate ? formatDate(selectedDate) : 'selected date'}
                     </h3>
+                    {totalDurationMinutes > 90 && (
+                      <p className="booking-inline-note" role="status">
+                        Your services take about {formatDuration(totalDurationMinutes)}, so each visit uses more than one time slot. Only start times with enough free time after them are shown.
+                      </p>
+                    )}
                     <div className="booking-slot-grid">
                       {dateSchedules.map((schedule) => {
                         const selected = selectedScheduleId === String(schedule.schedule_id)
@@ -965,13 +1044,59 @@ function CustomerBookingPage({ user, onLogout }) {
                     </p>
                   </section>
 
+                  <section className="booking-summary-section booking-coupon">
+                    <div className="booking-summary-heading">
+                      <span>04</span>
+                      <h3>Coupon</h3>
+                    </div>
+                    {activeCoupon ? (
+                      <div className="booking-coupon-applied">
+                        <span>
+                          <strong>{activeCoupon.code}</strong>
+                          {activeCoupon.description && <small>{activeCoupon.description}</small>}
+                        </span>
+                        <button disabled={submitting} onClick={removeCoupon} type="button">Remove</button>
+                      </div>
+                    ) : (
+                      <div className="booking-coupon-form">
+                        <label className="booking-visually-hidden" htmlFor="booking-coupon-code">Coupon code</label>
+                        <input
+                          autoComplete="off"
+                          disabled={couponChecking || submitting}
+                          id="booking-coupon-code"
+                          maxLength="50"
+                          onChange={(event) => { setCouponInput(event.target.value); setCouponError('') }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') { event.preventDefault(); void applyCoupon() }
+                          }}
+                          placeholder="Have a coupon code?"
+                          value={couponInput}
+                        />
+                        <button
+                          disabled={!couponInput.trim() || couponChecking || submitting}
+                          onClick={() => void applyCoupon()}
+                          type="button"
+                        >
+                          {couponChecking ? 'Checking…' : 'Apply'}
+                        </button>
+                      </div>
+                    )}
+                    {couponError && <p className="booking-coupon-error" role="alert">{couponError}</p>}
+                  </section>
+
+                  {activeCoupon && (
+                    <div className="booking-summary-breakdown">
+                      <span>Subtotal</span><span>{formatCents(totalCents)}</span>
+                      <span>Coupon discount</span><span>−{formatCents(activeCoupon.discountCents)}</span>
+                    </div>
+                  )}
                   <div className="booking-summary-total">
-                    <span>Amount due for services</span>
-                    <strong>{formatCents(totalCents)}</strong>
+                    <span>Amount due</span>
+                    <strong>{formatCents(payableCents)}</strong>
                   </div>
                 </div>
                 <p className="booking-payment-note">
-                  Payment is not collected here. You can use the existing payment options after booking.
+                  After booking, pay online within 15 minutes to confirm your slot. Unpaid bookings are cancelled automatically.
                 </p>
               </div>
             )}

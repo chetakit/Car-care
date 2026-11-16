@@ -9,7 +9,7 @@ import formatMoney from '../utils/formatMoney.js'
 
 const REFUNDS_PAGE_SIZE = 100
 const MAX_BOOKING_ID = 2147483647
-const BOOKING_STATUSES = ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
+const BOOKING_STATUSES = ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
 
 function isValidBookingId(value) {
   const id = String(value ?? '')
@@ -38,6 +38,25 @@ function vehicleSummary(row) {
     [row.brand_name, row.model_name].filter(Boolean).join(' '),
     row.license_plate,
   ].filter(Boolean).join(' · ') || '—'
+}
+
+const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'CONFIRMED']
+
+function toCents(value) {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(value ?? ''))
+  return match ? Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0')) : 0
+}
+
+// Same rounding as backend calculateRefund(): fee 20% (rounded), refund the rest.
+function cancellationPreview(payment) {
+  if (payment?.payment_status !== 'PAID') return null
+  const paidCents = toCents(payment.amount)
+  const feeCents = Math.floor((paidCents * 20 + 50) / 100)
+  return {
+    paid: (paidCents / 100).toFixed(2),
+    fee: (feeCents / 100).toFixed(2),
+    refund: ((paidCents - feeCents) / 100).toFixed(2),
+  }
 }
 
 async function findBookingRefunds(api, userId, bookingId) {
@@ -84,6 +103,11 @@ function BookingsPage({ onNavigate }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const [refundError, setRefundError] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelConfirming, setCancelConfirming] = useState(false)
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const [cancelMessage, setCancelMessage] = useState('')
   const api = useApi()
   const autoOpenAttempted = useRef(false)
   const params = new URLSearchParams({ page: String(page), limit: '20' })
@@ -106,8 +130,12 @@ function BookingsPage({ onNavigate }) {
     setQuery(values.toString())
   }
 
-  const openDetails = useCallback(async (bookingId) => {
+  const openDetails = useCallback(async (bookingId, { keepMessage = false } = {}) => {
     if (detailLoading) return
+    setCancelReason('')
+    setCancelConfirming(false)
+    setCancelError('')
+    if (!keepMessage) setCancelMessage('')
     setSelectedId(bookingId)
     setDetail(null)
     setHistory([])
@@ -144,8 +172,30 @@ function BookingsPage({ onNavigate }) {
     void openDetails(requestedBookingId)
   }, [openDetails, requestedBookingId])
 
+  async function cancelBooking() {
+    if (cancelSubmitting || selectedId === null) return
+    setCancelSubmitting(true)
+    setCancelError('')
+    try {
+      const response = await api(`/api/cancellations/${selectedId}`, {
+        method: 'POST',
+        body: cancelReason.trim() ? { reason: cancelReason.trim() } : {},
+      })
+      const refund = response.data?.refund
+      setCancelMessage(refund
+        ? `Booking cancelled. Fee ${formatMoney(refund.cancellation_fee)} kept; ${formatMoney(refund.refund_amount)} credited to the customer's Wallet.`
+        : 'Booking cancelled. Nothing was paid, so no fee or refund applies.')
+      refresh()
+      await openDetails(selectedId, { keepMessage: true })
+    } catch (requestError) {
+      setCancelError(requestError.message)
+    } finally {
+      setCancelSubmitting(false)
+    }
+  }
+
   function closeDetails() {
-    if (detailLoading) return
+    if (cancelSubmitting) return
     setSelectedId(null)
     setDetail(null)
     setHistory([])
@@ -163,6 +213,8 @@ function BookingsPage({ onNavigate }) {
   const schedule = detail?.schedule
   const payment = detail?.payment
   const services = detail?.services ?? []
+  const canCancel = Boolean(booking && CANCELLABLE_STATUSES.includes(booking.booking_status))
+  const preview = cancellationPreview(payment)
 
   return (
     <div className="admin-bookings-page">
@@ -270,25 +322,16 @@ function BookingsPage({ onNavigate }) {
                     </span>
                   ),
                 },
-                { key: 'vehicle', label: 'Vehicle', render: vehicleSummary },
-                {
-                  key: 'service',
-                  label: 'Service',
-                  render: (row) => (
-                    <button
-                      className="admin-booking-detail-link"
-                      disabled={detailLoading}
-                      onClick={() => openDetails(row.booking_id)}
-                      type="button"
-                    >
-                      View services
-                    </button>
-                  ),
-                },
+                { key: 'vehicle', label: 'Vehicle', render: vehicleSummary, wrap: true },
                 {
                   key: 'schedule',
                   label: 'Schedule',
-                  render: (row) => scheduleSummary(row.booking_date, row.start_time, row.end_time),
+                  render: (row) => (
+                    <span className="admin-booking-schedule">
+                      <span>{formatDate(row.booking_date)}</span>
+                      <small>{[formatTime(row.start_time), formatTime(row.end_time)].filter(Boolean).join('–')}</small>
+                    </span>
+                  ),
                 },
                 { key: 'final_amount', label: 'Amount', render: (row) => formatMoney(row.final_amount) },
                 { key: 'booking_status', label: 'Booking status', render: (row) => <StatusBadge value={row.booking_status} /> },
@@ -330,14 +373,16 @@ function BookingsPage({ onNavigate }) {
           onClose={closeDetails}
           onSubmit={handleModalSubmit}
           open
-          submitLabel="Done"
-          submitting={detailLoading}
+          submitLabel="Close"
+          submitting={cancelSubmitting}
           title={`Booking #${selectedId}`}
+          viewOnly
         >
           {detailLoading ? (
             <RequestState loading />
           ) : detail && booking ? (
             <div className="admin-booking-detail">
+              {cancelMessage && <div className="admin-alert admin-alert-success" role="status">{cancelMessage}</div>}
               <section className="admin-booking-detail-section">
                 <h3>Overview</h3>
                 <dl className="admin-booking-detail-grid">
@@ -440,6 +485,48 @@ function BookingsPage({ onNavigate }) {
                   <p className="admin-booking-detail-empty">No refunds recorded for this Booking.</p>
                 )}
               </section>
+
+              {canCancel && (
+                <section className="admin-booking-detail-section admin-booking-cancel">
+                  <h3>Cancel booking</h3>
+                  {preview ? (
+                    <dl className="admin-booking-detail-grid">
+                      <div><dt>Paid</dt><dd>{formatMoney(preview.paid)}</dd></div>
+                      <div><dt>Cancellation fee (20%)</dt><dd>{formatMoney(preview.fee)}</dd></div>
+                      <div><dt>Refund to Wallet (80%)</dt><dd><strong>{formatMoney(preview.refund)}</strong></dd></div>
+                    </dl>
+                  ) : (
+                    <p className="admin-booking-detail-empty">This booking is not paid, so it is cancelled with no fee and no refund.</p>
+                  )}
+                  <label className="admin-booking-cancel-reason">
+                    <span>Reason (optional)</span>
+                    <textarea
+                      disabled={cancelSubmitting}
+                      maxLength="5000"
+                      onChange={(event) => setCancelReason(event.target.value)}
+                      rows="2"
+                      value={cancelReason}
+                    />
+                  </label>
+                  {cancelError && <div className="admin-alert admin-alert-error" role="alert">{cancelError}</div>}
+                  <div className="admin-row-actions">
+                    {cancelConfirming ? (
+                      <>
+                        <button className="admin-primary-button" disabled={cancelSubmitting} onClick={cancelBooking} type="button">
+                          {cancelSubmitting ? 'Cancelling…' : 'Confirm cancellation'}
+                        </button>
+                        <button className="admin-secondary-button" disabled={cancelSubmitting} onClick={() => setCancelConfirming(false)} type="button">
+                          Keep booking
+                        </button>
+                      </>
+                    ) : (
+                      <button className="admin-secondary-button" onClick={() => setCancelConfirming(true)} type="button">
+                        Cancel this booking
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
 
               <section className="admin-booking-detail-section">
                 <h3>Status history</h3>

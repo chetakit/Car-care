@@ -47,7 +47,7 @@ async function ensureExists(req, res, next) {
 
 async function list(req, res) {
   try {
-    const data = await serviceService.list(req.serviceListQuery);
+    const data = await serviceService.list({ ...req.serviceListQuery, includePrices: true });
     return res.status(200).json({ status: "success", data });
   } catch (error) {
     return handleError(res, error);

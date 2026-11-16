@@ -91,9 +91,21 @@ function installUsersMock() {
       user.role = role
       return [{ affectedRows: 1 }]
     }
+    if (sql.startsWith("SELECT user_id FROM users WHERE email = ?")) {
+      return [users.filter((item) => item.email === values[0]).map(({ user_id }) => ({ user_id }))]
+    }
+    if (sql.startsWith("INSERT INTO users")) {
+      const [full_name, email, phone, password_hash, role] = values
+      const user = { user_id: users.length + 1, full_name, email, phone, role, status: "ACTIVE", password_hash }
+      users.push(user)
+      return [{ insertId: user.user_id, affectedRows: 1 }]
+    }
     if (sql.includes("FROM users WHERE user_id = ?")) {
       const user = users.find((item) => item.user_id === values[0])
-      return [user ? [{ ...user }] : []]
+      if (!user) return [[]]
+      // The real query selects only public columns; never the password hash.
+      const { password_hash: _passwordHash, ...publicColumns } = user
+      return [[publicColumns]]
     }
     throw new Error(`Unexpected users query: ${sql}`)
   }
@@ -312,6 +324,50 @@ test("role endpoint rejects unchanged and unsupported roles", async () => {
     assert.equal(unsupportedRole.statusCode, 400)
     assert.deepEqual(updates, [])
   })
+})
+
+test("Admin can create a Staff account directly, with a hashed password", async () => {
+  const { users } = installUsersMock()
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/admin/users", createToken("ADMIN"), {
+      full_name: "  New Staff  ",
+      email: "New.Staff@Example.test",
+      phone: "0812345678",
+      password: "temporary-pass",
+      role: "STAFF",
+    })
+    assert.equal(response.statusCode, 201)
+    assert.equal(response.payload.data.role, "STAFF")
+    assert.equal(response.payload.data.email, "new.staff@example.test")
+    assert.equal(response.payload.data.full_name, "New Staff")
+    assert.equal(Object.hasOwn(response.payload.data, "password_hash"), false)
+    const created = users.find((user) => user.email === "new.staff@example.test")
+    assert.match(created.password_hash, /^\$2[aby]\$12\$/)
+    assert.notEqual(created.password_hash, "temporary-pass")
+  })
+})
+
+test("creating a user rejects duplicates, customers, weak passwords, and non-Admins", async () => {
+  const { users } = installUsersMock()
+  const valid = { full_name: "X", email: "x@example.test", password: "long-enough", role: "STAFF" }
+  await withServer(async (port) => {
+    const token = createToken("ADMIN")
+    const cases = [
+      [{ ...valid, email: "staff@example.test" }, 409],
+      [{ ...valid, role: "CUSTOMER" }, 400],
+      [{ ...valid, password: "short" }, 400],
+      [{ ...valid, phone: "12345" }, 400],
+      [{ ...valid, email: "not-an-email" }, 400],
+      [{ ...valid, status: "INACTIVE" }, 400],
+    ]
+    for (const [body, statusCode] of cases) {
+      const response = await sendRequest(port, "POST", "/api/admin/users", token, body)
+      assert.equal(response.statusCode, statusCode, JSON.stringify(body))
+    }
+    const staff = await sendRequest(port, "POST", "/api/admin/users", createToken("STAFF", 2), valid)
+    assert.equal(staff.statusCode, 403)
+  })
+  assert.equal(users.length, initialUsers.length)
 })
 
 after(() => {

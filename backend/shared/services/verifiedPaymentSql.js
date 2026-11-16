@@ -5,7 +5,8 @@ module.exports = `p.payment_status = 'PAID'
   AND (SELECT COUNT(*) FROM payments booking_payments
     WHERE booking_payments.booking_id = b.booking_id) = 1
   AND (
-    (p.payment_method = 'WALLET' AND
+    (p.payment_method = 'SIMULATED' AND p.transaction_ref LIKE 'SIM-%')
+    OR (p.payment_method = 'WALLET' AND
       (SELECT COUNT(*) FROM wallet_transactions wt
         INNER JOIN wallets w ON w.wallet_id = wt.wallet_id
         WHERE wt.booking_id = b.booking_id AND wt.transaction_type = 'DEBIT'

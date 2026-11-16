@@ -1,4 +1,5 @@
 const pool = require("../../shared/config/db");
+const { PAYMENT_HOLD_MINUTES } = require("../../shared/services/bookingPaymentHold");
 
 class VehicleNotFoundError extends Error {}
 
@@ -33,6 +34,10 @@ function toBooking(row, services) {
     start_time: row.start_time,
     end_time: row.end_time,
     booking_status: row.booking_status,
+    // Seconds left to pay before the slot is released (unpaid bookings only).
+    payment_seconds_left: row.booking_status === "PENDING_PAYMENT"
+      ? Math.max(0, toNumber(row.payment_seconds_left))
+      : null,
     total_amount: toNumber(row.total_amount),
     discount_amount: toNumber(row.discount_amount),
     final_amount: toNumber(row.final_amount),
@@ -108,6 +113,7 @@ async function list({
       b.start_time,
       b.end_time,
       b.booking_status,
+      GREATEST(0, TIMESTAMPDIFF(SECOND, NOW(), b.created_at + INTERVAL ${PAYMENT_HOLD_MINUTES} MINUTE)) AS payment_seconds_left,
       b.total_amount,
       b.discount_amount,
       b.final_amount,

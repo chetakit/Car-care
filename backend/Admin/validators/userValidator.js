@@ -137,6 +137,65 @@ function validateUpdate(req, res, next) {
   return next();
 }
 
+const CREATE_FIELDS = new Set(["full_name", "email", "phone", "password", "role"]);
+const CREATABLE_ROLES = new Set(["STAFF", "ADMIN"]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^[0-9]{10}$/;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 72;
+
+// POST /api/admin/users — an Admin creates a Staff or Admin account directly.
+function validateCreate(req, res, next) {
+  const body = req.body;
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    Object.keys(body).some((key) => !CREATE_FIELDS.has(key))
+  ) {
+    return sendValidationError(
+      res,
+      "Only full_name, email, phone, password, and role are accepted.",
+    );
+  }
+  if (!CREATABLE_ROLES.has(body.role)) {
+    return sendValidationError(res, "role must be STAFF or ADMIN.");
+  }
+  const fullName = typeof body.full_name === "string" ? body.full_name.trim() : "";
+  if (fullName.length === 0 || Array.from(fullName).length > 100) {
+    return sendValidationError(res, "full_name must contain 1 to 100 characters.");
+  }
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (email.length === 0 || email.length > 150 || !EMAIL_PATTERN.test(email)) {
+    return sendValidationError(res, "Provide a valid email address.");
+  }
+  if (
+    typeof body.password !== "string" ||
+    Array.from(body.password).length < MIN_PASSWORD_LENGTH ||
+    Buffer.byteLength(body.password, "utf8") > MAX_PASSWORD_LENGTH
+  ) {
+    return sendValidationError(
+      res,
+      `password must be at least ${MIN_PASSWORD_LENGTH} characters (at most ${MAX_PASSWORD_LENGTH} bytes).`,
+    );
+  }
+  let phone = null;
+  if (body.phone !== undefined && body.phone !== null && body.phone !== "") {
+    if (typeof body.phone !== "string" || !PHONE_PATTERN.test(body.phone.trim())) {
+      return sendValidationError(res, "phone must be empty or exactly 10 digits.");
+    }
+    phone = body.phone.trim();
+  }
+  req.userCreateInput = {
+    full_name: fullName,
+    email,
+    phone,
+    password: body.password,
+    role: body.role,
+  };
+  return next();
+}
+
 function validateRole(req, res, next) {
   const body = req.body;
   if (
@@ -171,6 +230,7 @@ module.exports = {
   parseId,
   validateListQuery,
   validateUpdate,
+  validateCreate,
   validateRole,
   validateStatus,
 };

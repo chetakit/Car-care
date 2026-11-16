@@ -104,7 +104,7 @@ The service collection accepts a trailing slash as well.
 |---|---|---|---|
 | `GET /api/customer/schedules/availability` | Required inclusive date range: `from=YYYY-MM-DD&to=YYYY-MM-DD`; `from` must not be after `to`. | `200`, `data: { items: ScheduleAvailability[] }`; each item has `schedule_id`, `schedule_date`, `start_time`, `end_time`, `capacity`, `booked_count`, and `remaining_capacity`. Only future `AVAILABLE` schedules with capacity remaining are returned; on the current database date, the start time must be later than the database session time. | `400` invalid/missing dates or unsupported query, `401`, `403`, `500`. Availability is informational; booking creation rechecks that the schedule has not started, its status, and capacity using database session date/time. |
 | `POST /api/customer/bookings` | JSON body: `vehicle_id`, `schedule_id`, non-empty unique `service_ids`. Customer token required; `user_id` is derived from the token. Amounts, times, status, and payment fields are server-controlled. | `201`, `data: Booking` using the history item fields; `payment` is `null`. | `400` invalid body, service duration exceeds the schedule, or final amount is zero, `401`, `403`, `404` vehicle/schedule/service not found, `409` inactive resources, unavailable/full schedule, or missing vehicle-type price, `500`. |
-| `GET /api/customer/bookings` | `page`, `limit`, `booking_status`, `sort` (`newest` or `oldest`). Defaults: 1, 20, no status, newest; limit max 100. Status: `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW`. | `200`, `data: { items: Booking[], pagination }` | `400` invalid/unsupported query, `401`, `403`, `500`. No matches returns an empty list. |
+| `GET /api/customer/bookings` | `page`, `limit`, `booking_status`, `sort` (`newest` or `oldest`). Defaults: 1, 20, no status, newest; limit max 100. Status: `PENDING_PAYMENT`, `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW`. | `200`, `data: { items: Booking[], pagination }` | `400` invalid/unsupported query, `401`, `403`, `500`. No matches returns an empty list. |
 | `GET /api/customer/vehicles/:vehicleId/bookings` | Same filters; vehicle must belong to the authenticated customer. | Same as above | `400`, `401`, `403`, `404` vehicle missing/not owned, `500`. |
 
 The create request accepts exactly `vehicle_id`, `schedule_id`, and `service_ids`; client-supplied identity, dates, times, status, prices, durations, totals, coupons, notes, and payment data are rejected. Only `AVAILABLE` schedules with capacity remaining are accepted. Capacity counts bookings except `CANCELLED`. Booking date and times are copied from the selected schedule; the sum of active service durations must fit its time interval. Prices and service snapshots are read from the database, and creation is transactional. The database default sets the initial status to `CONFIRMED`. Payment is created separately through the shared payment APIs.
@@ -121,7 +121,7 @@ All `/api/admin/...` business routes require an ADMIN token. Collection lists re
 |---|---|---|---|
 | `GET /api/admin/dashboard/summary` | No parameters | `200`, `data` contains `totalCustomers`, `totalVehicles`, `todayBookings`, `bookingStatusSummary`, `todayGrossRevenue`, `todayRefunds`, `todayRevenue`, `monthlyGrossRevenue`, `monthlyRefunds`, `monthlyRevenue`, `recentBookings` | `401`, `403`, `500`. |
 
-Dashboard and revenue reports include only verified real payments with `PAID` status and a `paid_at` timestamp. Simulated, failed, pending, unverified, amount-mismatched, and duplicate booking payments are excluded. Dashboard refunds are counted only when linked to a payment meeting the same verification rules; Reports revenue remains gross, not net of refunds.
+Dashboard and revenue reports include only payments with `PAID` status and a `paid_at` timestamp that are settled: `SIMULATED` payments with a `SIM-` transaction reference (the project's online payment), Wallet payments with a matching debit, and verified cash/bank-transfer payments. Failed, pending, unverified, amount-mismatched, and duplicate booking payments are excluded. Dashboard refunds subtract `refund_amount`; no-show forfeits record a refund of 0 and do not reduce revenue.
 
 ### Vehicle types, brands, and models
 
@@ -188,11 +188,13 @@ Coupon fields returned: `coupon_id`, `coupon_code`, `description`, `discount_typ
 | `GET /api/admin/reports/bookings` | Query: optional `date_from`, `date_to` (`YYYY-MM-DD`), `group_by` (`day`/`month`, default `day`) | `data: { totalBookings, bookingCountsByStatus, bookingCountsByPeriod }` | `400`, `401`, `403`, `500`. |
 | `GET /api/admin/reports/revenue` | Same query as bookings report | `data: { totalRevenue, successfulPayments, revenueByPeriod }` | `400`, `401`, `403`, `500`. |
 
-Booking list statuses: `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW`. Payment filter statuses: `PENDING`, `PAID`, `FAILED`. `date_from` must not be after `date_to`.
+Booking list statuses: `PENDING_PAYMENT`, `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW`. Payment filter statuses: `PENDING`, `PAID`, `FAILED`. `date_from` must not be after `date_to`.
 
 Admin booking-list items include `booking_id`, `user_id`, customer name/email/phone, vehicle ID/plate/year/model/brand/type, booking date/times/status, `payment_status`, `payment_method`, and total/discount/final amounts. Booking detail groups are `booking` (dates, times, status, notes, totals, timestamps), `customer` (`user_id`, name, email, phone), `vehicle` (vehicle fields and model/brand/type), `schedule` (schedule ID/date/times/capacity/status), `services`, `payment`, and `coupon`. History items contain `history_id`, old/new status, `changed_by`, `changed_by_name`, `reason`, and `created_at`.
 
 ## Shared payment, cancellation, and wallet APIs
+
+**Pay before confirm.** `POST /api/customer/bookings` creates a `PENDING_PAYMENT` booking that holds its slot for 15 minutes. A successful payment (`SIMULATED` → `PAID`, Wallet, or a verified `BANK_TRANSFER`) moves it to `CONFIRMED` and records the change in booking history. `CASH` cannot confirm a `PENDING_PAYMENT` booking. After 15 minutes an unpaid booking no longer counts toward capacity, cannot be paid (`409`), and is cancelled by the server's background sweeper (`shared/services/bookingPaymentHold.js`). Staff queues hide `PENDING_PAYMENT` bookings. Requires `database/migrations/2026-11-16_pay_before_confirm.sql`.
 
 These routes allow CUSTOMER or ADMIN tokens. Customers are limited to their own bookings/wallet; Admin may target other users where noted.
 
@@ -203,7 +205,7 @@ These routes allow CUSTOMER or ADMIN tokens. Customers are limited to their own 
 | `POST /api/payments/:bookingId/simulate` | `{ "payment_status": "PAID" }` or `FAILED`; only simulated payments can use this route | `200`, `data: Payment` | `400`, `401`, `403`, `404`, `409` payment state conflict, `500`. |
 | `POST /api/payments/:bookingId/wallet` | No body or `{}` | `200`, `data: { payment: Payment, wallet: { wallet_id, balance } }` | `400` invalid/insufficient balance or booking state, `401`, `403`, `404`, `409`, `500`. |
 | `POST /api/payments/:bookingId/verify` | ACTIVE STAFF confirms `{ "payment_method": "CASH", "amount": "25.00" }`; ACTIVE STAFF or ADMIN verifies `{ "payment_method": "BANK_TRANSFER", "amount": "25.00", "transfer_reference": "bank-reference" }`. The operator must independently verify receipt and the full amount. | `200`, `data: Payment`; locks the booking and pending payment, records the verifier and amount, and marks the payment `PAID` atomically. | `400` invalid input, `401`, `403`, `404`, `409` terminal/mismatched payment, booking state, or reused transfer reference, `500`. |
-| `POST /api/cancellations/:bookingId` | Optional `{ "reason": "..." }`; no refund amount is accepted. Only a `CONFIRMED` booking with a `PAID` Wallet payment and a matching debit from the booking owner's wallet can be cancelled. Other payment methods are not eligible for wallet refunds. | `200`, `data: { booking_id, booking_status, refund, wallet }` | `400` validation/payment requirement, `401`, `403`, `404`, `409` status/refund conflict, `500`. |
+| `POST /api/cancellations/:bookingId` | Optional `{ "reason": "..." }`; no refund amount is accepted. `PENDING_PAYMENT` and `CONFIRMED` bookings can be cancelled. Unpaid: cancelled with no fee (a pending payment becomes `FAILED`). Paid by any method: 20% fee kept, 80% credited to the customer's Wallet (created if missing), `data.refund` and `data.wallet` returned. | `200`, `data: { booking_id, booking_status, refund, wallet }` | `400` validation/payment requirement, `401`, `403`, `404`, `409` status/refund conflict, `500`. |
 | `GET /api/wallet` | Admin must provide `user_id`; Customer may omit it or provide only their own ID | `200`, `data: { wallet_id, user_id, balance, created_at, updated_at }`. Missing wallet is represented with `wallet_id: null` and balance `"0.00"`. | `400` missing/invalid Admin target, `401`, `403`, `500`. |
 | `GET /api/wallet/transactions` | `page` (default 1), `limit` (default 20, max 100), optional `transaction_type` (`CREDIT`/`DEBIT`); same `user_id` rules | Paginated transaction items | `400`, `401`, `403`, `500`. |
 | `GET /api/wallet/refunds` | `page` (default 1), `limit` (default 20, max 100); same `user_id` rules | Paginated refund items | `400`, `401`, `403`, `500`. |
@@ -227,7 +229,7 @@ WHERE b.booking_status = 'COMPLETED'
 
 Reconcile each result with service and payment evidence before any separately approved correction. Also review historical `PAID` cash/transfer payments and existing transfer references; the new uniqueness constraint covers only verifications recorded in the new table.
 
-Cancellation credits the original wallet with the paid amount less a 20% fee. A `PAID` status alone is not proof of settlement: simulated, cash, and bank-transfer payments cannot currently be refunded through this endpoint.
+Cancellation of a paid booking credits the customer's Wallet with the paid amount less a 20% fee (fee rounded to the nearest cent), whatever the original payment method. A no-show (staff `POST /no-show`) on a paid booking forfeits 100%: a `refunds` row is recorded with `refund_amount` 0 and `cancellation_fee` equal to the paid amount.
 
 Wallet transaction items contain `wallet_transaction_id`, `amount`, `transaction_type`, `description`, `refund_id`, `booking_id`, and `created_at`. Refund items contain `refund_id`, `booking_id`, `payment_id`, `refund_amount`, `cancellation_fee`, `refund_status`, `processed_at`, and `created_at`. Cancellation returns a refund with those refund fields plus `refund_reason`; its wallet object contains `wallet_id` and `balance`.
 
@@ -343,9 +345,28 @@ All routes require a `Bearer` token whose current database role is `STAFF` (`req
 | `GET /api/staff/bookings/:id` | – | `booking`, `customer`, `vehicle`, `services`, `payment`, `check_in`, `status_history`, `notes`, `allowed_next_statuses`. |
 | `POST /api/staff/bookings/:id/check-in` | `{ mileage, fuel_level, condition_note?, note? }` | `CONFIRMED → CHECKED_IN`; writes `vehicle_check_ins`. `fuel_level`: `EMPTY`, `QUARTER`, `HALF`, `THREE_QUARTER`, `FULL`. |
 | `PATCH /api/staff/bookings/:id/status` | `{ status, reason }` (reason required) | Allowed: `CHECKED_IN → IN_SERVICE`, `IN_SERVICE → COMPLETED`. `CANCELLED` returns `403` (staff cannot cancel). |
-| `POST /api/staff/bookings/:id/no-show` | `{ reason }` | `CONFIRMED → NO_SHOW`, only after the appointment start time. |
+| `POST /api/staff/bookings/:id/no-show` | `{ reason }` | `CONFIRMED → NO_SHOW`, only after the appointment start time. If the booking was paid, 100% is forfeited (refund row with `refund_amount` 0). |
 | `POST /api/staff/bookings/:id/notes` | `{ note }` | Adds a note without changing status; writes `booking_notes`. |
 
 Mutations return the updated booking detail. Errors: `400` invalid body, `403` role/cancel, `404` not found, `409` status not allowed.
 
 Completing an `IN_SERVICE` booking requires exactly one `PAID` payment matching its positive final amount. Wallet payments require exactly one matching debit from the booking owner's Wallet; cash and bank transfers require a matching authorized verification record. Simulated payments never qualify. The booking, payment, and relevant verification or debit are checked while locked within the status-change transaction. Existing inconsistent records are not automatically changed. `allowed_next_statuses` describes the structural transition; completion can still return `409` if payment is not verified.
+
+## Additions (2026-11-16)
+
+| Endpoint | Request | Notes |
+|---|---|---|
+| `POST /api/customer/bookings` | Optional `coupon_code` (1–50 chars, case-insensitive) | Coupon must be `ACTIVE`, within its dates, under its usage limit, and meet `min_order_amount`. `PERCENT` discounts round to the nearest cent and respect `max_discount`; a coupon never reduces the total below THB 0.01. Records `coupon_usages` and increments `used_count` in the same transaction. Invalid coupon → `400` with a customer-readable message. |
+| `GET /api/customer/coupons/preview?code=&subtotal=` | CUSTOMER | Preview only: returns `discount_amount` and `final_amount` for a subtotal. Booking creation recalculates on the server. |
+| `POST /api/admin/users` | ADMIN; `{ full_name, email, phone?, password, role }` | Creates a `STAFF` or `ADMIN` account directly (`CUSTOMER` accounts use registration). Password ≥ 8 characters, stored as a bcrypt hash. Duplicate email → `409`. |
+| `GET /api/admin/services` | — | Each item now includes `min_price`, `max_price`, and `price_count` across active vehicle types. |
+| `GET /api/customer/bookings` | — | Each item includes `payment_seconds_left` (seconds remaining in the 15-minute hold) for `PENDING_PAYMENT` bookings, otherwise `null`. |
+
+A failed payment on a `PENDING_PAYMENT` booking can be retried (`POST /api/payments/:id` resets it to `PENDING` with the chosen method, or pay with `/wallet`). Cancelling an unpaid booking, or the hold expiring, gives the coupon use back. Wallet refund items include `refund_reason`.
+
+### Multi-slot bookings and dates (2026-11-16)
+
+- Schedule slots are 90 minutes. When the chosen services take longer than the selected slot, the booking continues into the following slots of the same day. They must be back to back, `AVAILABLE`, and not full. The booking keeps the first slot's `schedule_id` and `start_time`; its `end_time` is the end of the last slot it uses (for example, a 120-minute visit at 09:00 is stored as 09:00–12:00). Otherwise → `409` (a needed slot is full) or `400` (runs past the open slots).
+- Capacity is counted by time overlap (`booking_date` equal, `start_time < slot.end_time`, `end_time > slot.start_time`), so a multi-slot booking takes a place in every slot it covers.
+- `GET /api/customer/schedules/availability` accepts optional `duration_minutes` (1–720). Only start times with enough back-to-back free slots are returned; `end_time` is the end of the last slot used and `remaining_capacity` is the smallest free count across them.
+- `DATE` columns (`booking_date`, `schedule_date`) are returned as `YYYY-MM-DD` strings. Previously they were serialised as UTC timestamps, which showed dates one day early in Thailand.

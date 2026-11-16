@@ -8,6 +8,7 @@ import PaymentsPage from './pages/PaymentsPage.jsx'
 import ReportsPage from './pages/ReportsPage.jsx'
 import ServicesPage from './pages/ServicesPage.jsx'
 import StaffPage from './pages/StaffPage.jsx'
+import VehicleTypesPage from './pages/VehicleTypesPage.jsx'
 import WalletPage from './pages/WalletPage.jsx'
 import './styles/admin.css'
 
@@ -24,6 +25,7 @@ const navigationItems = [
     ],
   },
   { id: 'services', label: 'Services & pricing', icon: 'tool' },
+  { id: 'vehicle-types', label: 'Vehicle types', icon: 'car' },
   { id: 'coupons', label: 'Coupons', icon: 'tag' },
   { id: 'payments', label: 'Payments', icon: 'credit-card' },
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
@@ -35,6 +37,7 @@ const pages = {
   bookings: BookingsPage,
   customers: CustomersPage,
   services: ServicesPage,
+  'vehicle-types': VehicleTypesPage,
   coupons: CouponsPage,
   payments: PaymentsPage,
   wallet: WalletPage,

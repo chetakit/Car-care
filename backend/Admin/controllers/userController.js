@@ -61,6 +61,15 @@ async function getById(req, res) {
   }
 }
 
+async function create(req, res) {
+  try {
+    const data = await userService.create(req.userCreateInput);
+    return res.status(201).json({ status: "success", data });
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 async function update(req, res) {
   try {
     const data = await userService.update(req.userId, req.body);
@@ -96,4 +105,4 @@ async function updateStatus(req, res) {
   }
 }
 
-module.exports = { list, getById, update, updateRole, updateStatus };
+module.exports = { list, getById, create, update, updateRole, updateStatus };

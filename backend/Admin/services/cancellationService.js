@@ -1,4 +1,5 @@
 const pool = require("../../shared/config/db");
+const { releaseCouponForBooking } = require("../../shared/services/couponPricing");
 
 class CancellationNotFoundError extends Error {}
 class CancellationConflictError extends Error {}
@@ -94,6 +95,8 @@ async function withTransaction(operation) {
   }
 }
 
+const CANCELLABLE_STATUSES = ["PENDING_PAYMENT", "CONFIRMED"];
+
 async function lockBooking(connection, bookingId, user) {
   const [rows] = await connection.execute(
     `SELECT booking_id, user_id, booking_status
@@ -107,15 +110,15 @@ async function lockBooking(connection, bookingId, user) {
     throw new CancellationNotFoundError();
   }
   assertBookingAccess(booking, user);
-  if (booking.booking_status !== "CONFIRMED") {
+  if (!CANCELLABLE_STATUSES.includes(booking.booking_status)) {
     throw new CancellationConflictError(
-      "Only confirmed bookings can be cancelled.",
+      "Only unpaid or confirmed bookings can be cancelled.",
     );
   }
   return booking;
 }
 
-async function lockPaidPayment(connection, bookingId) {
+async function lockPayment(connection, bookingId) {
   const [rows] = await connection.execute(
     `SELECT payment_id, booking_id, amount, payment_method, payment_status
     FROM payments
@@ -123,18 +126,7 @@ async function lockPaidPayment(connection, bookingId) {
     FOR UPDATE`,
     [bookingId],
   );
-  const payment = rows[0];
-  if (!payment || payment.payment_status !== "PAID") {
-    throw new CancellationValidationError(
-      "A paid payment is required to cancel this booking.",
-    );
-  }
-  if (payment.payment_method !== "WALLET") {
-    throw new CancellationValidationError(
-      "Only verified Wallet payments can be refunded.",
-    );
-  }
-  return payment;
+  return rows[0] || null;
 }
 
 async function assertNoExistingRefund(connection, paymentId, bookingId) {
@@ -153,47 +145,78 @@ async function assertNoExistingRefund(connection, paymentId, bookingId) {
   }
 }
 
-async function lockPaidWallet(connection, booking, payment) {
-  const [debits] = await connection.execute(
-    `SELECT wt.wallet_id, wt.amount
-    FROM wallet_transactions wt
-    INNER JOIN wallets w ON w.wallet_id = wt.wallet_id
-    WHERE wt.booking_id = ? AND wt.transaction_type = 'DEBIT'
-      AND wt.refund_id IS NULL AND w.user_id = ?
-    FOR UPDATE`,
-    [booking.booking_id, booking.user_id],
+// Refunds go to the customer's Wallet whatever the original payment method.
+async function lockCustomerWallet(connection, userId) {
+  await connection.execute(
+    "INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, '0.00')",
+    [userId],
   );
-  if (
-    debits.length !== 1 ||
-    decimalToCents(debits[0].amount) !== decimalToCents(payment.amount)
-  ) {
-    throw new CancellationValidationError(
-      "A matching Wallet debit is required to refund this payment.",
-    );
-  }
-
   const [rows] = await connection.execute(
     `SELECT wallet_id, balance
     FROM wallets
-    WHERE wallet_id = ? AND user_id = ?
+    WHERE user_id = ?
     FOR UPDATE`,
-    [debits[0].wallet_id, booking.user_id],
+    [userId],
   );
   if (!rows[0]) {
-    throw new CancellationValidationError(
-      "The Wallet used for this payment could not be found.",
-    );
+    throw new Error("The customer Wallet could not be created.");
   }
   return rows[0];
+}
+
+async function markBookingCancelled(connection, booking, user, reason) {
+  const [bookingUpdate] = await connection.execute(
+    `UPDATE bookings
+    SET booking_status = 'CANCELLED'
+    WHERE booking_id = ? AND booking_status = ?`,
+    [booking.booking_id, booking.booking_status],
+  );
+  if (bookingUpdate.affectedRows !== 1) {
+    throw new CancellationConflictError(
+      "Booking status changed before cancellation could be completed.",
+    );
+  }
+  await connection.execute(
+    `INSERT INTO booking_status_history (
+      booking_id,
+      old_status,
+      new_status,
+      changed_by,
+      reason
+    )
+    VALUES (?, ?, 'CANCELLED', ?, ?)`,
+    [booking.booking_id, booking.booking_status, user.user_id, reason],
+  );
 }
 
 async function cancel(bookingId, { reason }, user) {
   return withTransaction(async (connection) => {
     const booking = await lockBooking(connection, bookingId, user);
-    const payment = await lockPaidPayment(connection, bookingId);
+    const payment = await lockPayment(connection, bookingId);
+
+    // Nothing was paid: cancel without a fee or refund.
+    if (!payment || payment.payment_status !== "PAID") {
+      if (payment && payment.payment_status === "PENDING") {
+        await connection.execute(
+          `UPDATE payments SET payment_status = 'FAILED'
+          WHERE payment_id = ? AND payment_status = 'PENDING'`,
+          [payment.payment_id],
+        );
+      }
+      await markBookingCancelled(connection, booking, user, reason);
+      // Nothing was paid, so the coupon use is given back.
+      await releaseCouponForBooking(connection, bookingId);
+      return {
+        booking_id: bookingId,
+        booking_status: "CANCELLED",
+        refund: null,
+        wallet: null,
+      };
+    }
+
     await assertNoExistingRefund(connection, payment.payment_id, bookingId);
     const { cancellationFee, refundAmount } = calculateRefund(payment.amount);
-    const wallet = await lockPaidWallet(connection, booking, payment);
+    const wallet = await lockCustomerWallet(connection, booking.user_id);
 
     const [refundResult] = await connection.execute(
       `INSERT INTO refunds (
@@ -214,30 +237,32 @@ async function cancel(bookingId, { reason }, user) {
       ],
     );
 
-    const [walletUpdate] = await connection.execute(
-      "UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?",
-      [refundAmount, wallet.wallet_id],
-    );
-    if (walletUpdate.affectedRows !== 1) {
-      throw new Error("Wallet balance could not be credited.");
+    if (decimalToCents(refundAmount) > 0n) {
+      const [walletUpdate] = await connection.execute(
+        "UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?",
+        [refundAmount, wallet.wallet_id],
+      );
+      if (walletUpdate.affectedRows !== 1) {
+        throw new Error("Wallet balance could not be credited.");
+      }
+      await connection.execute(
+        `INSERT INTO wallet_transactions (
+          wallet_id,
+          refund_id,
+          booking_id,
+          transaction_type,
+          amount,
+          description
+        )
+        VALUES (?, ?, NULL, 'CREDIT', ?, ?)`,
+        [
+          wallet.wallet_id,
+          refundResult.insertId,
+          refundAmount,
+          `Refund for booking ${bookingId}`,
+        ],
+      );
     }
-    await connection.execute(
-      `INSERT INTO wallet_transactions (
-        wallet_id,
-        refund_id,
-        booking_id,
-        transaction_type,
-        amount,
-        description
-      )
-      VALUES (?, ?, NULL, 'CREDIT', ?, ?)`,
-      [
-        wallet.wallet_id,
-        refundResult.insertId,
-        refundAmount,
-        `Refund for booking ${bookingId}`,
-      ],
-    );
     const [refundUpdate] = await connection.execute(
       `UPDATE refunds
       SET refund_status = 'REFUNDED', processed_at = CURRENT_TIMESTAMP
@@ -248,28 +273,7 @@ async function cancel(bookingId, { reason }, user) {
       throw new Error("Refund status could not be completed.");
     }
 
-    const [bookingUpdate] = await connection.execute(
-      `UPDATE bookings
-      SET booking_status = 'CANCELLED'
-      WHERE booking_id = ? AND booking_status = 'CONFIRMED'`,
-      [bookingId],
-    );
-    if (bookingUpdate.affectedRows !== 1) {
-      throw new CancellationConflictError(
-        "Booking status changed before cancellation could be completed.",
-      );
-    }
-    await connection.execute(
-      `INSERT INTO booking_status_history (
-        booking_id,
-        old_status,
-        new_status,
-        changed_by,
-        reason
-      )
-      VALUES (?, 'CONFIRMED', 'CANCELLED', ?, ?)`,
-      [bookingId, user.user_id, reason],
-    );
+    await markBookingCancelled(connection, booking, user, reason);
 
     const [walletRows] = await connection.execute(
       "SELECT balance FROM wallets WHERE wallet_id = ?",
@@ -298,9 +302,45 @@ async function cancel(bookingId, { reason }, user) {
   });
 }
 
+// No-show: the customer forfeits 100% of a paid booking. Records a refunds
+// row with refund_amount 0 and the full amount as the fee so the forfeit
+// appears in refund history. Runs inside the caller's transaction.
+async function recordNoShowForfeit(connection, bookingId, reason) {
+  const payment = await lockPayment(connection, bookingId);
+  if (!payment || payment.payment_status !== "PAID") {
+    return null;
+  }
+  await assertNoExistingRefund(connection, payment.payment_id, bookingId);
+  const [result] = await connection.execute(
+    `INSERT INTO refunds (
+      payment_id,
+      booking_id,
+      refund_amount,
+      cancellation_fee,
+      refund_reason,
+      refund_status,
+      processed_at
+    )
+    VALUES (?, ?, '0.00', ?, ?, 'REFUNDED', CURRENT_TIMESTAMP)`,
+    [
+      payment.payment_id,
+      bookingId,
+      payment.amount,
+      `No-show (100% forfeited): ${reason}`,
+    ],
+  );
+  return {
+    refund_id: result.insertId,
+    refund_amount: "0.00",
+    cancellation_fee: payment.amount,
+  };
+}
+
 module.exports = {
   CancellationNotFoundError,
   CancellationConflictError,
   CancellationValidationError,
+  calculateRefund,
   cancel,
+  recordNoShowForfeit,
 };

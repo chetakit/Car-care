@@ -13,6 +13,7 @@ const publicServiceCatalogRoutes = require("./Public/routes/serviceCatalogRoutes
 const customerBookingRoutes = require("./Customer/routes/bookingRoutes");
 const customerBookingHistoryRoutes = require("./Customer/routes/bookingHistoryRoutes");
 const customerScheduleRoutes = require("./Customer/routes/scheduleRoutes");
+const customerCouponRoutes = require("./Customer/routes/couponRoutes");
 const dashboardRoutes = require("./Admin/routes/dashboardRoutes");
 const vehicleTypeRoutes = require("./Admin/routes/vehicleTypeRoutes");
 const vehicleBrandRoutes = require("./Admin/routes/vehicleBrandRoutes");
@@ -44,6 +45,7 @@ app.use("/api/public/catalog/services", publicServiceCatalogRoutes);
 app.use("/api/customer", customerBookingRoutes);
 app.use("/api/customer", customerBookingHistoryRoutes);
 app.use("/api/customer/schedules", customerScheduleRoutes);
+app.use("/api/customer/coupons", customerCouponRoutes);
 app.use("/api/admin/dashboard", dashboardRoutes);
 app.use("/api/admin/vehicle-types", vehicleTypeRoutes);
 app.use("/api/admin/vehicle-brands", vehicleBrandRoutes);

@@ -98,7 +98,9 @@ test("Customer can retrieve available schedules with remaining capacity", async 
       /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time > CURRENT_TIME\(\)/,
     );
     assert.match(sql, /b\.booking_status <> 'CANCELLED'/);
-    assert.match(sql, /HAVING s\.capacity - COUNT\(b\.booking_id\) > 0/);
+    // Counts bookings that overlap each slot in time, so multi-slot bookings are included.
+    assert.match(sql, /b\.start_time < s\.end_time/);
+    assert.match(sql, /b\.end_time > s\.start_time/);
     assert.deepEqual(values, ["2026-11-20", "2026-11-22"]);
     return [schedules];
   };
@@ -190,7 +192,10 @@ test("Fully booked schedules are excluded", async () => {
   let query;
   pool.execute = async (sql) => {
     query = sql;
-    return [[]];
+    return [[{
+      schedule_id: 4, schedule_date: "2026-11-20", start_time: "09:00:00",
+      end_time: "10:30:00", capacity: 2, booked_count: 2,
+    }]];
   };
 
   await withServer(async (port) => {
@@ -202,7 +207,34 @@ test("Fully booked schedules are excluded", async () => {
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.payload.data.items, []);
   });
-  assert.match(query, /HAVING s\.capacity - COUNT\(b\.booking_id\) > 0/);
+  assert.match(query, /b\.booking_date = s\.schedule_date/);
+});
+
+test("With duration_minutes, only start times with enough back-to-back free slots are offered", async () => {
+  const slot = (id, start, end, booked = 0) => ({
+    schedule_id: id, schedule_date: "2026-11-20", start_time: start, end_time: end, capacity: 2, booked_count: booked,
+  });
+  pool.execute = async () => [[
+    slot(1, "09:00:00", "10:30:00"),
+    slot(2, "10:30:00", "12:00:00", 1),
+    slot(3, "12:00:00", "13:30:00", 2),
+    slot(4, "13:30:00", "15:00:00"),
+    slot(5, "15:00:00", "16:30:00"),
+  ]];
+  await withServer(async (port) => {
+    const response = await sendRequest(
+      port,
+      "/api/customer/schedules/availability?from=2026-11-20&to=2026-11-20&duration_minutes=120",
+      createToken(),
+    );
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(
+      response.payload.data.items.map((item) => [item.schedule_id, item.end_time, item.remaining_capacity]),
+      // 09:00 uses slots 1+2 (one place left in slot 2); 10:30 would run into full slot 3;
+      // 13:30 uses 4+5; 15:00 has no slot after it.
+      [[1, "12:00:00", 1], [4, "16:30:00", 2]],
+    );
+  });
 });
 
 test("Cancelled bookings do not consume schedule capacity", async () => {

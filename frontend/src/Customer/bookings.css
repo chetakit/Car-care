@@ -590,3 +590,25 @@
     padding: 0 9px;
   }
 }
+
+/* Cancel booking */
+.bookings-cancel-button { margin: 6px 0; padding: 0 12px; min-height: 40px; border: 1px solid #e3c4c0; border-radius: 7px; color: #a33a32; background: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.bookings-cancel-button:hover { background: #fff5f4; }
+.bookings-cancel-dialog { width: min(440px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 14px; box-shadow: 0 24px 60px rgb(0 0 0 / 22%); }
+.bookings-cancel-dialog::backdrop { background: rgb(15 25 22 / 45%); }
+.bookings-cancel-dialog form { display: grid; gap: 14px; padding: 22px; }
+.bookings-cancel-dialog h2 { margin: 0; font-size: 18px; }
+.bookings-cancel-dialog p { margin: 0; color: #65736f; font-size: 13px; }
+.bookings-cancel-preview { display: grid; gap: 8px; margin: 0; padding: 12px 14px; border-radius: 10px; background: #f3f7f6; }
+.bookings-cancel-preview div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.bookings-cancel-preview dt { color: #65736f; }
+.bookings-cancel-preview dd { margin: 0; }
+.bookings-cancel-dialog label { display: grid; gap: 6px; font-size: 12px; color: #65736f; font-weight: 600; }
+.bookings-cancel-dialog textarea { padding: 8px 10px; border: 1px solid #d8e2df; border-radius: 8px; font: inherit; font-size: 13px; resize: vertical; }
+.bookings-cancel-note { font-size: 12px !important; }
+.bookings-cancel-error { color: #a33a32 !important; }
+.bookings-cancel-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.bookings-cancel-confirm { padding: 0 16px; min-height: 40px; border: 0; border-radius: 7px; color: #fff; background: #a33a32; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.bookings-cancel-confirm:disabled, .bookings-cancel-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.bookings-cancel-notice { margin: 0 0 16px; padding: 12px 14px; border: 1px solid #cde5d8; border-radius: 10px; color: #32634a; background: #f5fbf7; font-size: 13px; }
+.bookings-cancel-notice a { color: inherit; font-weight: 700; }

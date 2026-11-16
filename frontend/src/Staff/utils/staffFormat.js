@@ -2,6 +2,7 @@
 
 // ต้องตรงกับ bookings.booking_status ใน database
 export const STATUS_LABEL = {
+  PENDING_PAYMENT: 'รอชำระเงิน',
   CONFIRMED: 'รอรับรถ',
   CHECKED_IN: 'รับรถแล้ว',
   IN_SERVICE: 'กำลังให้บริการ',

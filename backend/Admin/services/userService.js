@@ -1,4 +1,7 @@
+const bcrypt = require("bcryptjs");
 const pool = require("../../shared/config/db");
+
+const PASSWORD_HASH_ROUNDS = 12;
 
 class UserNotFoundError extends Error {}
 class DuplicateUserEmailError extends Error {}
@@ -126,6 +129,31 @@ async function update(userId, changes) {
   return getById(userId);
 }
 
+async function create({ full_name, email, phone, password, role }) {
+  const [existing] = await pool.execute(
+    "SELECT user_id FROM users WHERE email = ? LIMIT 1",
+    [email],
+  );
+  if (existing.length > 0) {
+    throw new DuplicateUserEmailError();
+  }
+  const passwordHash = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS);
+  let result;
+  try {
+    [result] = await pool.execute(
+      `INSERT INTO users (full_name, email, phone, password_hash, role, status)
+      VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
+      [full_name, email, phone, passwordHash, role],
+    );
+  } catch (error) {
+    if (isDuplicateEntryError(error)) {
+      throw new DuplicateUserEmailError();
+    }
+    throw error;
+  }
+  return getById(result.insertId);
+}
+
 async function updateRole(userId, role, authenticatedUserId) {
   if (Number(userId) === Number(authenticatedUserId)) {
     throw new SelfRoleChangeError();
@@ -183,6 +211,7 @@ module.exports = {
   STATUSES,
   list,
   getById,
+  create,
   update,
   updateRole,
   updateStatus,

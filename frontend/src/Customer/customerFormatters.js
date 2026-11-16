@@ -1,6 +1,7 @@
 export const CUSTOMER_TIME_ZONE = 'Asia/Bangkok'
 
 const BOOKING_STATUS_LABELS = {
+  PENDING_PAYMENT: 'Awaiting payment',
   CONFIRMED: 'Confirmed',
   CHECKED_IN: 'Checked in',
   IN_SERVICE: 'In service',

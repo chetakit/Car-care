@@ -83,6 +83,10 @@ function createDatabase(options = {}) {
     },
     async execute(sql, values) {
       state.queries.push({ sql, values });
+      if (sql.includes("FROM schedules s") && sql.includes("s.start_time >= ?")) {
+        state.laterSlotLookup = values;
+        return [(options.laterSlots || []).map((slot) => ({ ...slot }))];
+      }
       if (sql.includes("FROM schedules")) {
         if (options.schedule === null) return [[]];
         const schedule = {
@@ -140,6 +144,18 @@ function createDatabase(options = {}) {
       if (sql.includes("FROM service_prices")) {
         return [prices];
       }
+      if (sql.includes("FROM coupons WHERE coupon_code = ?")) {
+        state.couponLookup = values;
+        return [options.coupon ? [{ ...options.coupon }] : []];
+      }
+      if (sql.startsWith("UPDATE coupons SET used_count = used_count + 1")) {
+        state.couponCountUpdated = values;
+        return [{ affectedRows: options.couponLimitReached ? 0 : 1 }];
+      }
+      if (sql.startsWith("INSERT INTO coupon_usages")) {
+        state.couponUsage = values;
+        return [{ insertId: 301, affectedRows: 1 }];
+      }
       if (sql.startsWith("INSERT INTO bookings")) {
         if (options.failBookingInsert) throw new Error("database insert failed");
         state.bookingInsert = { sql, values };
@@ -159,10 +175,10 @@ function createDatabase(options = {}) {
           booking_date: valuesForBooking[3],
           start_time: valuesForBooking[4],
           end_time: valuesForBooking[5],
-          booking_status: "CONFIRMED",
+          booking_status: "PENDING_PAYMENT",
           total_amount: valuesForBooking[6],
-          discount_amount: "0.00",
-          final_amount: valuesForBooking[7],
+          discount_amount: state.bookingInsert.sql.includes("coupon_id") ? valuesForBooking[8] : "0.00",
+          final_amount: state.bookingInsert.sql.includes("coupon_id") ? valuesForBooking[9] : valuesForBooking[7],
           vehicle_id: 42,
           license_plate: "TEST-42",
           production_year: 2020,
@@ -203,6 +219,76 @@ function createDatabase(options = {}) {
 
   return { state, connection };
 }
+
+const liveCoupon = {
+  coupon_id: 9,
+  coupon_code: "SAVE10",
+  description: "10% off",
+  discount_type: "PERCENT",
+  discount_value: "10.00",
+  max_discount: null,
+  min_order_amount: "0.00",
+  usage_limit: 5,
+  used_count: 0,
+  status: "ACTIVE",
+  is_live: 1,
+  not_started: 0,
+};
+
+test("A valid coupon lowers the final amount and records one use", async () => {
+  const database = createDatabase({ coupon: liveCoupon });
+  pool.getConnection = async () => database.connection;
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/customer/bookings", createToken("CUSTOMER", 50), {
+      vehicle_id: 42, schedule_id: 7, service_ids: [3, 5], coupon_code: " save10 ",
+    });
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.payload.data.discount_amount, 2.01);
+    assert.equal(response.payload.data.final_amount, 18.08);
+  });
+  assert.deepEqual(database.state.couponLookup, ["SAVE10"]);
+  assert.match(database.state.bookingInsert.sql, /coupon_id/);
+  assert.deepEqual(database.state.bookingInsert.values.slice(3, 4), [9]);
+  assert.deepEqual(database.state.bookingInsert.values.slice(7), ["20.09", "2.01", "18.08"]);
+  assert.deepEqual(database.state.couponCountUpdated, [9]);
+  assert.deepEqual(database.state.couponUsage, [9, 101, 50, "2.01"]);
+  assert.equal(database.state.committed, true);
+});
+
+test("Expired, unknown, exhausted, or under-minimum coupons are rejected before booking", async () => {
+  const cases = [
+    [{ ...liveCoupon, is_live: 0 }, /expired/],
+    [null, /not valid/],
+    [{ ...liveCoupon, used_count: 5 }, /usage limit/],
+    [{ ...liveCoupon, min_order_amount: "100.00" }, /minimum order/],
+    [{ ...liveCoupon, status: "INACTIVE" }, /not valid/],
+  ];
+  for (const [coupon, message] of cases) {
+    const database = createDatabase({ coupon });
+    pool.getConnection = async () => database.connection;
+    await withServer(async (port) => {
+      const response = await sendRequest(port, "POST", "/api/customer/bookings", createToken("CUSTOMER", 50), {
+        vehicle_id: 42, schedule_id: 7, service_ids: [3, 5], coupon_code: "SAVE10",
+      });
+      assert.equal(response.statusCode, 400);
+      assert.match(response.payload.message, message);
+    });
+    assert.ok(!database.state.bookingInsert);
+    assert.ok(!database.state.committed);
+  }
+});
+
+test("A fixed coupon never makes a booking free", async () => {
+  const database = createDatabase({ coupon: { ...liveCoupon, discount_type: "FIXED", discount_value: "500.00" } });
+  pool.getConnection = async () => database.connection;
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/customer/bookings", createToken("CUSTOMER", 50), {
+      vehicle_id: 42, schedule_id: 7, service_ids: [3, 5], coupon_code: "SAVE10",
+    });
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.payload.data.final_amount, 0.01);
+  });
+});
 
 after(() => {
   pool.getConnection = originalGetConnection;
@@ -367,7 +453,7 @@ test("Customer booking uses locked database values and returns a history-compati
     assert.equal(response.payload.status, "success");
     const booking = response.payload.data;
     assert.equal(booking.booking_id, 101);
-    assert.equal(booking.booking_status, "CONFIRMED");
+    assert.equal(booking.booking_status, "PENDING_PAYMENT");
     assert.equal(booking.booking_date, "2026-11-20");
     assert.equal(booking.start_time, "09:00:00");
     assert.equal(booking.end_time, "10:30:00");
@@ -394,7 +480,8 @@ test("Customer booking uses locked database values and returns a history-compati
       /booking_status <> 'CANCELLED'/,
     );
     assert.deepEqual(database.state.queries[0].values, [7]);
-    assert.deepEqual(database.state.queries[1].values, [7]);
+    // Capacity counts bookings that overlap the slot's time, not only its id.
+    assert.deepEqual(database.state.queries[1].values, ["2026-11-20", "10:30:00", "09:00:00"]);
     assert.deepEqual(database.state.bookingInsert.values, [
       50,
       42,
@@ -406,7 +493,9 @@ test("Customer booking uses locked database values and returns a history-compati
       "20.09",
     ]);
     assert.match(database.state.bookingInsert.sql, /INSERT INTO bookings/);
-    assert.doesNotMatch(database.state.bookingInsert.sql, /booking_status/);
+    // New bookings start unpaid; payment confirms them.
+    assert.match(database.state.bookingInsert.sql, /'PENDING_PAYMENT'/);
+    assert.match(database.state.queries[1].sql, /PENDING_PAYMENT[\s\S]*INTERVAL 15 MINUTE/);
     assert.deepEqual(database.state.serviceInsert.values, [
       101, 3, "Wash", "19.99", 30,
       101, 5, "Polish", "0.10", 30,
@@ -598,6 +687,48 @@ test("Booking rejects service duration longer than the selected schedule", async
     assert.equal(database.state.bookingInsert, null);
     assert.equal(database.state.rolledBack, true);
   });
+});
+
+const twoHourServices = [
+  { service_id: 3, service_name: "Wash", duration_minutes: 60, status: "ACTIVE" },
+  { service_id: 5, service_name: "Polish", duration_minutes: 60, status: "ACTIVE" },
+];
+const nextSlot = { schedule_id: 8, start_time: "10:30:00", end_time: "12:00:00", capacity: 2, status: "AVAILABLE", booked_count: 0 };
+
+test("Services longer than one slot continue into the next slot", async () => {
+  const database = createDatabase({ services: twoHourServices, laterSlots: [nextSlot] });
+  pool.getConnection = async () => database.connection;
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/customer/bookings", createToken(), {
+      vehicle_id: 42, schedule_id: 7, service_ids: [3, 5],
+    });
+    assert.equal(response.statusCode, 201);
+  });
+  assert.deepEqual(database.state.laterSlotLookup, ["2026-11-20", "10:30:00"]);
+  // start of the first slot, end of the last slot used
+  assert.deepEqual(database.state.bookingInsert.values.slice(4, 6), ["09:00:00", "12:00:00"]);
+  assert.equal(database.state.committed, true);
+});
+
+test("A long booking is refused when the next slot is full, missing, closed, or not back to back", async () => {
+  const cases = [
+    [[{ ...nextSlot, booked_count: 2 }], 409],
+    [[], 400],
+    [[{ ...nextSlot, status: "CLOSED" }], 400],
+    [[{ ...nextSlot, start_time: "11:00:00", end_time: "12:30:00" }], 400],
+  ];
+  for (const [laterSlots, statusCode] of cases) {
+    const database = createDatabase({ services: twoHourServices, laterSlots });
+    pool.getConnection = async () => database.connection;
+    await withServer(async (port) => {
+      const response = await sendRequest(port, "POST", "/api/customer/bookings", createToken(), {
+        vehicle_id: 42, schedule_id: 7, service_ids: [3, 5],
+      });
+      assert.equal(response.statusCode, statusCode, JSON.stringify(laterSlots));
+      assert.match(response.payload.message, /120 minutes/);
+    });
+    assert.ok(!database.state.bookingInsert);
+  }
 });
 
 test("Booking inserts are rolled back when booking service snapshots fail", async () => {

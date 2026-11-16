@@ -1,4 +1,5 @@
-const ALLOWED_QUERY_FIELDS = new Set(["from", "to"]);
+const ALLOWED_QUERY_FIELDS = new Set(["from", "to", "duration_minutes"]);
+const MAX_DURATION_MINUTES = 720;
 
 function isValidDate(value) {
   if (typeof value !== "string") {
@@ -50,7 +51,7 @@ function validateAvailabilityQuery(req, res, next) {
   ) {
     return sendValidationError(
       res,
-      "Only from and to query parameters are supported.",
+      "Only from, to and duration_minutes query parameters are supported.",
     );
   }
 
@@ -71,7 +72,26 @@ function validateAvailabilityQuery(req, res, next) {
     return sendValidationError(res, "from must be on or before to.");
   }
 
-  req.scheduleDateRange = { from, to };
+  let durationMinutes;
+  if (req.query.duration_minutes !== undefined) {
+    durationMinutes = Number(req.query.duration_minutes);
+    if (
+      !/^\d+$/.test(String(req.query.duration_minutes)) ||
+      durationMinutes < 1 ||
+      durationMinutes > MAX_DURATION_MINUTES
+    ) {
+      return sendValidationError(
+        res,
+        `duration_minutes must be a whole number from 1 to ${MAX_DURATION_MINUTES}.`,
+      );
+    }
+  }
+
+  req.scheduleDateRange = {
+    from,
+    to,
+    ...(durationMinutes ? { duration_minutes: durationMinutes } : {}),
+  };
   return next();
 }
 

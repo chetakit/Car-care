@@ -1,7 +1,10 @@
+const { normalizeCouponCode } = require("../../shared/services/couponPricing");
+
 const ALLOWED_FIELDS = new Set([
   "vehicle_id",
   "schedule_id",
   "service_ids",
+  "coupon_code",
 ]);
 const MAX_MYSQL_INT = 2147483647;
 
@@ -60,10 +63,19 @@ function validateCreate(req, res, next) {
     seenServiceIds.add(serviceId);
   }
 
+  let couponCode = null;
+  if (body.coupon_code !== undefined && body.coupon_code !== null && body.coupon_code !== "") {
+    couponCode = normalizeCouponCode(body.coupon_code);
+    if (!couponCode) {
+      return sendValidationError(res, "coupon_code must be a code of 1 to 50 characters.");
+    }
+  }
+
   req.bookingInput = {
     vehicle_id: body.vehicle_id,
     schedule_id: body.schedule_id,
     service_ids: [...body.service_ids],
+    ...(couponCode ? { coupon_code: couponCode } : {}),
   };
   return next();
 }

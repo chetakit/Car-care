@@ -250,7 +250,7 @@ test("completion requires a full verified Wallet payment and a matching owner de
     { name: "no payment", payment: null },
     { name: "pending", payment: { ...paid, payment_status: "PENDING" } },
     { name: "failed", payment: { ...paid, payment_status: "FAILED" } },
-    { name: "simulated paid", payment: { ...paid, payment_method: "SIMULATED" } },
+    { name: "simulated pending", payment: { ...paid, payment_method: "SIMULATED", payment_status: "PENDING" } },
     { name: "unverified cash", payment: { ...paid, payment_method: "CASH" } },
     { name: "unverified transfer", payment: { ...paid, payment_method: "BANK_TRANSFER" } },
     { name: "missing paid timestamp", payment: { ...paid, paid_at: null } },
@@ -311,6 +311,74 @@ test("authorized cash and transfer verifications permit completion", async () =>
       assert.equal(state.history, 1);
     }
   });
+});
+
+test("a paid simulated payment permits completion", async () => {
+  const state = statusDatabase({
+    payment: { payment_id: 3, payment_status: "PAID", payment_method: "SIMULATED",
+      amount: "25.00", amount_matches: 1, paid_at: "2026-11-15" },
+  });
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "PATCH", "/api/staff/bookings/5/status", createToken(), {
+      status: "COMPLETED", reason: "Service finished",
+    });
+    assert.equal(response.statusCode, 200);
+  });
+  assert.equal(state.commits, 1);
+  assert.equal(state.history, 1);
+});
+
+test("no-show of a paid booking forfeits 100% (refund 0, fee = full amount)", async () => {
+  const state = { status: "CONFIRMED", refunds: [], history: [], commits: 0 };
+  const connection = {
+    beginTransaction: async () => {},
+    commit: async () => { state.commits += 1; },
+    rollback: async () => {},
+    release: () => {},
+    execute: async (sql, values) => {
+      if (sql.includes("FROM bookings") && sql.includes("FOR UPDATE")) {
+        return [[{ booking_id: 5, user_id: 8, final_amount: "25.00", booking_status: state.status, appointment_started: 1 }]];
+      }
+      if (sql.startsWith("UPDATE bookings")) {
+        assert.deepEqual(values, ["NO_SHOW", 5, "CONFIRMED"]);
+        state.status = "NO_SHOW";
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes("INSERT INTO booking_status_history")) {
+        state.history.push(values);
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes("FROM payments") && sql.includes("FOR UPDATE")) {
+        return [[{ payment_id: 3, booking_id: 5, amount: "25.00", payment_method: "SIMULATED", payment_status: "PAID" }]];
+      }
+      if (sql.includes("FROM refunds") && sql.includes("FOR UPDATE")) return [[]];
+      if (sql.includes("INSERT INTO refunds")) {
+        state.refunds.push({ sql, values });
+        return [{ insertId: 70, affectedRows: 1 }];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  pool.getConnection = async () => connection;
+  pool.execute = async (sql) => {
+    if (sql.includes("FROM bookings b")) {
+      return [[{ booking_id: 5, booking_status: state.status, final_amount: "25.00" }]];
+    }
+    return [[]];
+  };
+
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/staff/bookings/5/no-show", createToken(), {
+      reason: "Did not arrive",
+    });
+    assert.equal(response.statusCode, 200);
+  });
+  assert.equal(state.status, "NO_SHOW");
+  assert.equal(state.commits, 1);
+  assert.equal(state.refunds.length, 1);
+  assert.match(state.refunds[0].sql, /'0\.00'/);
+  assert.deepEqual(state.refunds[0].values.slice(0, 3), [3, 5, "25.00"]);
+  assert.match(state.refunds[0].values[3], /No-show \(100% forfeited\)/);
 });
 
 test("no-show is rejected before the appointment time", async () => {

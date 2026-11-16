@@ -12,6 +12,10 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  // Return DATE columns (booking_date, schedule_date) as plain "YYYY-MM-DD"
+  // strings. As JS Date objects they are serialised to UTC, which shifted
+  // every date one day earlier for users in Thailand (UTC+7).
+  dateStrings: ["DATE"],
 });
 
 module.exports = pool;

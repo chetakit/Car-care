@@ -35,7 +35,7 @@ function ReportsPage() {
 
   return (
     <div>
-      <PageHeading description="Booking and revenue reports from existing Admin report endpoints." eyebrow="ANALYTICS" title="Reports" action={<button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">Refresh</button>} />
+      <PageHeading description="Booking counts and revenue for any date range." eyebrow="ANALYTICS" title="Reports" action={<button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">Refresh</button>} />
       <div aria-label="Report type" className="admin-tabs">
         {['bookings', 'revenue'].map((type) => <button aria-pressed={reportType === type} className={reportType === type ? 'is-selected' : ''} key={type} onClick={() => changeReportType(type)} type="button">{type === 'bookings' ? 'Bookings' : 'Revenue'}</button>)}
       </div>

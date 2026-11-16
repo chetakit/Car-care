@@ -12,4 +12,4 @@ CREATE TABLE payment_verifications (
     FOREIGN KEY (payment_id) REFERENCES payments (payment_id),
   CONSTRAINT fk_payment_verifications_user
     FOREIGN KEY (verified_by) REFERENCES users (user_id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

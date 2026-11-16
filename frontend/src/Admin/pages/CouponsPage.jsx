@@ -161,7 +161,7 @@ function CouponsPage() {
             <button className="admin-primary-button" onClick={openCreateForm} type="button">+ Add coupon</button>
           </div>
         )}
-        description="Review and manage coupons supported by the backend."
+        description="Create discount codes and see how often each one is used."
         eyebrow="PROMOTIONS"
         title="Coupons"
       />

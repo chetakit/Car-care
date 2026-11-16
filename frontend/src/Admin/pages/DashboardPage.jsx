@@ -7,6 +7,7 @@ import formatStatusLabel from '../utils/formatStatusLabel.js'
 import formatMoney from '../utils/formatMoney.js'
 
 const BOOKING_STATUS_ORDER = [
+  'PENDING_PAYMENT',
   'CONFIRMED',
   'CHECKED_IN',
   'IN_SERVICE',
@@ -90,7 +91,7 @@ function DashboardPage({ onNavigate }) {
         <div>
           <p className="admin-eyebrow">OVERVIEW</p>
           <h2>Business overview</h2>
-          <p className="admin-muted">Live information from your Car Care backend.</p>
+          <p className="admin-muted">Today at a glance.</p>
         </div>
         <button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>
       </section>
@@ -141,7 +142,7 @@ function DashboardPage({ onNavigate }) {
           <section className="admin-dashboard-grid">
             <article className="admin-panel admin-bookings-panel">
               <div className="admin-panel-heading">
-                <div><h3>Recent bookings</h3><p>Latest bookings recorded by the backend</p></div>
+                <div><h3>Recent bookings</h3><p>The newest bookings</p></div>
                 <button className="admin-text-button" onClick={() => onNavigate('bookings')} type="button">
                   View bookings <span aria-hidden="true">→</span>
                 </button>
@@ -221,7 +222,7 @@ function DashboardPage({ onNavigate }) {
                 ]} rows={statusRows} />
               )}
               <div className="admin-dashboard-payment-note">
-                <p>Payment follow-up counts are unavailable because this summary does not include payment records or statuses.</p>
+                <p>Need to verify a transfer or take a payment?</p>
                 <button className="admin-inline-button" onClick={() => onNavigate('payments')} type="button">
                   Open Payments
                 </button>

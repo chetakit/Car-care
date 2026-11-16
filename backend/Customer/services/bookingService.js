@@ -1,4 +1,7 @@
 const pool = require("../../shared/config/db");
+const { HOLDS_SLOT_SQL } = require("../../shared/services/bookingPaymentHold");
+const coupons = require("../../shared/services/couponPricing");
+const { OVERLAPPING_BOOKINGS_SQL, planFromSlot } = require("../../shared/services/slotPlanner");
 
 class BookingNotFoundError extends Error {}
 class BookingValidationError extends Error {}
@@ -122,6 +125,7 @@ async function create(
     vehicle_id: vehicleId,
     schedule_id: scheduleId,
     service_ids: serviceIds,
+    coupon_code: couponCode = null,
   },
 ) {
   return withTransaction(async (connection) => {
@@ -168,10 +172,13 @@ async function create(
       throw new BookingDataError("A schedule has an invalid capacity.");
     }
     const [capacityRows] = await connection.execute(
+      // Counts bookings overlapping this slot, including longer bookings that
+      // started in an earlier slot and run into this one.
       `SELECT COUNT(*) AS booking_count
-      FROM bookings
-      WHERE schedule_id = ? AND booking_status <> 'CANCELLED'`,
-      [scheduleId],
+      FROM bookings b
+      WHERE b.booking_date = ? AND b.start_time < ? AND b.end_time > ?
+        AND ${HOLDS_SLOT_SQL("b")}`,
+      [schedule.schedule_date, schedule.end_time, schedule.start_time],
     );
     const bookingCount = Number(capacityRows[0]?.booking_count);
     if (!Number.isSafeInteger(bookingCount) || bookingCount < 0) {
@@ -303,10 +310,34 @@ async function create(
       };
     });
 
+    // Services longer than one slot continue into the following slots.
+    let bookingEndTime = schedule.end_time;
     if (totalDurationMinutes * 60n > BigInt(scheduleDurationSeconds)) {
-      throw new BookingValidationError(
-        "The selected services exceed the schedule duration.",
+      const [laterSlots] = await connection.execute(
+        `SELECT s.schedule_id, s.start_time, s.end_time, s.capacity, s.status,
+          ${OVERLAPPING_BOOKINGS_SQL("s")} AS booked_count
+        FROM schedules s
+        WHERE s.schedule_date = ? AND s.start_time >= ?
+        ORDER BY s.start_time ASC
+        FOR UPDATE`,
+        [schedule.schedule_date, schedule.end_time],
       );
+      const plan = planFromSlot(
+        [{ ...schedule, booked_count: bookingCount }, ...laterSlots],
+        0,
+        Number(totalDurationMinutes),
+      );
+      if (plan.reason === "full") {
+        throw new BookingConflictError(
+          `These services take ${totalDurationMinutes} minutes, and a later slot they need is fully booked. Choose another time.`,
+        );
+      }
+      if (plan.reason) {
+        throw new BookingValidationError(
+          `These services take ${totalDurationMinutes} minutes, which runs past the open slots at this time. Choose an earlier time or fewer services.`,
+        );
+      }
+      bookingEndTime = plan.endTime;
     }
 
     if (totalCents === 0n) {
@@ -315,8 +346,43 @@ async function create(
       );
     }
 
+    let coupon = null;
+    let discountCents = 0n;
+    if (couponCode) {
+      coupon = await coupons.findCoupon(connection, couponCode, { lock: true });
+      try {
+        discountCents = coupons.calculateDiscount(coupon, totalCents);
+      } catch (error) {
+        if (error instanceof coupons.CouponError) {
+          throw new BookingValidationError(error.message);
+        }
+        throw error;
+      }
+    }
+
     const totalAmount = centsToDecimal(totalCents);
-    const [bookingResult] = await connection.execute(
+    const bookingInsert = coupon
+      ? connection.execute(
+          `INSERT INTO bookings (
+            user_id, vehicle_id, schedule_id, coupon_id, booking_date, start_time,
+            end_time, total_amount, discount_amount, final_amount, booking_status
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PAYMENT')`,
+          [
+            userId,
+            vehicleId,
+            scheduleId,
+            coupon.coupon_id,
+            schedule.schedule_date,
+            schedule.start_time,
+            bookingEndTime,
+            totalAmount,
+            centsToDecimal(discountCents),
+            centsToDecimal(totalCents - discountCents),
+          ],
+        )
+      : null;
+    const [bookingResult] = bookingInsert ? await bookingInsert : await connection.execute(
       `INSERT INTO bookings (
         user_id,
         vehicle_id,
@@ -326,16 +392,17 @@ async function create(
         end_time,
         total_amount,
         discount_amount,
-        final_amount
+        final_amount,
+        booking_status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, '0.00', ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, '0.00', ?, 'PENDING_PAYMENT')`,
       [
         userId,
         vehicleId,
         scheduleId,
         schedule.schedule_date,
         schedule.start_time,
-        schedule.end_time,
+        bookingEndTime,
         totalAmount,
         totalAmount,
       ],
@@ -365,6 +432,21 @@ async function create(
       VALUES ${serviceValueRows}`,
       serviceValues,
     );
+
+    if (coupon) {
+      try {
+        await coupons.recordCouponUse(connection, coupon, {
+          bookingId: bookingResult.insertId,
+          userId,
+          discountCents,
+        });
+      } catch (error) {
+        if (error instanceof coupons.CouponError) {
+          throw new BookingConflictError(error.message);
+        }
+        throw error;
+      }
+    }
 
     const [createdRows] = await connection.execute(
       `SELECT

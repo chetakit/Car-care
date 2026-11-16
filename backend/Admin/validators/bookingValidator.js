@@ -1,4 +1,5 @@
 const BOOKING_STATUSES = new Set([
+  "PENDING_PAYMENT",
   "CONFIRMED",
   "CHECKED_IN",
   "IN_SERVICE",

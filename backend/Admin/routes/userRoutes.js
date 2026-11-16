@@ -11,6 +11,7 @@ const router = express.Router();
 router.use(authenticateToken, requireCurrentAdmin);
 
 router.get("/", userValidator.validateListQuery, userController.list);
+router.post("/", userValidator.validateCreate, userController.create);
 router.get("/:id", userValidator.parseId, userController.getById);
 router.patch(
   "/:id/role",

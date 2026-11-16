@@ -102,7 +102,7 @@ export function DataTable({ columns, rows, rowKey }) {
           {rows.map((row, index) => (
             <tr key={rowKey ? rowKey(row) : row.id ?? row.user_id ?? row.booking_id ?? index}>
               {columns.map((column) => (
-                <td key={column.key}>
+                <td className={column.wrap ? 'admin-cell-wrap' : undefined} key={column.key}>
                   {column.render ? column.render(row) : (row[column.key] ?? '—')}
                 </td>
               ))}
@@ -123,7 +123,7 @@ export function PaymentStatusBadge({ payment }) {
   return (
     <>
       <StatusBadge value={payment.payment_status} />
-      {payment.payment_method === 'SIMULATED' && <span> (Demo — not a real payment)</span>}
+      {payment.payment_method === 'SIMULATED' && <span className="admin-payment-method-note">Online</span>}
     </>
   )
 }

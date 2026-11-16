@@ -1572,12 +1572,21 @@
 .admin-table-wrap { width: 100%; }
 .admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 .admin-table th { padding: 10px 12px; border-bottom: 1px solid #e8ebee; color: #697681; font-size: 11px; font-weight: 700; letter-spacing: 0.35px; text-transform: uppercase; white-space: nowrap; }
-.admin-table td { padding: 12px; border-bottom: 1px solid #f0f2f3; color: #44515c; vertical-align: middle; }
+.admin-table td { padding: 12px; border-bottom: 1px solid #f0f2f3; color: #44515c; vertical-align: middle; white-space: nowrap; }
+/* Long free text may wrap; ids, money, dates, emails and phones never break mid-word. */
+.admin-table td.admin-cell-wrap { min-width: 160px; max-width: 320px; white-space: normal; overflow-wrap: anywhere; }
 .admin-table tr:last-child td { border-bottom: 0; }
 .admin-status-badge { display: inline-flex; padding: 4px 7px; border-radius: 4px; color: #596671; background: #f0f2f3; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.status-active, .status-paid, .status-confirmed, .status-completed, .status-credit { color: #2f684d; background: #edf7f0; }
-.status-inactive, .status-failed, .status-cancelled, .status-no-show { color: #8b4540; background: #fff1ef; }
-.status-pending, .status-checked-in, .status-in-service, .status-debit { color: #806126; background: #fbf5e8; }
+/* Status colours: orange = waiting on money, blue = booked, yellow = in the shop,
+   green = done/paid, red = stopped, purple = refunded, grey = neutral movement. */
+.status-pending-payment, .status-pending, .status-refund-pending { color: #94520f; background: #fdf0e1; }
+.status-confirmed { color: #2a5c96; background: #e9f1fb; }
+.status-checked-in, .status-in-service { color: #806126; background: #fbf5e8; }
+.status-active, .status-paid, .status-completed, .status-credit { color: #2f684d; background: #edf7f0; }
+.status-inactive, .status-failed, .status-cancelled, .status-no-show, .status-refund-failed { color: #8b4540; background: #fff1ef; }
+.status-refunded { color: #5e4596; background: #f2eefb; }
+.status-debit { color: #596671; background: #f0f2f3; }
+.admin-payment-method-note { margin-left: 6px; color: var(--admin-muted); font-size: 11px; white-space: nowrap; }
 .admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; padding-top: 12px; border-top: 1px solid #eff1f2; color: #697681; font-size: 12px; }
 .admin-pagination > div { display: flex; gap: 7px; }
 .admin-pagination button { min-height: 36px; padding: 0 9px; border: 1px solid var(--admin-border); border-radius: 4px; color: #52606b; background: #fff; cursor: pointer; font: inherit; }
@@ -2021,3 +2030,22 @@
   .admin-price-row { grid-template-columns: minmax(0, 1fr) minmax(110px, 0.8fr); gap: 8px; }
   .admin-price-row > .admin-inline-button { grid-column: 1 / -1; justify-self: start; min-height: 44px; }
 }
+
+.admin-booking-cancel-reason { display: grid; gap: 6px; margin: 12px 0; font-size: 0.875rem; }
+.admin-booking-cancel-reason textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px 10px; border: 1px solid #d6dbe1; border-radius: 8px; resize: vertical; }
+.admin-wallet-lookup input { min-width: min(320px, 100%); }
+.admin-wallet-matches { margin: 12px 0; padding: 12px; }
+.admin-wallet-matches-note { margin: 0 0 8px; color: var(--admin-muted); font-size: 0.85rem; }
+.admin-wallet-matches ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.admin-wallet-matches button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; color: var(--admin-ink); font: inherit; text-align: left; cursor: pointer; }
+.admin-wallet-matches button:hover, .admin-wallet-matches button:focus-visible { border-color: var(--admin-accent); }
+.admin-wallet-matches button span { grid-column: 1; color: var(--admin-muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.admin-wallet-matches button small { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--admin-muted); }
+.admin-booking-cancel-reason span { color: var(--admin-muted); font-size: 12px; font-weight: 600; }
+.admin-booking-schedule { display: grid; gap: 2px; }
+.admin-booking-schedule small { color: var(--admin-muted); font-size: 11px; }
+/* The dashboard's recent-bookings card has only four columns; it does not need the Bookings page width. */
+.admin-dashboard .admin-bookings-panel .admin-table { min-width: 0; }
+.admin-payment-queue { margin: 16px 0; }
+.admin-payment-queue .admin-panel-heading { flex-wrap: wrap; gap: 12px; }
+.admin-booking-link[aria-current="true"] { border-color: var(--admin-accent); color: var(--admin-accent-dark); }

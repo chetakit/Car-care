@@ -1341,3 +1341,17 @@
     color: #e2e4e3;
   }
 }
+
+/* Coupon */
+.booking-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.booking-coupon-form { display: flex; gap: 8px; }
+.booking-coupon-form input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid #d8e2df; border-radius: 8px; font: inherit; font-size: 13px; text-transform: uppercase; }
+.booking-coupon-form input::placeholder { text-transform: none; }
+.booking-coupon-form button,
+.booking-coupon-applied button { padding: 0 16px; min-height: 40px; border: 1px solid var(--customer-teal-dark); border-radius: 8px; color: var(--customer-teal-dark); background: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.booking-coupon-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+.booking-coupon-applied { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px dashed var(--customer-teal-dark); border-radius: 8px; background: #f3f7f6; }
+.booking-coupon-applied span { display: grid; gap: 2px; }
+.booking-coupon-applied small { color: #65736f; font-size: 12px; }
+.booking-coupon-error { margin: 8px 0 0; color: #a33a32; font-size: 12px; }
+.booking-summary-breakdown { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 12px 18px 0; color: #65736f; font-size: 12px; }

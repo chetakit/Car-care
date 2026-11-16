@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PageHeading, PaymentStatusBadge, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
+import { DataTable, PageHeading, PaymentStatusBadge, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
+import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
 
 const MAX_BOOKING_ID = 2147483647
 const TERMINAL_BOOKING_STATUSES = new Set(['CANCELLED', 'NO_SHOW'])
 
+// A failed attempt on a booking that still awaits payment can be retried.
+function isRetryableFailure(booking, payment) {
+  return payment?.payment_status === 'FAILED' && booking?.booking_status === 'PENDING_PAYMENT'
+}
+
 function isWalletPaymentAllowed(booking, payment, balance) {
   const canPayBooking = booking && !TERMINAL_BOOKING_STATUSES.has(booking.booking_status)
-  const canUseExistingPayment = !payment || (
+  const canUseExistingPayment = !payment || isRetryableFailure(booking, payment) || (
     payment.payment_status === 'PENDING' &&
     ['SIMULATED', 'WALLET'].includes(payment.payment_method)
   )
@@ -36,6 +42,64 @@ function paymentActionConfirmation(operation, booking, paymentMethod) {
   return `Simulate this payment as ${operation === 'simulate-paid' ? 'PAID' : 'FAILED'}?`
 }
 
+const QUEUE_TABS = [
+  { status: 'PENDING', label: 'Waiting', empty: 'No payments are waiting.' },
+  { status: 'PAID', label: 'Paid', empty: 'No paid bookings yet.' },
+  { status: 'FAILED', label: 'Failed', empty: 'No failed payments.' },
+]
+
+// Recent bookings by payment status, so an Admin can pick one instead of typing its ID.
+function PaymentQueue({ onOpen, selectedId }) {
+  const [tab, setTab] = useState('PENDING')
+  const params = new URLSearchParams({ payment_status: tab, page: '1', limit: '8', sort: 'newest' })
+  const { data, loading, error, refresh } = useRemoteData(`/api/admin/bookings?${params}`)
+  const rows = data?.items ?? []
+  const current = QUEUE_TABS.find((item) => item.status === tab)
+  return (
+    <section className="admin-panel admin-data-panel admin-payment-queue">
+      <div className="admin-panel-heading">
+        <div>
+          <h3>Recent payments</h3>
+          <p>{data?.pagination?.total ?? 0} {current.label.toLowerCase()} · select one to open it</p>
+        </div>
+        <div aria-label="Payment status" className="admin-tabs">
+          {QUEUE_TABS.map((item) => (
+            <button aria-pressed={tab === item.status} className={tab === item.status ? 'is-selected' : ''} key={item.status} onClick={() => setTab(item.status)} type="button">
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <RequestState empty={!rows.length} emptyDescription="Payments appear here as customers pay." emptyTitle={current.empty} error={error} loading={loading} loadingMessage="Loading payments…" onRetry={refresh} />
+      {!loading && !error && rows.length > 0 && (
+        <DataTable
+          columns={[
+            {
+              key: 'booking_id',
+              label: 'Booking',
+              render: (row) => (
+                <button aria-current={String(row.booking_id) === selectedId ? 'true' : undefined} className="admin-booking-link" onClick={() => onOpen(String(row.booking_id))} type="button">
+                  #{row.booking_id}
+                </button>
+              ),
+            },
+            { key: 'full_name', label: 'Customer', render: (row) => row.full_name || '—' },
+            { key: 'final_amount', label: 'Amount', render: (row) => formatMoney(row.final_amount) },
+            { key: 'payment_method', label: 'Method', render: (row) => row.payment_method === 'SIMULATED' ? 'Online' : formatMethod(row.payment_method) },
+            { key: 'booking_status', label: 'Booking', render: (row) => <StatusBadge value={row.booking_status} /> },
+          ]}
+          rowKey={(row) => row.booking_id}
+          rows={rows}
+        />
+      )}
+    </section>
+  )
+}
+
+function formatMethod(value) {
+  return value ? value.charAt(0) + value.slice(1).toLowerCase().replace('_', ' ') : '—'
+}
+
 function PaymentsPage() {
   const initialBookingId = new URLSearchParams(window.location.search).get('booking_id') ?? ''
   const [bookingId, setBookingId] = useState(initialBookingId)
@@ -53,6 +117,7 @@ function PaymentsPage() {
   const [lookupComplete, setLookupComplete] = useState(false)
   const [paymentLookupComplete, setPaymentLookupComplete] = useState(false)
   const autoLookupAttempted = useRef(false)
+  const [queueRefreshKey, setQueueRefreshKey] = useState(0)
   const api = useApi()
 
   const bookingCanHavePayment = booking &&
@@ -61,14 +126,14 @@ function PaymentsPage() {
     lookupComplete &&
     paymentLookupComplete &&
     bookingCanHavePayment &&
-    !payment,
+    (!payment || isRetryableFailure(booking, payment)),
   )
   const canPayWithWallet = paymentLookupComplete &&
     isWalletPaymentAllowed(booking, payment, walletBalance)
 
-  const loadPayment = useCallback(async (event) => {
+  const loadPayment = useCallback(async (event, overrideId) => {
     event?.preventDefault()
-    const id = bookingId.trim()
+    const id = (overrideId ?? bookingId).trim()
     if (!/^[1-9]\d*$/.test(id) || Number(id) > MAX_BOOKING_ID) {
       setError(`Enter a valid Booking ID between 1 and ${MAX_BOOKING_ID}.`)
       setBooking(null)
@@ -101,6 +166,10 @@ function PaymentsPage() {
       }
 
       setBooking(bookingData)
+      // Cash cannot confirm an unpaid booking, so never carry it over to one.
+      if (bookingData?.booking_status === 'PENDING_PAYMENT') {
+        setPaymentMethod((current) => (current === 'CASH' ? 'SIMULATED' : current))
+      }
       setLookupComplete(true)
 
       let paymentData = null
@@ -140,6 +209,13 @@ function PaymentsPage() {
       setLoading(false)
     }
   }, [api, bookingId])
+
+  // Opening a row from the payment list fills the Booking ID and loads it.
+  function openFromQueue(id) {
+    if (loading || action) return
+    setBookingId(id)
+    void loadPayment(undefined, id)
+  }
 
   useEffect(() => {
     if (!initialBookingId || autoLookupAttempted.current) return
@@ -195,6 +271,7 @@ function PaymentsPage() {
             ? `Payment status updated to ${operation === 'simulate-paid' ? 'PAID' : 'FAILED'}.`
             : 'Payment created successfully.',
       )
+      setQueueRefreshKey((key) => key + 1)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -205,7 +282,7 @@ function PaymentsPage() {
   return (
     <div className="admin-payments-page">
       <PageHeading
-        description="Search with the numeric Booking ID shown in Bookings. Only payment actions supported by the backend are available."
+        description="Enter a Booking ID (shown in Bookings) to see its payment, verify a bank transfer, or take a payment."
         eyebrow="FINANCE"
         title="Payments"
       />
@@ -247,6 +324,7 @@ function PaymentsPage() {
       {error && <div className="admin-alert admin-alert-error" role="alert">{error}</div>}
       {notice && !error && <div className="admin-alert admin-alert-success" role="status">{notice}</div>}
       {loading && <RequestState loading />}
+      {!booking && <PaymentQueue key={queueRefreshKey} onOpen={openFromQueue} selectedId={searchedBookingId} />}
 
       {!loading && lookupComplete && paymentLookupComplete && booking && (
         <section className="admin-panel admin-payment-panel">
@@ -290,7 +368,7 @@ function PaymentsPage() {
                 </div>
               )}
               {payment.payment_status === 'PENDING' && payment.payment_method === 'BANK_TRANSFER' &&
-                ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'].includes(booking.booking_status) && (
+                ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'].includes(booking.booking_status) && (
                   <div className="admin-payment-create">
                     <label htmlFor="transfer-reference">Bank transfer reference (check with the bank before confirming)</label>
                     <input id="transfer-reference" maxLength="128" onChange={(event) => setTransferReference(event.target.value)} value={transferReference} />
@@ -300,12 +378,16 @@ function PaymentsPage() {
                   </div>
                 )}
               {payment.payment_status === 'FAILED' && (
-                <p className="admin-payment-guidance">Payment unsuccessful. The backend does not allow this payment to be replaced or retried with Wallet.</p>
+                <p className="admin-payment-guidance">
+                  {isRetryableFailure(booking, payment)
+                    ? 'Payment unsuccessful. The booking still awaits payment, so you can create a new attempt below.'
+                    : 'Payment unsuccessful. This attempt cannot be retried.'}
+                </p>
               )}
               {payment.payment_status === 'PAID' && (
                 <p className="admin-payment-guidance">
                   {payment.payment_method === 'SIMULATED'
-                    ? 'Demo payment marked paid; no real payment was verified.'
+                    ? 'Paid online (simulated payment). Counted as revenue.'
                     : 'Paid status recorded. Historical cash and transfer payments may require reconciliation.'}
                 </p>
               )}
@@ -340,7 +422,7 @@ function PaymentsPage() {
                     value={paymentMethod}
                   >
                     <option value="SIMULATED">SIMULATED</option>
-                    <option value="CASH">CASH</option>
+                    {booking.booking_status !== 'PENDING_PAYMENT' && <option value="CASH">CASH</option>}
                     <option value="BANK_TRANSFER">BANK_TRANSFER</option>
                   </select>
                   <button
@@ -390,6 +472,7 @@ function PaymentsPage() {
           <span>Enter the numeric Booking ID to view its payment status, amount, and supported actions.</span>
         </div>
       )}
+      {booking && <PaymentQueue key={queueRefreshKey} onOpen={openFromQueue} selectedId={searchedBookingId} />}
     </div>
   )
 }

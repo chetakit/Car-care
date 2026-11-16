@@ -3,6 +3,7 @@ import AdminModal from '../components/AdminModal.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
+import formatMoney from '../utils/formatMoney.js'
 
 const initialForm = { service_name: '', description: '', duration_minutes: '' }
 const VEHICLE_TYPE_PAGE_SIZE = 100
@@ -417,7 +418,7 @@ function ServicesPage() {
             <button className="admin-primary-button" onClick={openCreateForm} type="button">+ Add service</button>
           </div>
         )}
-        description="Manage service records using the existing Admin service endpoints."
+        description="Add services, set how long they take, and set a price for each vehicle type."
         eyebrow="CATALOG"
         title="Services & pricing"
       />
@@ -467,6 +468,19 @@ function ServicesPage() {
               { key: 'service_id', label: 'ID' },
               { key: 'service_name', label: 'Service' },
               { key: 'duration_minutes', label: 'Duration (min)' },
+              {
+                key: 'price',
+                label: 'Price',
+                render: (row) => {
+                  if (!row.price_count) {
+                    return <button className="admin-inline-button admin-action-danger" onClick={() => setPricingServiceId(row.service_id)} type="button">Set prices</button>
+                  }
+                  const range = Number(row.min_price) === Number(row.max_price)
+                    ? formatMoney(row.min_price)
+                    : `${formatMoney(row.min_price)} – ${formatMoney(row.max_price)}`
+                  return <span>{range} <small className="admin-muted">· {row.price_count} {row.price_count === 1 ? 'type' : 'types'}</small></span>
+                },
+              },
               { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
               { key: 'actions', label: 'Actions', render: (row) => (
                 <div className="admin-row-actions">
@@ -480,7 +494,7 @@ function ServicesPage() {
           </>
         )}
       </section>
-      {pricingServiceId && <ServicePricesPanel api={api} key={pricingServiceId} onClose={() => setPricingServiceId(null)} serviceId={pricingServiceId} />}
+      {pricingServiceId && <ServicePricesPanel api={api} key={pricingServiceId} onClose={() => { setPricingServiceId(null); refresh() }} serviceId={pricingServiceId} />}
     </div>
   )
 }

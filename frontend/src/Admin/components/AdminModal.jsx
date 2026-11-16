@@ -10,6 +10,8 @@ function AdminModal({
   onClose,
   onSubmit,
   children,
+  // View-only dialogs show a single close button instead of Cancel + Save.
+  viewOnly = false,
 }) {
   const dialogRef = useRef(null)
   const titleId = useId()
@@ -66,17 +68,25 @@ function AdminModal({
             {children}
           </div>
           <footer className="admin-modal-footer">
-            <button
-              className="admin-secondary-button"
-              disabled={submitting}
-              onClick={onClose}
-              type="button"
-            >
-              Cancel
-            </button>
-            <button className="admin-primary-button" disabled={submitting} form={formId} type="submit">
-              {submitting ? 'Saving…' : submitLabel}
-            </button>
+            {viewOnly ? (
+              <button className="admin-primary-button" form={formId} type="submit">
+                {submitLabel || 'Close'}
+              </button>
+            ) : (
+              <>
+                <button
+                  className="admin-secondary-button"
+                  disabled={submitting}
+                  onClick={onClose}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button className="admin-primary-button" disabled={submitting} form={formId} type="submit">
+                  {submitting ? 'Saving…' : submitLabel}
+                </button>
+              </>
+            )}
           </footer>
         </form>
       </div>

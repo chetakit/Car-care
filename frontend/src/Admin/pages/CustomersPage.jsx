@@ -9,6 +9,8 @@ import formatMoney from '../utils/formatMoney.js'
 const BOOKING_PAGE_SIZE = 10
 const WALLET_TRANSACTION_PAGE_SIZE = 10
 const ROLE_OPTIONS = ['ADMIN', 'STAFF', 'CUSTOMER']
+const BLANK_MEMBER = { full_name: '', email: '', phone: '', password: '', role: 'STAFF' }
+const MIN_PASSWORD_LENGTH = 8
 
 function isValidUserId(value) {
   const id = String(value ?? '')
@@ -22,7 +24,7 @@ function vehicleLabel(vehicle) {
   ].filter(Boolean).join(' · ') || 'Vehicle details unavailable'
 }
 
-function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
+function CustomersPage({ user, role = 'CUSTOMER' }) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -49,6 +51,11 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
   const [roleChanging, setRoleChanging] = useState(false)
   const [selectedRoleUser, setSelectedRoleUser] = useState(null)
   const [newRole, setNewRole] = useState('')
+  const [statusChangingId, setStatusChangingId] = useState(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createForm, setCreateForm] = useState(BLANK_MEMBER)
+  const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
   const requestId = useRef(0)
   const api = useApi()
   const memberType = role === 'STAFF' ? 'Staff' : 'Customer'
@@ -114,6 +121,80 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
       setRoleChangeError(requestError.message)
     } finally {
       setRoleChanging(false)
+    }
+  }
+
+  function openCreate() {
+    setCreateForm(BLANK_MEMBER)
+    setCreateError('')
+    setRoleChangeMessage('')
+    setCreateOpen(true)
+  }
+
+  async function createMember(event) {
+    event.preventDefault()
+    if (user?.role !== 'ADMIN' || creating) return
+    const phone = createForm.phone.trim()
+    if (phone && !/^\d{10}$/.test(phone)) {
+      setCreateError('Phone must be exactly 10 digits, or leave it empty.')
+      return
+    }
+    if (createForm.password.length < MIN_PASSWORD_LENGTH) {
+      setCreateError(`The temporary password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
+      return
+    }
+    setCreating(true)
+    setCreateError('')
+    try {
+      const response = await api('/api/admin/users', {
+        method: 'POST',
+        body: {
+          full_name: createForm.full_name.trim(),
+          email: createForm.email.trim(),
+          phone: phone || null,
+          password: createForm.password,
+          role: createForm.role,
+        },
+      })
+      const created = response.data
+      setCreateOpen(false)
+      setCreateForm(BLANK_MEMBER)
+      setRoleChangeMessage(`${created?.full_name ?? 'The account'} was created as ${created?.role ?? createForm.role}. Share the temporary password with them privately.`)
+      refresh()
+    } catch (requestError) {
+      setCreateError(requestError.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function toggleStatus(row) {
+    if (
+      user?.role !== 'ADMIN' ||
+      Number(row.user_id) === Number(user?.user_id) ||
+      statusChangingId !== null
+    ) return
+    const nextStatus = row.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    const name = row.full_name || row.email || `User #${row.user_id}`
+    const question = nextStatus === 'INACTIVE'
+      ? `Suspend ${name}? They will be signed out and cannot sign in until the account is activated again. Their bookings and payments are kept.`
+      : `Activate ${name}? They will be able to sign in again.`
+    if (!window.confirm(question)) return
+
+    setStatusChangingId(row.user_id)
+    setRoleChangeError('')
+    setRoleChangeMessage('')
+    try {
+      await api(`/api/admin/users/${row.user_id}/status`, {
+        method: 'PATCH',
+        body: { status: nextStatus },
+      })
+      setRoleChangeMessage(nextStatus === 'INACTIVE' ? `${name} is suspended.` : `${name} is active again.`)
+      refresh()
+    } catch (requestError) {
+      setRoleChangeError(requestError.message)
+    } finally {
+      setStatusChangingId(null)
     }
   }
 
@@ -289,8 +370,35 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
         description={`Search and review ${memberType.toLowerCase()} accounts and their related records.`}
         eyebrow="PEOPLE"
         title={memberType}
-        action={<button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
+        action={(
+          <div className="admin-heading-actions">
+            <button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>
+            {role === 'STAFF' && user?.role === 'ADMIN' && (
+              <button className="admin-primary-button" onClick={openCreate} type="button">+ Add staff</button>
+            )}
+          </div>
+        )}
       />
+      {createOpen && (
+        <AdminModal
+          description="Create a Staff or Admin account. They sign in with this email and the temporary password you set."
+          error={createError}
+          onClose={() => { if (!creating) setCreateOpen(false) }}
+          onSubmit={createMember}
+          open
+          submitLabel="Create account"
+          submitting={creating}
+          title="Add a staff account"
+        >
+          <div className="admin-form-grid">
+            <label className="admin-form-wide">Full name<input autoComplete="off" autoFocus maxLength="100" onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })} required value={createForm.full_name} /></label>
+            <label>Email<input autoComplete="off" maxLength="150" onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} required type="email" value={createForm.email} /></label>
+            <label>Phone (optional)<input autoComplete="off" inputMode="numeric" maxLength="10" onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} placeholder="10 digits" value={createForm.phone} /></label>
+            <label>Temporary password<input autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required type="password" value={createForm.password} /></label>
+            <label>Role<select onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })} value={createForm.role}><option value="STAFF">Staff</option><option value="ADMIN">Admin</option></select></label>
+          </div>
+        </AdminModal>
+      )}
       <form className="admin-filter-bar admin-customer-filters" onSubmit={applyFilters}>
         <input
           aria-label={`Search ${memberCountLabel}`}
@@ -337,7 +445,6 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
                 { key: 'full_name', label: 'Full name' },
                 { key: 'email', label: 'Email' },
                 { key: 'phone', label: 'Phone' },
-                { key: 'role', label: 'Role' },
                 { key: 'created_at', label: 'Registered', render: (row) => formatDate(row.created_at) },
                 { key: 'status', label: 'Account status', render: (row) => <StatusBadge value={row.status} /> },
                 {
@@ -353,14 +460,6 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
                       >
                         View details
                       </button>
-                      <button
-                        className="admin-inline-button"
-                        disabled={customerLoading || !isValidUserId(row.user_id)}
-                        onClick={() => onNavigate('wallet', { user_id: String(row.user_id) })}
-                        type="button"
-                      >
-                        View Wallet
-                      </button>
                       {user?.role === 'ADMIN' && (
                         <button
                           aria-label={`Change role for ${row.full_name || row.email || `user ${row.user_id}`}`}
@@ -370,6 +469,17 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
                           type="button"
                         >
                           Change Role
+                        </button>
+                      )}
+                      {user?.role === 'ADMIN' && (
+                        <button
+                          aria-label={`${row.status === 'ACTIVE' ? 'Suspend' : 'Activate'} ${row.full_name || row.email || `user ${row.user_id}`}`}
+                          className={`admin-inline-button ${row.status === 'ACTIVE' ? 'admin-action-danger' : 'admin-action-success'}`}
+                          disabled={statusChangingId !== null || !isValidUserId(row.user_id) || Number(row.user_id) === Number(user?.user_id)}
+                          onClick={() => toggleStatus(row)}
+                          type="button"
+                        >
+                          {statusChangingId === row.user_id ? 'Saving…' : row.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
                         </button>
                       )}
                     </div>
@@ -393,6 +503,7 @@ function CustomersPage({ onNavigate, user, role = 'CUSTOMER' }) {
           open
           submitLabel="Close"
           submitting={false}
+          viewOnly
           title={`Member #${selectedCustomer.user_id}`}
         >
           <div className="admin-customer-detail">

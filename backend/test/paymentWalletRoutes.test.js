@@ -351,17 +351,38 @@ function createDatabase(options = {}) {
     }
 
     if (normalized.startsWith("UPDATE BOOKINGS SET BOOKING_STATUS")) {
+      const newStatus = /SET BOOKING_STATUS = '([A-Z_]+)'/.exec(normalized)[1];
+      const literalOld = /AND BOOKING_STATUS = '([A-Z_]+)'/.exec(normalized);
+      const expectedOld = literalOld ? literalOld[1] : values[1];
       if (!state.booking || Number(state.booking.booking_id) !== Number(values[0]) ||
-          state.booking.booking_status !== "CONFIRMED") {
+          state.booking.booking_status !== expectedOld) {
         return [{ affectedRows: 0 }];
       }
-      state.booking.booking_status = "CANCELLED";
+      state.booking.booking_status = newStatus;
       return [{ affectedRows: 1 }];
     }
 
     if (normalized.startsWith("INSERT INTO BOOKING_STATUS_HISTORY")) {
-      state.bookingHistory.push({ booking_id: values[0], changed_by: values[1], reason: values[2] });
+      const literal = /VALUES \(\?, '([A-Z_]+)', '([A-Z_]+)'/.exec(normalized);
+      state.bookingHistory.push(literal
+        ? { booking_id: values[0], old_status: literal[1], new_status: literal[2], changed_by: values[1], reason: values[2] }
+        : { booking_id: values[0], old_status: values[1], new_status: "CANCELLED", changed_by: values[2], reason: values[3] });
       return [{ affectedRows: 1 }];
+    }
+
+    if (normalized.startsWith("INSERT IGNORE INTO WALLETS")) {
+      if (!state.wallets.some((wallet) => Number(wallet.user_id) === Number(values[0]))) {
+        state.wallets.push({ wallet_id: 600 + state.wallets.length, user_id: values[0], balance: "0.00" });
+      }
+      return [{ affectedRows: 1 }];
+    }
+
+    if (normalized.startsWith("UPDATE PAYMENTS SET PAYMENT_STATUS = 'FAILED'")) {
+      const payment = state.payments.find(
+        (row) => Number(row.payment_id) === Number(values[0]) && row.payment_status === "PENDING",
+      );
+      if (payment) payment.payment_status = "FAILED";
+      return [{ affectedRows: payment ? 1 : 0 }];
     }
 
     if (normalized.startsWith("INSERT INTO PAYMENTS")) {
@@ -411,7 +432,7 @@ function createDatabase(options = {}) {
       const payment = state.payments.find(
         (row) => Number(row.payment_id) === Number(values[2]),
       );
-      if (payment && payment.payment_status === "PENDING") {
+      if (payment && payment.payment_status === (values[3] ?? "PENDING")) {
         payment.amount = values[0];
         payment.payment_method = "WALLET";
         payment.payment_status = "PAID";
@@ -420,6 +441,22 @@ function createDatabase(options = {}) {
         payment.updated_at = "2026-11-14 10:01:00";
       }
       return [{ affectedRows: payment ? 1 : 0 }];
+    }
+
+    if (normalized.startsWith("SELECT COUPON_ID FROM COUPON_USAGES")) {
+      return [(state.couponUsages || []).filter((row) => Number(row.booking_id) === Number(values[0]))];
+    }
+
+    if (normalized.startsWith("UPDATE PAYMENTS SET PAYMENT_METHOD = ?")) {
+      const payment = state.payments.find(
+        (row) => Number(row.payment_id) === Number(values[2]) && row.payment_status === "FAILED",
+      );
+      if (!payment) return [{ affectedRows: 0 }];
+      Object.assign(payment, {
+        payment_method: values[0], amount: values[1], payment_status: "PENDING",
+        transaction_ref: null, paid_at: null,
+      });
+      return [{ affectedRows: 1 }];
     }
 
     throw new Error(`Unexpected mocked database query: ${query}`);
@@ -640,8 +677,8 @@ test("Simulated payments can be marked PAID or FAILED and duplicate results are 
   }
 });
 
-test("A simulated paid booking cannot be cancelled for wallet credit", async () => {
-  const database = createDatabase();
+test("A simulated payment confirms an unpaid booking, and cancelling it refunds 80% to the Wallet", async () => {
+  const database = createDatabase({ booking: { booking_status: "PENDING_PAYMENT", hold_expired: 0 } });
   useDatabase(database);
 
   await withServer(async (port) => {
@@ -652,56 +689,122 @@ test("A simulated paid booking cannot be cancelled for wallet credit", async () 
     assert.equal((await sendRequest(port, "POST", "/api/payments/77/simulate", token, {
       payment_status: "PAID",
     })).statusCode, 200);
-    const response = await sendRequest(port, "POST", "/api/cancellations/77", token);
-    assert.equal(response.statusCode, 400);
     assert.equal(database.state.booking.booking_status, "CONFIRMED");
-    assert.equal(database.state.wallets[0].balance, "100.00");
-    assert.equal(database.state.refunds.length, 0);
-    assert.equal(database.state.walletTransactions.length, 0);
+    assert.deepEqual(
+      database.state.bookingHistory.map((row) => [row.old_status, row.new_status]),
+      [["PENDING_PAYMENT", "CONFIRMED"]],
+    );
+
+    const response = await sendRequest(port, "POST", "/api/cancellations/77", token);
+    assert.equal(response.statusCode, 200);
+    assert.equal(database.state.booking.booking_status, "CANCELLED");
+    assert.equal(database.state.refunds[0].cancellation_fee, "5.00");
+    assert.equal(database.state.refunds[0].refund_amount, "20.00");
+    assert.equal(database.state.wallets[0].balance, "120.00");
   });
 });
 
-test("Cancellation rejects unverified methods and wallet payments without a matching debit", async () => {
-  const debit = {
-    wallet_transaction_id: 1,
-    wallet_id: 501,
-    booking_id: 77,
-    transaction_type: "DEBIT",
-    amount: "25.00",
-    refund_id: null,
-  };
-  const cases = [
-    { method: "CASH", debits: [debit] },
-    { method: "BANK_TRANSFER", debits: [debit] },
-    { method: "WALLET", debits: [] },
-    { method: "WALLET", debits: [{ ...debit, amount: "24.99" }] },
-    { method: "WALLET", debits: [{ ...debit, wallet_id: 502 }] },
-    { method: "WALLET", debits: [debit, { ...debit, wallet_transaction_id: 2 }] },
-    { method: "WALLET", debits: [{ ...debit, refund_id: 5 }] },
-  ];
+test("A failed payment on an unpaid booking can be retried by simulation or Wallet", async () => {
+  for (const via of ["simulate", "wallet"]) {
+    const database = createDatabase({
+      booking: { booking_status: "PENDING_PAYMENT", hold_expired: 0 },
+      payments: [{ payment_status: "FAILED", transaction_ref: "SIM-old" }],
+    });
+    useDatabase(database);
+    await withServer(async (port) => {
+      const token = createToken();
+      if (via === "simulate") {
+        const retried = await sendRequest(port, "POST", "/api/payments/77", token, { payment_method: "SIMULATED" });
+        assert.equal(retried.statusCode, 201);
+        assert.equal(retried.payload.data.payment_status, "PENDING");
+        const paid = await sendRequest(port, "POST", "/api/payments/77/simulate", token, { payment_status: "PAID" });
+        assert.equal(paid.statusCode, 200);
+      } else {
+        const paid = await sendRequest(port, "POST", "/api/payments/77/wallet", token);
+        assert.equal(paid.statusCode, 200);
+        assert.equal(database.state.wallets[0].balance, "75.00");
+      }
+      assert.equal(database.state.payments.length, 1);
+      assert.equal(database.state.payments[0].payment_status, "PAID");
+      assert.equal(database.state.booking.booking_status, "CONFIRMED");
+    });
+  }
+});
 
-  for (const { method, debits } of cases) {
+test("A failed payment on a confirmed booking still cannot be replaced", async () => {
+  const database = createDatabase({ payments: [{ payment_status: "FAILED" }] });
+  useDatabase(database);
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/payments/77", createToken(), { payment_method: "SIMULATED" });
+    assert.equal(response.statusCode, 409);
+    assert.equal(database.state.payments[0].payment_status, "FAILED");
+  });
+});
+
+test("An expired payment hold cannot be paid", async () => {
+  const database = createDatabase({
+    booking: { booking_status: "PENDING_PAYMENT", hold_expired: 1 },
+    payments: [{}],
+  });
+  useDatabase(database);
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/payments/77/simulate", createToken(), {
+      payment_status: "PAID",
+    });
+    assert.equal(response.statusCode, 409);
+    assert.equal(database.state.booking.booking_status, "PENDING_PAYMENT");
+    assert.equal(database.state.payments[0].payment_status, "PENDING");
+  });
+});
+
+test("Cash cannot be used to confirm an unpaid booking", async () => {
+  const database = createDatabase({ booking: { booking_status: "PENDING_PAYMENT", hold_expired: 0 } });
+  useDatabase(database);
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/payments/77", createToken(), {
+      payment_method: "CASH",
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(database.state.payments.length, 0);
+  });
+});
+
+test("Cancelling a paid CASH or BANK_TRANSFER booking credits 80% to the Wallet", async () => {
+  for (const method of ["CASH", "BANK_TRANSFER"]) {
     const database = createDatabase({
       payments: [{ payment_method: method, payment_status: "PAID" }],
-      wallets: [
-        { wallet_id: 501, user_id: 101, balance: "100.00" },
-        { wallet_id: 502, user_id: 202, balance: "100.00" },
-      ],
-      walletTransactions: debits,
+      wallets: [],
     });
     useDatabase(database);
     await withServer(async (port) => {
       const response = await sendRequest(
         port, "POST", "/api/cancellations/77", createToken(),
       );
-      assert.equal(response.statusCode, 400, JSON.stringify({ method, debits }));
-      assert.equal(database.state.booking.booking_status, "CONFIRMED");
-      assert.equal(database.state.wallets[0].balance, "100.00");
-      assert.equal(database.state.wallets[1].balance, "100.00");
-      assert.equal(database.state.refunds.length, 0);
-      assert.equal(database.state.walletTransactions.length, debits.length);
+      assert.equal(response.statusCode, 200, method);
+      assert.equal(database.state.booking.booking_status, "CANCELLED");
+      assert.equal(database.state.wallets.length, 1, "a Wallet is created for the refund");
+      assert.equal(database.state.wallets[0].balance, "20.00");
+      assert.equal(database.state.refunds[0].cancellation_fee, "5.00");
+      assert.equal(database.state.walletTransactions.length, 1);
     });
   }
+});
+
+test("Cancelling an unpaid booking has no fee or refund", async () => {
+  const database = createDatabase({
+    booking: { booking_status: "PENDING_PAYMENT", hold_expired: 0 },
+    payments: [{}],
+  });
+  useDatabase(database);
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/cancellations/77", createToken());
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.payload.data.refund, null);
+    assert.equal(database.state.booking.booking_status, "CANCELLED");
+    assert.equal(database.state.payments[0].payment_status, "FAILED");
+    assert.equal(database.state.refunds.length, 0);
+    assert.equal(database.state.wallets[0].balance, "100.00");
+  });
 });
 
 test("A wallet payment refunds its original wallet only once", async () => {

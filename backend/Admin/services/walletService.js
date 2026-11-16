@@ -85,6 +85,7 @@ async function getRefunds({ userId, page, limit, offset }) {
       r.payment_id,
       r.refund_amount,
       r.cancellation_fee,
+      r.refund_reason,
       r.refund_status,
       r.processed_at,
       r.created_at
