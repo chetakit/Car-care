@@ -162,6 +162,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
                     <strong>{displayName}</strong>
                     {user.email && <span>{user.email}</span>}
                   </div>
+                  {user.role === 'CUSTOMER' && <a href="/customer/profile">My Profile</a>}
                   <a href="/customer/vehicles">My Vehicles</a>
                   <a href="/customer/bookings">My Bookings</a>
                   {user.role === 'CUSTOMER' && <a href="/customer/wallet">My Wallet</a>}

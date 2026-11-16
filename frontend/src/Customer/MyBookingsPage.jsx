@@ -345,12 +345,13 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel }) {
   )
 }
 
-function MyBookingsPage({ user, onLogout }) {
+function MyBookingsPage({ user, onLogout, vehicleId }) {
   const { token, handleUnauthorized } = useAuth()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
   )
+  const isVehicleHistory = vehicleId !== undefined && vehicleId !== null
   const [bookings, setBookings] = useState([])
   const [pagination, setPagination] = useState(null)
   const [bookingState, setBookingState] = useState('loading')
@@ -395,7 +396,11 @@ function MyBookingsPage({ user, onLogout }) {
     })
     if (bookingStatus) query.set('booking_status', bookingStatus)
 
-    api(`/api/customer/bookings?${query.toString()}`, {
+    const endpoint = isVehicleHistory
+      ? `/api/customer/vehicles/${encodeURIComponent(vehicleId)}/bookings`
+      : '/api/customer/bookings'
+
+    api(`${endpoint}?${query.toString()}`, {
       signal: controller.signal,
     })
       .then((response) => {
@@ -429,7 +434,7 @@ function MyBookingsPage({ user, onLogout }) {
       })
 
     return () => controller.abort()
-  }, [api, bookingStatus, page, reload])
+  }, [api, bookingStatus, isVehicleHistory, page, reload, vehicleId])
 
   function changeStatus(event) {
     setBookingStatus(event.target.value)
@@ -472,14 +477,28 @@ function MyBookingsPage({ user, onLogout }) {
           <nav aria-label="Breadcrumb" className="bookings-breadcrumb">
             <a href="/customer">Home</a>
             <span aria-hidden="true">/</span>
-            <span aria-current="page">My Bookings</span>
+            {isVehicleHistory ? (
+              <>
+                <a href="/customer/vehicles">My Vehicles</a>
+                <span aria-hidden="true">/</span>
+                <span aria-current="page">Service History</span>
+              </>
+            ) : (
+              <span aria-current="page">My Bookings</span>
+            )}
           </nav>
 
           <header className="bookings-heading">
             <div>
-              <span className="customer-eyebrow">YOUR VISITS</span>
-              <h1>My Bookings</h1>
-              <p>Review your service appointments and booking details.</p>
+              <span className="customer-eyebrow">
+                {isVehicleHistory ? 'VEHICLE VISITS' : 'YOUR VISITS'}
+              </span>
+              <h1>{isVehicleHistory ? 'Service History' : 'My Bookings'}</h1>
+              <p>
+                {isVehicleHistory
+                  ? 'Review service appointments and booking details for this vehicle.'
+                  : 'Review your service appointments and booking details.'}
+              </p>
             </div>
             <label className="bookings-filter">
               <span>Filter by status</span>
@@ -527,12 +546,18 @@ function MyBookingsPage({ user, onLogout }) {
               <span className="bookings-empty-icon"><BookingIcon /></span>
               <span className="customer-eyebrow">NO BOOKINGS YET</span>
               <h2 id="bookings-empty-title">
-                {bookingStatus ? 'No bookings match this status.' : 'Your visits will appear here.'}
+                {bookingStatus
+                  ? 'No bookings match this status.'
+                  : isVehicleHistory
+                    ? 'No service history for this vehicle yet.'
+                    : 'Your visits will appear here.'}
               </h2>
               <p>
                 {bookingStatus
                   ? 'Try another status filter to see your booking history.'
-                  : 'When you have a service booking, you can review its details here.'}
+                  : isVehicleHistory
+                    ? 'Completed and upcoming bookings for this vehicle will appear here.'
+                    : 'When you have a service booking, you can review its details here.'}
               </p>
               {bookingStatus && (
                 <button

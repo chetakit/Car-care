@@ -60,6 +60,12 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
         <p className="vehicles-card-location">{vehicle.province}</p>
       )}
       <div className="vehicles-card-actions">
+        <a
+          className="vehicles-edit-button"
+          href={`/customer/vehicles/${vehicle.vehicle_id}/bookings`}
+        >
+          Service history
+        </a>
         <button
           className="vehicles-edit-button"
           onClick={(event) => onEdit(vehicle, event)}
