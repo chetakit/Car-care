@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { ApiError, apiRequest } from '../Admin/api/client.js'
+import CustomerHeader from '../Customer/CustomerHeader.jsx'
+import AuthShowcase from './AuthShowcase.jsx'
 import './auth.css'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -91,87 +93,92 @@ function RegistrationPage({ onNavigate }) {
   }
 
   return (
-    <main className="shared-auth-page">
-      <section aria-labelledby="registration-title" className="shared-auth-card">
-        <div className="shared-auth-brand">
-          <span className="shared-auth-brand-mark">C</span>
-          <span>
-            <strong>Car Care</strong>
-            <small>CREATE YOUR ACCOUNT</small>
-          </span>
+    <>
+      <CustomerHeader bookingAvailable={false} user={null} />
+      <main className="shared-auth-page">
+        <div className="shared-auth-layout">
+          <AuthShowcase />
+          <section aria-labelledby="registration-title" className="shared-auth-card">
+            <span className="shared-auth-kicker">JOIN CAR CARE</span>
+            <h1 id="registration-title">Create your account</h1>
+            <p className="shared-auth-description">
+              Register for a Customer account to book and manage car care services.
+            </p>
+            {error && (
+              <div className="shared-auth-error" role="alert">
+                {error}
+              </div>
+            )}
+            <form className="shared-auth-form" noValidate onSubmit={handleSubmit}>
+              <label>
+                Full name
+                <input
+                  autoComplete="name"
+                  onChange={(event) => {
+                    setFullName(event.target.value)
+                    setError('')
+                  }}
+                  type="text"
+                  value={fullName}
+                />
+              </label>
+              <label>
+                Email address
+                <input
+                  autoComplete="email"
+                  onChange={(event) => {
+                    setEmail(event.target.value)
+                    setError('')
+                  }}
+                  type="email"
+                  value={email}
+                />
+              </label>
+              <label>
+                Phone (optional)
+                <input
+                  autoComplete="tel"
+                  inputMode="numeric"
+                  onChange={(event) => {
+                    setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 10))
+                    setError('')
+                  }}
+                  type="tel"
+                  value={phone}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  autoComplete="new-password"
+                  maxLength={1024}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    setError('')
+                  }}
+                  type="password"
+                  value={password}
+                />
+              </label>
+              <button disabled={submitting} type="submit">
+                {submitting ? 'Creating account…' : 'Create Account'}
+                {!submitting && (
+                  <span aria-hidden="true" className="shared-auth-submit-arrow">
+                    →
+                  </span>
+                )}
+              </button>
+            </form>
+            <p className="shared-auth-account-link">
+              Already have an account?{' '}
+              <a href="/login" onClick={(event) => onNavigate?.(event, '/login')}>
+                Sign in
+              </a>
+            </p>
+          </section>
         </div>
-        <h1 id="registration-title">Create your account</h1>
-        <p className="shared-auth-description">
-          Register for a Customer account to book and manage car care services.
-        </p>
-        {error && (
-          <div className="shared-auth-error" role="alert">
-            {error}
-          </div>
-        )}
-        <form className="shared-auth-form" noValidate onSubmit={handleSubmit}>
-          <label>
-            Full name
-            <input
-              autoComplete="name"
-              onChange={(event) => {
-                setFullName(event.target.value)
-                setError('')
-              }}
-              type="text"
-              value={fullName}
-            />
-          </label>
-          <label>
-            Email address
-            <input
-              autoComplete="email"
-              onChange={(event) => {
-                setEmail(event.target.value)
-                setError('')
-              }}
-              type="email"
-              value={email}
-            />
-          </label>
-          <label>
-            Phone (optional)
-            <input
-              autoComplete="tel"
-              inputMode="numeric"
-              onChange={(event) => {
-                setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 10))
-                setError('')
-              }}
-              type="tel"
-              value={phone}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              autoComplete="new-password"
-              maxLength={1024}
-              onChange={(event) => {
-                setPassword(event.target.value)
-                setError('')
-              }}
-              type="password"
-              value={password}
-            />
-          </label>
-          <button disabled={submitting} type="submit">
-            {submitting ? 'Creating account…' : 'Create Account'}
-          </button>
-        </form>
-        <p className="shared-auth-account-link">
-          Already have an account?{' '}
-          <a href="/login" onClick={(event) => onNavigate?.(event, '/login')}>
-            Sign in
-          </a>
-        </p>
-      </section>
-    </main>
+      </main>
+    </>
   )
 }
 
