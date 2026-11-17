@@ -15,7 +15,12 @@ function AdminSidebar({
         className="admin-brand"
         href="/"
       >
-        <span className="admin-brand-mark">C</span>
+        <span aria-hidden="true" className="admin-brand-mark">
+          <svg fill="none" viewBox="0 0 32 32">
+            <path d="M5 20.5h2.2l2.1-7.1a2.8 2.8 0 0 1 2.7-2h8a2.8 2.8 0 0 1 2.7 2l2.1 7.1H27v4h-2.1v1.7h-3v-1.7H10.1v1.7h-3v-1.7H5v-4Z" />
+            <path d="M9.3 18.2h13.4l-1.5-4.7H10.8l-1.5 4.7ZM10.4 21.3h.1m11 0h.1" />
+          </svg>
+        </span>
         <span className="admin-brand-copy">
           <strong>Car Care</strong>
           <small>ADMINISTRATION</small>

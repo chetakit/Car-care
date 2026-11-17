@@ -415,7 +415,7 @@
   width: 100%;
   padding: 24px;
   place-items: center;
-  background: #f6f8f7;
+  background: #f5f5f3;
 }
 
 .app-session-state {
@@ -431,8 +431,8 @@
 .app-session-spinner {
   width: 22px;
   height: 22px;
-  border: 2px solid #dce7e4;
-  border-top-color: var(--auth-accent);
+  border: 2px solid #e6e6e3;
+  border-top-color: #c62832;
   border-radius: 50%;
   animation: auth-spin 700ms linear infinite;
 }
