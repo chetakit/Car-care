@@ -1,0 +1,34 @@
+.language-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #d5d9dc;
+  border-radius: 999px;
+  background: #f5f6f6;
+}
+
+.language-toggle__option {
+  min-width: 38px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #555d60;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.language-toggle__option[aria-pressed='true'] {
+  background: #fff;
+  color: #146b68;
+  box-shadow: 0 1px 3px rgb(22 43 42 / 16%);
+}
+
+.language-toggle__option:focus-visible {
+  outline: 2px solid #146b68;
+  outline-offset: 2px;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import {
@@ -58,12 +59,13 @@ function findUpcomingBooking(bookings, now = new Date()) {
     })[0] ?? null
 }
 
-function vehicleName(vehicle) {
-  return [vehicle?.brand_name, vehicle?.model_name].filter(Boolean).join(' ') || 'Vehicle'
+function vehicleName(vehicle, unavailableLabel) {
+  return [vehicle?.brand_name, vehicle?.model_name].filter(Boolean).join(' ') || unavailableLabel
 }
 
 function CustomerDashboardPage({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
+  const { language, t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -124,7 +126,8 @@ function CustomerDashboardPage({ user, onLogout }) {
     return () => controller.abort()
   }, [api, bookingReload])
 
-  const firstName = user?.full_name?.trim().split(/\s+/)[0] || 'there'
+  const firstName =
+    user?.full_name?.trim().split(/\s+/)[0] || (language === 'TH' ? 'คุณ' : 'there')
 
   return (
     <div className="customer-home customer-dashboard">
@@ -134,12 +137,12 @@ function CustomerDashboardPage({ user, onLogout }) {
         <div className="customer-container">
           <header className="dashboard-heading">
             <div>
-              <span className="customer-eyebrow">YOUR CAR CARE</span>
-              <h1>Welcome, {firstName}.</h1>
-              <p>Manage your vehicles and appointments, or plan your next visit.</p>
+              <span className="customer-eyebrow">{t('customer.dashboard.eyebrow')}</span>
+              <h1>{t('customer.dashboard.welcome', { name: firstName })}</h1>
+              <p>{t('customer.dashboard.intro')}</p>
             </div>
             <a className="customer-button customer-button-primary" href="/customer/booking">
-              Book a Service
+              {t('customer.common.bookService')}
               <span aria-hidden="true">→</span>
             </a>
           </header>
@@ -148,11 +151,15 @@ function CustomerDashboardPage({ user, onLogout }) {
             <section aria-labelledby="dashboard-vehicles-title" className="dashboard-section">
               <header className="dashboard-section-heading">
                 <div>
-                  <span className="customer-eyebrow">YOUR GARAGE</span>
-                  <h2 id="dashboard-vehicles-title">Your vehicles</h2>
+                  <span className="customer-eyebrow">
+                    {t('customer.vehicles.eyebrow')}
+                  </span>
+                  <h2 id="dashboard-vehicles-title">
+                    {t('customer.dashboard.yourVehicles')}
+                  </h2>
                 </div>
                 <a className="dashboard-section-link" href="/customer/vehicles">
-                  Manage vehicles
+                  {t('customer.dashboard.manageVehicles')}
                   <span aria-hidden="true">→</span>
                 </a>
               </header>
@@ -160,12 +167,12 @@ function CustomerDashboardPage({ user, onLogout }) {
               {vehicleState === 'loading' && (
                 <div aria-live="polite" className="dashboard-state">
                   <span className="customer-loader" />
-                  <span>Loading your vehicles…</span>
+                  <span>{t('customer.dashboard.loadingVehicles')}</span>
                 </div>
               )}
               {vehicleState === 'error' && (
                 <div className="dashboard-state dashboard-state-error" role="alert">
-                  <p>We couldn’t load your vehicles.</p>
+                  <p>{t('customer.dashboard.loadVehiclesError')}</p>
                   <button
                     onClick={() => {
                       setVehicleState('loading')
@@ -173,16 +180,18 @@ function CustomerDashboardPage({ user, onLogout }) {
                     }}
                     type="button"
                   >
-                    Try again
+                    {t('customer.common.retry')}
                   </button>
                 </div>
               )}
               {vehicleState === 'empty' && (
                 <div className="dashboard-state dashboard-state-empty">
                   <p>
-                    Add a vehicle to see services and prices that fit it when you book.
+                    {t('customer.dashboard.vehicleEmpty')}
                   </p>
-                  <a href="/customer/vehicles">Add your first vehicle</a>
+                  <a href="/customer/vehicles">
+                    {t('customer.dashboard.addFirstVehicle')}
+                  </a>
                 </div>
               )}
               {vehicleState === 'ready' && (
@@ -190,22 +199,28 @@ function CustomerDashboardPage({ user, onLogout }) {
                   {vehicles.slice(0, 3).map((vehicle) => (
                     <li key={vehicle.vehicle_id}>
                       <div>
-                        <strong>{vehicleName(vehicle)}</strong>
+                        <strong>
+                          {vehicleName(vehicle, t('customer.common.notAvailable'))}
+                        </strong>
                         <span>
                           {[vehicle.type_name, vehicle.production_year]
                             .filter(Boolean)
-                            .join(' · ') || 'Vehicle details'}
+                            .join(' · ') || t('customer.dashboard.vehicleDetails')}
                         </span>
                       </div>
                       <span className="dashboard-license-plate">
-                        {vehicle.license_plate || 'Plate not listed'}
+                        {vehicle.license_plate || t('customer.dashboard.plateNotListed')}
                       </span>
                     </li>
                   ))}
                   {vehicles.length > 3 && (
                     <li className="dashboard-more-vehicles">
-                      <span>{vehicles.length - 3} more vehicles</span>
-                      <a href="/customer/vehicles">View all</a>
+                      <span>
+                        {t('customer.dashboard.moreVehicles', {
+                          count: vehicles.length - 3,
+                        })}
+                      </span>
+                      <a href="/customer/vehicles">{t('customer.dashboard.viewAll')}</a>
                     </li>
                   )}
                 </ul>
@@ -215,11 +230,15 @@ function CustomerDashboardPage({ user, onLogout }) {
             <section aria-labelledby="dashboard-upcoming-title" className="dashboard-section">
               <header className="dashboard-section-heading">
                 <div>
-                  <span className="customer-eyebrow">YOUR NEXT VISIT</span>
-                  <h2 id="dashboard-upcoming-title">Upcoming booking</h2>
+                  <span className="customer-eyebrow">
+                    {t('customer.dashboard.nextVisit')}
+                  </span>
+                  <h2 id="dashboard-upcoming-title">
+                    {t('customer.dashboard.upcomingBooking')}
+                  </h2>
                 </div>
                 <a className="dashboard-section-link" href="/customer/bookings">
-                  My Bookings
+                  {t('customer.common.myBookings')}
                   <span aria-hidden="true">→</span>
                 </a>
               </header>
@@ -227,12 +246,12 @@ function CustomerDashboardPage({ user, onLogout }) {
               {bookingState === 'loading' && (
                 <div aria-live="polite" className="dashboard-state">
                   <span className="customer-loader" />
-                  <span>Checking your bookings…</span>
+                  <span>{t('customer.dashboard.loadingBookings')}</span>
                 </div>
               )}
               {bookingState === 'error' && (
                 <div className="dashboard-state dashboard-state-error" role="alert">
-                  <p>We couldn’t load your bookings.</p>
+                  <p>{t('customer.dashboard.loadBookingsError')}</p>
                   <button
                     onClick={() => {
                       setBookingState('loading')
@@ -240,23 +259,26 @@ function CustomerDashboardPage({ user, onLogout }) {
                     }}
                     type="button"
                   >
-                    Try again
+                    {t('customer.common.retry')}
                   </button>
                 </div>
               )}
               {bookingState === 'ready' && upcomingBooking && (
                 <article className="dashboard-upcoming">
                   <p className="dashboard-upcoming-date">
-                    {formatCustomerDate(upcomingBooking.booking_date)}
+                    {formatCustomerDate(upcomingBooking.booking_date, language)}
                   </p>
                   <p className="dashboard-upcoming-time">
-                    {formatCustomerTime(upcomingBooking.start_time)}
+                    {formatCustomerTime(upcomingBooking.start_time, language)}
                     {upcomingBooking.end_time &&
-                      ` – ${formatCustomerTime(upcomingBooking.end_time)}`}
+                      ` – ${formatCustomerTime(upcomingBooking.end_time, language)}`}
                   </p>
                   <div className="dashboard-upcoming-details">
                     <span>
-                      {vehicleName(upcomingBooking.vehicle)}
+                      {vehicleName(
+                        upcomingBooking.vehicle,
+                        t('customer.common.notAvailable'),
+                      )}
                       {upcomingBooking.vehicle?.license_plate
                         ? ` · ${upcomingBooking.vehicle.license_plate}`
                         : ''}
@@ -268,21 +290,25 @@ function CustomerDashboardPage({ user, onLogout }) {
                             .map((service) => service.service_name)
                             .filter(Boolean)
                             .join(', ')
-                        : 'Service details unavailable'}
+                        : t('customer.dashboard.serviceDetailsUnavailable')}
                     </span>
                   </div>
-                  <a href="/customer/bookings">View booking details</a>
+                  <a href="/customer/bookings">
+                    {t('customer.dashboard.viewBookingDetails')}
+                  </a>
                 </article>
               )}
               {bookingState === 'ready' && !upcomingBooking && (
                 <div className="dashboard-state dashboard-state-empty">
                   <p>
                     {hasMoreBookings
-                      ? 'No upcoming visit was found in your recent bookings.'
-                      : 'You have no upcoming bookings.'}
+                      ? t('customer.dashboard.noUpcomingRecent')
+                      : t('customer.dashboard.noUpcoming')}
                   </p>
                   <a href={hasMoreBookings ? '/customer/bookings' : '/customer/booking'}>
-                    {hasMoreBookings ? 'Review all bookings' : 'Book a Service'}
+                    {hasMoreBookings
+                      ? t('customer.dashboard.reviewBookings')
+                      : t('customer.common.bookService')}
                   </a>
                 </div>
               )}

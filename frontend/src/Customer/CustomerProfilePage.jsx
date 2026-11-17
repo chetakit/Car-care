@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ApiError, createApiClient } from '../Admin/api/client.js'
+import { createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
 import './customer.css'
@@ -16,6 +17,7 @@ function isProfileResponse(user) {
 
 function CustomerProfilePage({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
+  const { t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -46,7 +48,7 @@ function CustomerProfilePage({ user, onLogout }) {
       })
       .catch((error) => {
         if (error.name === 'AbortError') return
-        setLoadError('We couldn’t load your profile. Check your connection and try again.')
+        setLoadError('customer.profile.loadError')
         setProfileState('error')
       })
 
@@ -74,13 +76,9 @@ function CustomerProfilePage({ user, onLogout }) {
       setProfile(nextProfile)
       setFullName(nextProfile.full_name)
       setPhone(nextProfile.phone ?? '')
-      setNotice('Your profile has been saved.')
-    } catch (error) {
-      setSaveError(
-        error instanceof ApiError
-          ? error.message
-          : error.message || 'Unable to save your profile. Please try again.',
-      )
+      setNotice('customer.profile.saved')
+    } catch {
+      setSaveError('customer.profile.saveError')
     } finally {
       setSaving(false)
     }
@@ -91,28 +89,31 @@ function CustomerProfilePage({ user, onLogout }) {
       <CustomerHeader onLogout={onLogout} user={user} />
       <main className="profile-main">
         <div className="customer-container">
-          <nav aria-label="Breadcrumb" className="profile-breadcrumb">
-            <a href="/customer">Home</a>
+          <nav
+            aria-label={t('customer.profile.breadcrumbLabel')}
+            className="profile-breadcrumb"
+          >
+            <a href="/customer">{t('customer.profile.breadcrumb')}</a>
             <span aria-hidden="true">/</span>
-            <span aria-current="page">My Profile</span>
+            <span aria-current="page">{t('customer.profile.title')}</span>
           </nav>
 
           <header className="profile-heading">
-            <span className="customer-eyebrow">YOUR ACCOUNT</span>
-            <h1>My Profile</h1>
-            <p>Review and update your contact details.</p>
+            <span className="customer-eyebrow">{t('customer.profile.eyebrow')}</span>
+            <h1>{t('customer.profile.title')}</h1>
+            <p>{t('customer.profile.description')}</p>
           </header>
 
           {profileState === 'loading' && (
             <div aria-live="polite" className="profile-state">
               <span className="customer-loader" />
-              Loading your profile…
+              {t('customer.profile.loading')}
             </div>
           )}
 
           {profileState === 'error' && (
             <div className="profile-state profile-error" role="alert">
-              <p>{loadError}</p>
+              <p>{t(loadError)}</p>
               <button
                 onClick={() => {
                   setProfileState('loading')
@@ -120,7 +121,7 @@ function CustomerProfilePage({ user, onLogout }) {
                 }}
                 type="button"
               >
-                Try again
+                {t('customer.common.retry')}
               </button>
             </div>
           )}
@@ -128,20 +129,22 @@ function CustomerProfilePage({ user, onLogout }) {
           {profileState === 'ready' && profile && (
             <section aria-labelledby="profile-form-title" className="profile-card">
               <div className="profile-card-heading">
-                <h2 id="profile-form-title">Personal details</h2>
-                <p>Only your name and phone number can be changed here.</p>
+                <h2 id="profile-form-title">{t('customer.profile.details')}</h2>
+                <p>{t('customer.profile.editNotice')}</p>
               </div>
 
               {notice && (
-                <p className="profile-notice" role="status">{notice}</p>
+                <p className="profile-notice" role="status">{t(notice)}</p>
               )}
               {saveError && (
-                <p className="profile-error" role="alert">{saveError}</p>
+                <p className="profile-error" role="alert">
+                  {saveError === 'customer.profile.saveError' ? t(saveError) : saveError}
+                </p>
               )}
 
               <form className="profile-form" onSubmit={saveProfile}>
                 <label className="profile-field">
-                  <span>Full name</span>
+                  <span>{t('customer.profile.fullName')}</span>
                   <input
                     autoComplete="name"
                     maxLength={100}
@@ -152,7 +155,7 @@ function CustomerProfilePage({ user, onLogout }) {
                 </label>
 
                 <label className="profile-field">
-                  <span>Email address</span>
+                  <span>{t('customer.profile.email')}</span>
                   <input
                     autoComplete="email"
                     readOnly
@@ -161,7 +164,7 @@ function CustomerProfilePage({ user, onLogout }) {
                 </label>
 
                 <label className="profile-field">
-                  <span>Phone number</span>
+                  <span>{t('customer.profile.phone')}</span>
                   <input
                     autoComplete="tel"
                     maxLength={20}
@@ -176,7 +179,9 @@ function CustomerProfilePage({ user, onLogout }) {
                     disabled={saving}
                     type="submit"
                   >
-                    {saving ? 'Saving…' : 'Save changes'}
+                    {saving
+                      ? t('customer.common.saving')
+                      : t('customer.profile.saveChanges')}
                   </button>
                 </div>
               </form>

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminAccountMenu from '../Admin/components/AdminAccountMenu.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import './customer-theme.css'
 
 export function BrandMark() {
@@ -14,6 +16,7 @@ export function BrandMark() {
 }
 
 function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage = false }) {
+  const { t } = useLanguage()
   const [profileOpen, setProfileOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const profileRef = useRef(null)
@@ -33,6 +36,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   const aboutHref = isPublicLanding ? '#about' : '/#about'
   const howItWorksHref = isPublicLanding ? '#how-it-works' : '/#how-it-works'
   const contactHref = isPublicLanding ? '#contact' : '/#contact'
+  const customerLabel = (key, fallback) => (isCustomer ? t(key) : fallback)
 
   useEffect(() => {
     if (!profileOpen) return undefined
@@ -63,14 +67,23 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   return (
     <header className={`customer-header${useLandingNavigation ? ' customer-header-landing' : ''}${isCustomer ? ' customer-header-customer' : ''}`}>
       <div className="customer-container customer-header-inner">
-        <a aria-label="Car Care home" className="customer-brand" href={homeHref}>
+        <a
+          aria-label={customerLabel('customer.header.home', 'Car Care home')}
+          className="customer-brand"
+          href={homeHref}
+        >
           <BrandMark />
           <span className="customer-brand-name">Car Care</span>
         </a>
 
         <button
           aria-expanded={mobileNavOpen}
-          aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+          aria-label={customerLabel(
+            mobileNavOpen
+              ? 'customer.header.closeNavigation'
+              : 'customer.header.openNavigation',
+            mobileNavOpen ? 'Close navigation' : 'Open navigation',
+          )}
           aria-controls="customer-main-navigation"
           className={`customer-menu-toggle${mobileNavOpen ? ' is-open' : ''}`}
           onClick={() => setMobileNavOpen((open) => !open)}
@@ -81,23 +94,31 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
         </button>
 
         <nav
-          aria-label="Main navigation"
+          aria-label={customerLabel('customer.header.mainNavigation', 'Main navigation')}
           className={`customer-nav${mobileNavOpen ? ' is-open' : ''}`}
           id="customer-main-navigation"
         >
           {useLandingNavigation ? (
             <>
-              <a href={homeHref} onClick={closeMobileNav}>Home</a>
-              <a href={servicesHref} onClick={closeMobileNav}>Our Services</a>
-              <a href={howItWorksHref} onClick={closeMobileNav}>How It Works</a>
-              <a href={contactHref} onClick={closeMobileNav}>Contact</a>
+              <a href={homeHref} onClick={closeMobileNav}>
+                {customerLabel('customer.header.home', 'Home')}
+              </a>
+              <a href={servicesHref} onClick={closeMobileNav}>
+                {customerLabel('customer.header.ourServices', 'Our Services')}
+              </a>
+              <a href={howItWorksHref} onClick={closeMobileNav}>
+                {customerLabel('customer.header.howItWorks', 'How It Works')}
+              </a>
+              <a href={contactHref} onClick={closeMobileNav}>
+                {customerLabel('customer.header.contact', 'Contact')}
+              </a>
               {bookingAvailable && (
                 <a
                   className="customer-nav-book"
                   href="/customer/booking"
                   onClick={closeMobileNav}
                 >
-                  Book a Service
+                  {customerLabel('customer.header.bookService', 'Book a Service')}
                 </a>
               )}
             </>
@@ -105,12 +126,14 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
             <>
               {user?.role === 'CUSTOMER' ? (
                 <>
-                  <a href={homeHref} onClick={closeMobileNav}>Home</a>
+                  <a href={homeHref} onClick={closeMobileNav}>
+                    {customerLabel('customer.header.home', 'Home')}
+                  </a>
                   <a
                     href="/customer/booking"
                     onClick={closeMobileNav}
                   >
-                    Book a Service
+                    {customerLabel('customer.header.bookService', 'Book a Service')}
                   </a>
                 </>
               ) : (
@@ -131,6 +154,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
               )}
             </>
           )}
+          {isCustomer && <LanguageToggle />}
         </nav>
 
         {isAdmin ? (
@@ -162,10 +186,22 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
                     <strong>{displayName}</strong>
                     {user.email && <span>{user.email}</span>}
                   </div>
-                  {user.role === 'CUSTOMER' && <a href="/customer/profile">My Profile</a>}
-                  <a href="/customer/vehicles">My Vehicles</a>
-                  <a href="/customer/bookings">My Bookings</a>
-                  {user.role === 'CUSTOMER' && <a href="/customer/wallet">My Wallet</a>}
+                  {user.role === 'CUSTOMER' && (
+                    <a href="/customer/profile">
+                      {customerLabel('customer.header.myProfile', 'My Profile')}
+                    </a>
+                  )}
+                  <a href="/customer/vehicles">
+                    {customerLabel('customer.header.myVehicles', 'My Vehicles')}
+                  </a>
+                  <a href="/customer/bookings">
+                    {customerLabel('customer.header.myBookings', 'My Bookings')}
+                  </a>
+                  {user.role === 'CUSTOMER' && (
+                    <a href="/customer/wallet">
+                      {customerLabel('customer.header.myWallet', 'My Wallet')}
+                    </a>
+                  )}
                   <button
                     onClick={() => {
                       setProfileOpen(false)
@@ -173,7 +209,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
                     }}
                     type="button"
                   >
-                    Sign out
+                    {customerLabel('customer.header.signOut', 'Sign out')}
                   </button>
                 </div>
               </>

@@ -14,6 +14,7 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
+import { LanguageProvider } from './i18n/LanguageContext.jsx'
 // [STAFF] หน้าพนักงาน (Staff & Service Management) — แทน StaffDashboard เดิม
 import StaffApp from './Staff/StaffApp.jsx'
 // [STAFF][MOCK] true เมื่อตั้ง VITE_STAFF_MOCK=true ใน frontend/.env.local
@@ -277,9 +278,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </LanguageProvider>
   )
 }
 
