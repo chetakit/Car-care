@@ -89,11 +89,23 @@ function CustomerLanding({ user, onLogout }) {
     return () => controller.abort()
   }, [api, catalogPath, serviceReload])
 
+  // Links such as /#about arrive before React has drawn the sections, so the
+  // browser cannot jump to them. Scroll once the services above have loaded
+  // (they change the page height).
+  useEffect(() => {
+    if (serviceState === 'loading') return undefined
+    const targetId = decodeURIComponent(window.location.hash.slice(1))
+    if (!targetId) return undefined
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [serviceState])
+
   return (
     <div className="customer-home customer-landing">
       <CustomerHeader
         bookingAvailable={serviceState !== 'empty'}
-        landingPage
         onLogout={onLogout}
         user={user}
       />

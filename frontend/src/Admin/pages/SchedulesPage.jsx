@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import AdminModal from '../components/AdminModal.jsx'
-import { DataTable, PageHeading, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
+import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
+import usePagedRows from '../hooks/usePagedRows.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDate } from '../utils/formatDate.js'
+import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 function getToday() {
   const date = new Date()
@@ -22,6 +24,7 @@ function addDays(dateValue, days) {
   const nextDay = String(date.getDate()).padStart(2, '0')
   return `${nextYear}-${nextMonth}-${nextDay}`
 }
+
 
 function formatTime(value) {
   return value ? String(value).slice(0, 5) : '—'
@@ -45,6 +48,7 @@ function SchedulesPage() {
     `/api/admin/schedules?${query}`,
   )
   const rows = data?.items ?? []
+  const { pageRows, pagination, setPage } = usePagedRows(rows, ADMIN_PAGE_SIZE, query)
 
   function applyFilters(event) {
     event.preventDefault()
@@ -185,9 +189,10 @@ function SchedulesPage() {
               },
             ]}
             rowKey={(row) => row.schedule_id}
-            rows={rows}
+            rows={pageRows}
           />
         )}
+        {!loading && !error && <Pagination onPageChange={setPage} pagination={pagination} />}
       </section>
       {editingSchedule && (
         <AdminModal

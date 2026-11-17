@@ -50,6 +50,15 @@ export function RequestState({
 
 export function Pagination({ pagination, onPageChange }) {
   if (!pagination || pagination.totalPages <= 1) return null
+
+  // Changing page brings the top of the table back into view instead of
+  // leaving the reader at the bottom of the new page.
+  function goTo(event, nextPage) {
+    onPageChange(nextPage)
+    const panel = event.currentTarget.closest('.admin-panel') ?? event.currentTarget.parentElement
+    window.requestAnimationFrame(() => panel?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+  }
+
   return (
     <div aria-label="Pagination" className="admin-pagination">
       <span>
@@ -58,14 +67,14 @@ export function Pagination({ pagination, onPageChange }) {
       <div>
         <button
           disabled={pagination.page <= 1}
-          onClick={() => onPageChange(pagination.page - 1)}
+          onClick={(event) => goTo(event, pagination.page - 1)}
           type="button"
         >
           Previous
         </button>
         <button
           disabled={pagination.page >= pagination.totalPages}
-          onClick={() => onPageChange(pagination.page + 1)}
+          onClick={(event) => goTo(event, pagination.page + 1)}
           type="button"
         >
           Next

@@ -6,6 +6,7 @@ import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDate, formatDateTime } from '../utils/formatDate.js'
 import formatStatusLabel from '../utils/formatStatusLabel.js'
 import formatMoney from '../utils/formatMoney.js'
+import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 const REFUNDS_PAGE_SIZE = 100
 const MAX_BOOKING_ID = 2147483647
@@ -110,7 +111,7 @@ function BookingsPage({ onNavigate }) {
   const [cancelMessage, setCancelMessage] = useState('')
   const api = useApi()
   const autoOpenAttempted = useRef(false)
-  const params = new URLSearchParams({ page: String(page), limit: '20' })
+  const params = new URLSearchParams({ page: String(page), limit: String(ADMIN_PAGE_SIZE) })
   new URLSearchParams(query).forEach((value, key) => params.set(key, value))
   const { data, loading, error, refresh } = useRemoteData(`/api/admin/bookings?${params}`)
   const rows = data?.items ?? []

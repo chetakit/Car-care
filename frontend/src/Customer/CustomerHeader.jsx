@@ -15,7 +15,7 @@ export function BrandMark() {
   )
 }
 
-function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage = false }) {
+function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
   const { t } = useLanguage()
   const [profileOpen, setProfileOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -27,13 +27,10 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   const initials = displayName.slice(0, 1).toUpperCase()
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isPublicLanding = currentPath === '/'
-  const isBookingPage = currentPath === '/customer/booking'
   const isCustomer = user?.role === 'CUSTOMER'
-  const useLandingNavigation = landingPage || isCustomer
   const profileTriggerRef = useRef(null)
   const homeHref = '/'
   const servicesHref = '/services'
-  const aboutHref = isPublicLanding ? '#about' : '/#about'
   const howItWorksHref = isPublicLanding ? '#how-it-works' : '/#how-it-works'
   const contactHref = isPublicLanding ? '#contact' : '/#contact'
   const customerLabel = (key, fallback) => (isCustomer ? t(key) : fallback)
@@ -65,7 +62,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
   }
 
   return (
-    <header className={`customer-header${useLandingNavigation ? ' customer-header-landing' : ''}${isCustomer ? ' customer-header-customer' : ''}`}>
+    <header className={`customer-header customer-header-landing${isCustomer ? ' customer-header-customer' : ''}`}>
       <div className="customer-container customer-header-inner">
         <a
           aria-label={customerLabel('customer.header.home', 'Car Care home')}
@@ -98,61 +95,27 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true, landingPage =
           className={`customer-nav${mobileNavOpen ? ' is-open' : ''}`}
           id="customer-main-navigation"
         >
-          {useLandingNavigation ? (
-            <>
-              <a href={homeHref} onClick={closeMobileNav}>
-                {customerLabel('customer.header.home', 'Home')}
-              </a>
-              <a href={servicesHref} onClick={closeMobileNav}>
-                {customerLabel('customer.header.ourServices', 'Our Services')}
-              </a>
-              <a href={howItWorksHref} onClick={closeMobileNav}>
-                {customerLabel('customer.header.howItWorks', 'How It Works')}
-              </a>
-              <a href={contactHref} onClick={closeMobileNav}>
-                {customerLabel('customer.header.contact', 'Contact')}
-              </a>
-              {bookingAvailable && (
-                <a
-                  className="customer-nav-book"
-                  href="/customer/booking"
-                  onClick={closeMobileNav}
-                >
-                  {customerLabel('customer.header.bookService', 'Book a Service')}
-                </a>
-              )}
-            </>
-          ) : (
-            <>
-              {user?.role === 'CUSTOMER' ? (
-                <>
-                  <a href={homeHref} onClick={closeMobileNav}>
-                    {customerLabel('customer.header.home', 'Home')}
-                  </a>
-                  <a
-                    href="/customer/booking"
-                    onClick={closeMobileNav}
-                  >
-                    {customerLabel('customer.header.bookService', 'Book a Service')}
-                  </a>
-                </>
-              ) : (
-                <>
-                  <a href={homeHref} onClick={closeMobileNav}>Home</a>
-                  <a href={servicesHref} onClick={closeMobileNav}>Services</a>
-                  <a href={aboutHref} onClick={closeMobileNav}>About</a>
-                </>
-              )}
-              {user?.role !== 'CUSTOMER' && (isPublicLanding || isBookingPage) && bookingAvailable && (
-                <a
-                  className="customer-nav-book"
-                  href="/customer/booking"
-                  onClick={closeMobileNav}
-                >
-                  Book a Service
-                </a>
-              )}
-            </>
+          {/* One menu on every page and for every role (guest, customer, admin). */}
+          <a href={homeHref} onClick={closeMobileNav}>
+            {customerLabel('customer.header.home', 'Home')}
+          </a>
+          <a href={servicesHref} onClick={closeMobileNav}>
+            {customerLabel('customer.header.ourServices', 'Our Services')}
+          </a>
+          <a href={howItWorksHref} onClick={closeMobileNav}>
+            {customerLabel('customer.header.howItWorks', 'How It Works')}
+          </a>
+          <a href={contactHref} onClick={closeMobileNav}>
+            {customerLabel('customer.header.contact', 'Contact')}
+          </a>
+          {bookingAvailable && (
+            <a
+              className="customer-nav-book"
+              href="/customer/booking"
+              onClick={closeMobileNav}
+            >
+              {customerLabel('customer.header.bookService', 'Book a Service')}
+            </a>
           )}
           {isCustomer && <LanguageToggle />}
         </nav>

@@ -5,6 +5,7 @@ import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
+import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 const blankCoupon = {
   coupon_code: '',
@@ -20,7 +21,7 @@ const blankCoupon = {
 
 function CouponUsages({ couponId, onClose }) {
   const [page, setPage] = useState(1)
-  const params = new URLSearchParams({ page: String(page), limit: '20' })
+  const params = new URLSearchParams({ page: String(page), limit: String(ADMIN_PAGE_SIZE) })
   const { data, loading, error, refresh } = useRemoteData(
     `/api/admin/coupons/${couponId}/usages?${params}`,
   )
@@ -68,7 +69,7 @@ function CouponsPage() {
   const [message, setMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const api = useApi()
-  const params = new URLSearchParams({ page: String(page), limit: '20', ...applied })
+  const params = new URLSearchParams({ page: String(page), limit: String(ADMIN_PAGE_SIZE), ...applied })
   const { data, loading, error, refresh } = useRemoteData(`/api/admin/coupons?${params}`)
   const rows = data?.items ?? []
 

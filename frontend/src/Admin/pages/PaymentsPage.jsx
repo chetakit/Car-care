@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DataTable, PageHeading, PaymentStatusBadge, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
+import { DataTable, PageHeading, Pagination, PaymentStatusBadge, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDateTime } from '../utils/formatDate.js'
@@ -51,7 +51,8 @@ const QUEUE_TABS = [
 // Recent bookings by payment status, so an Admin can pick one instead of typing its ID.
 function PaymentQueue({ onOpen, selectedId }) {
   const [tab, setTab] = useState('PENDING')
-  const params = new URLSearchParams({ payment_status: tab, page: '1', limit: '8', sort: 'newest' })
+  const [page, setPage] = useState(1)
+  const params = new URLSearchParams({ payment_status: tab, page: String(page), limit: '10', sort: 'newest' })
   const { data, loading, error, refresh } = useRemoteData(`/api/admin/bookings?${params}`)
   const rows = data?.items ?? []
   const current = QUEUE_TABS.find((item) => item.status === tab)
@@ -64,7 +65,7 @@ function PaymentQueue({ onOpen, selectedId }) {
         </div>
         <div aria-label="Payment status" className="admin-tabs">
           {QUEUE_TABS.map((item) => (
-            <button aria-pressed={tab === item.status} className={tab === item.status ? 'is-selected' : ''} key={item.status} onClick={() => setTab(item.status)} type="button">
+            <button aria-pressed={tab === item.status} className={tab === item.status ? 'is-selected' : ''} key={item.status} onClick={() => { setTab(item.status); setPage(1) }} type="button">
               {item.label}
             </button>
           ))}
@@ -92,6 +93,7 @@ function PaymentQueue({ onOpen, selectedId }) {
           rows={rows}
         />
       )}
+      {!loading && !error && <Pagination onPageChange={setPage} pagination={data?.pagination} />}
     </section>
   )
 }

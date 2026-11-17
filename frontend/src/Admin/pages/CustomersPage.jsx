@@ -5,6 +5,7 @@ import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDate, formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
+import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 const BOOKING_PAGE_SIZE = 10
 const WALLET_TRANSACTION_PAGE_SIZE = 10
@@ -63,7 +64,7 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
 
   const params = new URLSearchParams({
     page: String(page),
-    limit: '20',
+    limit: String(ADMIN_PAGE_SIZE),
     role,
   })
   if (appliedSearch) params.set('search', appliedSearch)
@@ -442,11 +443,11 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
             <DataTable
               columns={[
                 { key: 'user_id', label: 'User ID', render: (row) => `#${row.user_id}` },
-                { key: 'full_name', label: 'Full name' },
+                { key: 'full_name', label: 'Full name', wrap: true },
                 { key: 'email', label: 'Email' },
                 { key: 'phone', label: 'Phone' },
                 { key: 'created_at', label: 'Registered', render: (row) => formatDate(row.created_at) },
-                { key: 'status', label: 'Account status', render: (row) => <StatusBadge value={row.status} /> },
+                { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
                 {
                   key: 'actions',
                   label: 'Actions',

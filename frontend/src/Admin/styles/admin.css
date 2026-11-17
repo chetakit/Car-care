@@ -1582,8 +1582,8 @@
 .status-pending-payment, .status-pending, .status-refund-pending { color: #94520f; background: #fdf0e1; }
 .status-confirmed { color: #2a5c96; background: #e9f1fb; }
 .status-checked-in, .status-in-service { color: #806126; background: #fbf5e8; }
-.status-active, .status-paid, .status-completed, .status-credit { color: #2f684d; background: #edf7f0; }
-.status-inactive, .status-failed, .status-cancelled, .status-no-show, .status-refund-failed { color: #8b4540; background: #fff1ef; }
+.status-active, .status-available, .status-paid, .status-completed, .status-credit { color: #2f684d; background: #edf7f0; }
+.status-inactive, .status-closed, .status-failed, .status-cancelled, .status-no-show, .status-refund-failed { color: #8b4540; background: #fff1ef; }
 .status-refunded { color: #5e4596; background: #f2eefb; }
 .status-debit { color: #596671; background: #f0f2f3; }
 .admin-payment-method-note { margin-left: 6px; color: var(--admin-muted); font-size: 11px; white-space: nowrap; }
@@ -2049,3 +2049,26 @@
 .admin-payment-queue { margin: 16px 0; }
 .admin-payment-queue .admin-panel-heading { flex-wrap: wrap; gap: 12px; }
 .admin-booking-link[aria-current="true"] { border-color: var(--admin-accent); color: var(--admin-accent-dark); }
+
+/* Reports */
+.admin-report-ranges { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.admin-report-ranges button { min-height: 36px; padding: 0 14px; border: 1px solid var(--admin-border); border-radius: 999px; color: var(--admin-ink); background: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.admin-report-ranges button.is-selected { border-color: var(--admin-accent); color: #fff; background: var(--admin-accent); }
+.admin-report-range-label { margin: 0 0 14px; color: var(--admin-muted); font-size: 13px; }
+.admin-report-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.admin-report-stats article { display: grid; gap: 4px; padding: 16px 18px; border: 1px solid var(--admin-border); border-radius: 10px; background: #fff; }
+.admin-report-stats span { color: var(--admin-muted); font-size: 12px; font-weight: 600; }
+.admin-report-stats strong { color: var(--admin-ink); font-size: 26px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.admin-report-stats small { color: var(--admin-muted); font-size: 12px; }
+.admin-report-panel { margin-bottom: 16px; }
+.admin-status-bars { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.admin-status-bars li { display: grid; grid-template-columns: 150px minmax(0, 1fr) 90px; align-items: center; gap: 12px; }
+.admin-status-bars li.is-empty { opacity: 0.55; }
+.admin-status-bars-track { height: 10px; border-radius: 999px; background: #f0f2f3; overflow: hidden; }
+.admin-status-bars-track span { display: block; height: 100%; min-width: 0; border-radius: 999px; background: var(--admin-accent); }
+.admin-status-bars-value { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-status-bars-value small { color: var(--admin-muted); }
+@media (max-width: 640px) {
+  .admin-status-bars li { grid-template-columns: 1fr auto; }
+  .admin-status-bars-track { grid-column: 1 / -1; grid-row: 2; }
+}

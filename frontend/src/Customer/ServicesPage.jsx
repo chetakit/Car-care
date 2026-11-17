@@ -35,7 +35,6 @@ function ServicesPage({ user, onLogout }) {
     <div className="customer-home customer-services-page">
       <CustomerHeader
         bookingAvailable={serviceState !== 'empty'}
-        landingPage
         onLogout={onLogout}
         user={user}
       />

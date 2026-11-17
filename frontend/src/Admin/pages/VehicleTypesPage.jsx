@@ -4,6 +4,7 @@ import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '.
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDateTime } from '../utils/formatDate.js'
+import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 const blankForm = { type_name: '', description: '' }
 
@@ -18,7 +19,7 @@ function VehicleTypesPage({ onNavigate }) {
   const [message, setMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const api = useApi()
-  const params = new URLSearchParams({ page: String(page), limit: '20', ...applied })
+  const params = new URLSearchParams({ page: String(page), limit: String(ADMIN_PAGE_SIZE), ...applied })
   const { data, loading, error, refresh } = useRemoteData(`/api/admin/vehicle-types?${params}`)
   const rows = data?.items ?? []
 

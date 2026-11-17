@@ -4,6 +4,7 @@ import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '.
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import formatMoney from '../utils/formatMoney.js'
+import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 const initialForm = { service_name: '', description: '', duration_minutes: '' }
 const VEHICLE_TYPE_PAGE_SIZE = 100
@@ -339,7 +340,7 @@ function ServicesPage() {
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const api = useApi()
-  const params = new URLSearchParams({ page: String(page), limit: '20' })
+  const params = new URLSearchParams({ page: String(page), limit: String(ADMIN_PAGE_SIZE) })
   if (appliedSearch) params.set('search', appliedSearch)
   const { data, loading, error, refresh } = useRemoteData(`/api/admin/services?${params}`)
   const rows = data?.items ?? []
