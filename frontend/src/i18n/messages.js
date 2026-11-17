@@ -17,6 +17,79 @@ const phaseOneMessages = {
   },
 }
 
+const authTranslations = {
+  'auth.login.eyebrow': { TH: 'เข้าสู่ระบบอย่างปลอดภัย', EN: 'SECURE ACCESS' },
+  'auth.login.title': { TH: 'ยินดีต้อนรับกลับ', EN: 'Welcome back' },
+  'auth.login.description': {
+    TH: 'เข้าสู่ระบบด้วยบัญชี Car Care เพื่อดำเนินการต่อ',
+    EN: 'Sign in with your Car Care account to continue.',
+  },
+  'auth.login.registrationSuccess': {
+    TH: 'สร้างบัญชีแล้ว เข้าสู่ระบบได้เลย',
+    EN: 'Your account has been created. You can sign in now.',
+  },
+  'auth.login.error': {
+    TH: 'ไม่สามารถเข้าสู่ระบบได้ ตรวจสอบข้อมูลแล้วลองอีกครั้ง',
+    EN: 'Unable to sign in. Check your details and try again.',
+  },
+  'auth.login.email': { TH: 'อีเมล', EN: 'Email address' },
+  'auth.login.password': { TH: 'รหัสผ่าน', EN: 'Password' },
+  'auth.login.validation.emailRequired': {
+    TH: 'กรุณากรอกอีเมล',
+    EN: 'Enter your email address.',
+  },
+  'auth.login.validation.emailInvalid': {
+    TH: 'กรุณากรอกอีเมลให้ถูกต้อง',
+    EN: 'Enter a valid email address.',
+  },
+  'auth.login.validation.passwordRequired': {
+    TH: 'กรุณากรอกรหัสผ่าน',
+    EN: 'Enter your password.',
+  },
+  'auth.login.submitting': { TH: 'กำลังเข้าสู่ระบบ…', EN: 'Signing in…' },
+  'auth.login.submit': { TH: 'เข้าสู่ระบบ', EN: 'Sign in' },
+  'auth.login.accessNote': {
+    TH: 'บทบาทบัญชีของคุณจะกำหนดพื้นที่ทำงาน Car Care ที่เข้าใช้ได้',
+    EN: 'Your account role determines which Car Care workspace you can access.',
+  },
+  'auth.login.newToCarCare': { TH: 'ยังไม่มีบัญชี Car Care?', EN: 'New to Car Care?' },
+  'auth.login.createAccount': { TH: 'สร้างบัญชี', EN: 'Create Account' },
+  'auth.register.eyebrow': { TH: 'สร้างบัญชี', EN: 'CREATE YOUR ACCOUNT' },
+  'auth.register.title': { TH: 'สร้างบัญชีของคุณ', EN: 'Create your account' },
+  'auth.register.description': {
+    TH: 'สมัครบัญชีลูกค้าเพื่อจองและจัดการบริการดูแลรถ',
+    EN: 'Register for a Customer account to book and manage car care services.',
+  },
+  'auth.register.error': {
+    TH: 'ไม่สามารถสร้างบัญชีได้ โปรดลองอีกครั้ง',
+    EN: 'Unable to create your account. Please try again.',
+  },
+  'auth.register.validation.required': {
+    TH: 'กรุณากรอกชื่อ อีเมล และรหัสผ่าน',
+    EN: 'Full name, email, and password are required.',
+  },
+  'auth.register.validation.nameEmail': {
+    TH: 'กรุณากรอกชื่อและอีเมลให้ถูกต้อง',
+    EN: 'Provide a valid name and email address.',
+  },
+  'auth.register.validation.passwordLength': {
+    TH: 'รหัสผ่านต้องมีความยาวไม่เกิน 1024 ตัวอักษร',
+    EN: 'Password must be 1024 characters or fewer.',
+  },
+  'auth.register.validation.phone': {
+    TH: 'หมายเลขโทรศัพท์ต้องมีตัวเลข 10 หลักพอดี',
+    EN: 'Phone must contain exactly 10 digits.',
+  },
+  'auth.register.fullName': { TH: 'ชื่อ-นามสกุล', EN: 'Full name' },
+  'auth.register.email': { TH: 'อีเมล', EN: 'Email address' },
+  'auth.register.phoneOptional': { TH: 'โทรศัพท์ (ไม่บังคับ)', EN: 'Phone (optional)' },
+  'auth.register.password': { TH: 'รหัสผ่าน', EN: 'Password' },
+  'auth.register.submitting': { TH: 'กำลังสร้างบัญชี…', EN: 'Creating account…' },
+  'auth.register.submit': { TH: 'สร้างบัญชี', EN: 'Create Account' },
+  'auth.register.alreadyHaveAccount': { TH: 'มีบัญชีอยู่แล้ว?', EN: 'Already have an account?' },
+  'auth.register.signIn': { TH: 'เข้าสู่ระบบ', EN: 'Sign in' },
+}
+
 const customerTranslations = {
   'customer.common.home': { TH: 'หน้าหลัก', EN: 'Home' },
   'customer.common.myAccount': { TH: 'บัญชีของฉัน', EN: 'My Account' },
@@ -32,6 +105,8 @@ const customerTranslations = {
   'customer.common.close': { TH: 'ปิด', EN: 'Close' },
   'customer.common.optional': { TH: 'ไม่บังคับ', EN: 'Optional' },
   'customer.common.notAvailable': { TH: 'ไม่พร้อมใช้งาน', EN: 'Unavailable' },
+  'customer.common.vehicle': { TH: 'รถ', EN: 'Vehicle' },
+  'customer.common.service': { TH: 'บริการ', EN: 'Service' },
 
   'customer.header.home': { TH: 'หน้าหลัก', EN: 'Home' },
   'customer.header.services': { TH: 'บริการ', EN: 'Services' },
@@ -98,6 +173,7 @@ const customerTranslations = {
     EN: 'Prices depend on vehicle type. Select your vehicle during booking to see its applicable prices.',
   },
   'customer.landing.serviceImageAlt': { TH: 'ภาพประกอบบริการดูแลรถ', EN: 'Image illustrating car care services' },
+  'customer.landing.serviceCategory': { TH: 'บริการดูแลรถ', EN: 'CAR CARE SERVICE' },
   'customer.landing.serviceDetailsCaption': { TH: 'รายละเอียดบริการที่เลือกได้', EN: 'Available service details' },
   'customer.landing.loadingServices': { TH: 'กำลังโหลดบริการที่เปิดให้จอง…', EN: 'Loading services available to book…' },
   'customer.landing.loadServicesError': { TH: 'ไม่สามารถโหลดรายการบริการได้', EN: 'Unable to load the service list.' },
@@ -131,6 +207,25 @@ const customerTranslations = {
   'customer.landing.readyToBookTitle': { TH: 'พร้อมเลือกบริการที่เหมาะกับรถของคุณหรือยัง?', EN: 'Ready to find the right service for your car?' },
   'customer.landing.noServicesReturn': { TH: 'โปรดกลับมาตรวจสอบอีกครั้งเมื่อมีบริการเปิดให้จอง', EN: 'Please check again when services become available.' },
   'customer.landing.bookingDescription': { TH: 'ไปที่หน้าจองเพื่อเลือกรถ บริการ และช่วงเวลาที่สะดวก ระบบจะแสดงราคาตามประเภทรถก่อนยืนยัน', EN: 'Choose your vehicle, services, and a convenient time. Vehicle-specific prices are shown before confirmation.' },
+  'customer.services.eyebrow': { TH: 'บริการดูแลรถ', EN: 'CAR CARE SERVICES' },
+  'customer.services.title': { TH: 'บริการดูแลรถของคุณ', EN: 'Car care services for your vehicle' },
+  'customer.services.description': {
+    TH: 'สำรวจบริการที่เปิดให้จอง และเลือกบริการที่เหมาะกับรถของคุณ',
+    EN: 'Explore available services and choose what works for your vehicle.',
+  },
+  'customer.services.catalogTitle': { TH: 'บริการทั้งหมด', EN: 'All services' },
+  'customer.services.priceNote': {
+    TH: 'เลือกรถและบริการในหน้าจองเพื่อดูราคาตามประเภทรถ',
+    EN: 'Select your vehicle and services during booking to see vehicle-specific prices.',
+  },
+  'customer.services.duration': {
+    TH: 'ระยะเวลาโดยประมาณ: {minutes} นาที',
+    EN: 'Estimated duration: {minutes} min',
+  },
+  'customer.services.durationUnavailable': {
+    TH: 'ระยะเวลาโดยประมาณ: ไม่ระบุ',
+    EN: 'Estimated duration: not specified',
+  },
 
   'customer.dashboard.eyebrow': { TH: 'CAR CARE ของคุณ', EN: 'YOUR CAR CARE' },
   'customer.dashboard.welcome': { TH: 'ยินดีต้อนรับ {name}', EN: 'Welcome, {name}.' },
@@ -252,6 +347,7 @@ const customerTranslations = {
   'customer.booking.payNow': { TH: 'ชำระเงินตอนนี้', EN: 'Pay now' },
   'customer.booking.viewBookings': { TH: 'ดูการจองของฉัน', EN: 'View My Bookings' },
   'customer.booking.stepLabel': { TH: 'ขั้นตอนที่ {step} จาก {total}: {title}. {description}{completed}', EN: 'Step {step} of {total}: {title}. {description}{completed}' },
+  'customer.booking.stepsNavigationLabel': { TH: 'ขั้นตอนการจอง', EN: 'Booking steps' },
   'customer.booking.completed': { TH: ' เสร็จแล้ว', EN: '. Completed' },
   'customer.booking.panelStep': { TH: 'ขั้นตอน {step} / 04', EN: 'STEP {step} / 04' },
   'customer.booking.paymentConfirmationNote': { TH: 'การจองจะยืนยันเมื่อชำระเงินแล้ว', EN: 'Your booking is confirmed once it is paid.' },
@@ -273,6 +369,8 @@ const customerTranslations = {
   'customer.booking.selectedService': { TH: 'บริการที่เลือก', EN: 'Selected service' },
   'customer.booking.noServiceDetails': { TH: 'ไม่มีรายละเอียดบริการเพิ่มเติม', EN: 'No additional service details are listed.' },
   'customer.booking.durationMinutes': { TH: '{minutes} นาที', EN: '{minutes} min' },
+  'customer.booking.durationHours': { TH: '{hours} ชั่วโมง', EN: '{hours} h' },
+  'customer.booking.durationHoursMinutes': { TH: '{hours} ชั่วโมง {minutes} นาที', EN: '{hours} h {minutes} min' },
   'customer.booking.unavailableVehicleType': { TH: 'ไม่พร้อมให้บริการสำหรับรถประเภทนี้', EN: 'Not available for this vehicle type' },
   'customer.booking.servicesSelected': { TH: 'เลือกแล้ว {count} รายการ', EN: '{count} services selected' },
   'customer.booking.serviceSelected': { TH: 'เลือกแล้ว {count} รายการ', EN: '{count} service selected' },
@@ -296,6 +394,7 @@ const customerTranslations = {
   'customer.booking.servicesLongNotice': { TH: 'บริการที่เลือกใช้เวลาประมาณ {duration} จึงใช้เวลามากกว่าหนึ่งช่วง ระบบแสดงเฉพาะเวลาเริ่มต้นที่มีเวลาว่างต่อเนื่องเพียงพอ', EN: 'Your services take about {duration}, so each visit uses more than one time slot. Only start times with enough free time after them are shown.' },
   'customer.booking.fullyBooked': { TH: 'รอบเต็มแล้ว', EN: 'Fully booked' },
   'customer.booking.slotUnavailable': { TH: 'ไม่พร้อมให้จอง', EN: 'Unavailable' },
+  'customer.booking.slotLabel': { TH: '{startTime} ถึง {endTime}. {availability}', EN: '{startTime} to {endTime}. {availability}' },
   'customer.booking.spotsAvailable': { TH: 'ว่าง {count} คัน', EN: '{count} spots available' },
   'customer.booking.spotsLeft': { TH: 'เหลือ {count} คัน', EN: '{count} spots left' },
   'customer.booking.spotLeft': { TH: 'เหลือ {count} คัน', EN: '{count} spot left' },
@@ -314,6 +413,7 @@ const customerTranslations = {
   'customer.booking.removeCoupon': { TH: 'นำออก', EN: 'Remove' },
   'customer.booking.couponCode': { TH: 'รหัสคูปอง', EN: 'Coupon code' },
   'customer.booking.couponPlaceholder': { TH: 'มีรหัสคูปองหรือไม่?', EN: 'Have a coupon code?' },
+  'customer.booking.couponCheckError': { TH: 'ไม่สามารถตรวจสอบคูปองนี้ได้', EN: 'This coupon could not be checked.' },
   'customer.booking.checkingCoupon': { TH: 'กำลังตรวจสอบ…', EN: 'Checking…' },
   'customer.booking.applyCoupon': { TH: 'ใช้คูปอง', EN: 'Apply' },
   'customer.booking.subtotal': { TH: 'ยอดก่อนส่วนลด', EN: 'Subtotal' },
@@ -348,6 +448,7 @@ const customerTranslations = {
   'customer.bookings.loadError': { TH: 'ไม่สามารถโหลดการจองของคุณได้', EN: 'We couldn’t load your bookings.' },
   'customer.bookings.connectionError': { TH: 'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง', EN: 'Check your connection and try again.' },
   'customer.bookings.noMatchStatus': { TH: 'ไม่พบการจองที่ตรงกับสถานะนี้', EN: 'No bookings match this status.' },
+  'customer.bookings.noBookingsEyebrow': { TH: 'ยังไม่มีการจอง', EN: 'NO BOOKINGS YET' },
   'customer.bookings.noVehicleHistory': { TH: 'ยังไม่มีประวัติบริการสำหรับรถคันนี้', EN: 'No service history for this vehicle yet.' },
   'customer.bookings.emptyTitle': { TH: 'ประวัติการใช้บริการจะแสดงที่นี่', EN: 'Your visits will appear here.' },
   'customer.bookings.tryAnotherFilter': { TH: 'ลองเลือกตัวกรองสถานะอื่นเพื่อดูประวัติการจอง', EN: 'Try another status filter to see your booking history.' },
@@ -360,6 +461,7 @@ const customerTranslations = {
   'customer.bookings.previous': { TH: 'ก่อนหน้า', EN: 'Previous' },
   'customer.bookings.next': { TH: 'ถัดไป', EN: 'Next' },
   'customer.bookings.pageOf': { TH: 'หน้า {page} จาก {totalPages}', EN: 'Page {page} of {totalPages}' },
+  'customer.bookings.pagesLabel': { TH: 'หน้ารายการจอง', EN: 'Bookings pages' },
   'customer.bookings.booking': { TH: 'การจอง', EN: 'BOOKING' },
   'customer.bookings.bookingStatus': { TH: 'สถานะการจอง', EN: 'Booking status' },
   'customer.bookings.paymentStatus': { TH: 'สถานะการชำระเงิน', EN: 'Payment status' },
@@ -513,6 +615,12 @@ const messages = {
   TH: {
     ...phaseOneMessages.TH,
     ...Object.fromEntries(
+      Object.entries(authTranslations).map(([key, translations]) => [
+        key,
+        translations.TH,
+      ]),
+    ),
+    ...Object.fromEntries(
       Object.entries(customerTranslations).map(([key, translations]) => [
         key,
         translations.TH,
@@ -521,6 +629,12 @@ const messages = {
   },
   EN: {
     ...phaseOneMessages.EN,
+    ...Object.fromEntries(
+      Object.entries(authTranslations).map(([key, translations]) => [
+        key,
+        translations.EN,
+      ]),
+    ),
     ...Object.fromEntries(
       Object.entries(customerTranslations).map(([key, translations]) => [
         key,

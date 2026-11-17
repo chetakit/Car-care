@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../Admin/api/client.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
@@ -7,6 +8,7 @@ import { SERVICE_IMAGE_URL } from './serviceAssets.js'
 import './customer.css'
 
 function ServicesPage({ user, onLogout }) {
+  const { t } = useLanguage()
   const [services, setServices] = useState([])
   const [serviceState, setServiceState] = useState('loading')
   const [serviceReload, setServiceReload] = useState(0)
@@ -42,9 +44,11 @@ function ServicesPage({ user, onLogout }) {
         <section className="services-page-intro" aria-labelledby="services-page-title">
           <div className="customer-container services-page-intro-inner">
             <div>
-              <span className="services-page-eyebrow">CAR CARE SERVICES</span>
-              <h1 id="services-page-title">บริการดูแลรถของคุณ</h1>
-              <p>สำรวจบริการที่เปิดให้จอง และเลือกบริการที่เหมาะกับรถของคุณ</p>
+              <span className="services-page-eyebrow">
+                {t('customer.services.eyebrow')}
+              </span>
+              <h1 id="services-page-title">{t('customer.services.title')}</h1>
+              <p>{t('customer.services.description')}</p>
             </div>
             <div className="services-page-image">
               {imageFailed ? (
@@ -54,7 +58,7 @@ function ServicesPage({ user, onLogout }) {
                 </div>
               ) : (
                 <img
-                  alt="ภาพประกอบบริการดูแลรถ"
+                  alt={t('customer.landing.serviceImageAlt')}
                   decoding="async"
                   onError={() => setImageFailed(true)}
                   src={SERVICE_IMAGE_URL}
@@ -66,19 +70,19 @@ function ServicesPage({ user, onLogout }) {
 
         <section className="services-page-catalog" aria-labelledby="services-catalog-title">
           <div className="customer-container">
-            <h2 id="services-catalog-title">บริการทั้งหมด</h2>
+            <h2 id="services-catalog-title">{t('customer.services.catalogTitle')}</h2>
             <p className="services-page-note">
-              เลือกรถและบริการในหน้าจองเพื่อดูราคาตามประเภทรถ
+              {t('customer.services.priceNote')}
             </p>
             {serviceState === 'loading' && (
               <div aria-live="polite" className="customer-catalog-message">
                 <span className="customer-loader" />
-                <span>กำลังโหลดบริการที่เปิดให้จอง…</span>
+                <span>{t('customer.landing.loadingServices')}</span>
               </div>
             )}
             {serviceState === 'error' && (
               <div className="customer-catalog-message customer-catalog-error" role="alert">
-                <span>ไม่สามารถโหลดรายการบริการได้</span>
+                <span>{t('customer.landing.loadServicesError')}</span>
                 <button
                   onClick={() => {
                     setServiceState('loading')
@@ -86,13 +90,13 @@ function ServicesPage({ user, onLogout }) {
                   }}
                   type="button"
                 >
-                  ลองอีกครั้ง
+                  {t('customer.common.retry')}
                 </button>
               </div>
             )}
             {serviceState === 'empty' && (
               <div aria-live="polite" className="customer-catalog-message" role="status">
-                ขณะนี้ยังไม่มีบริการให้จอง โปรดลองกลับมาตรวจสอบอีกครั้ง
+                {t('customer.landing.noServicesAvailable')}
               </div>
             )}
             {serviceState === 'ready' && (
@@ -103,15 +107,17 @@ function ServicesPage({ user, onLogout }) {
                     <h3>{service.service_name}</h3>
                     <p>
                       {service.description?.trim() ||
-                        'ยังไม่มีรายละเอียดเพิ่มเติมสำหรับบริการนี้'}
+                        t('customer.landing.noServiceDescription')}
                     </p>
                     <span className="services-page-duration">
                       {service.duration_minutes !== null && service.duration_minutes !== undefined
-                        ? `ระยะเวลาโดยประมาณ: ${service.duration_minutes} นาที`
-                        : 'ระยะเวลาโดยประมาณ: ไม่ระบุ'}
+                        ? t('customer.services.duration', {
+                            minutes: service.duration_minutes,
+                          })
+                        : t('customer.services.durationUnavailable')}
                     </span>
                     <a className="services-page-book" href="/customer/booking">
-                      Book This Service
+                      {t('customer.common.bookService')}
                     </a>
                   </article>
                 ))}

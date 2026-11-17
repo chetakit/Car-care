@@ -33,7 +33,10 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
   const servicesHref = '/services'
   const howItWorksHref = isPublicLanding ? '#how-it-works' : '/#how-it-works'
   const contactHref = isPublicLanding ? '#contact' : '/#contact'
-  const customerLabel = (key, fallback) => (isCustomer ? t(key) : fallback)
+  const customerLabel = (key, fallback) => {
+    const translation = t(key)
+    return translation === key ? fallback : translation
+  }
 
   useEffect(() => {
     if (!profileOpen) return undefined
@@ -117,7 +120,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
               {customerLabel('customer.header.bookService', 'Book a Service')}
             </a>
           )}
-          {isCustomer && <LanguageToggle />}
+          <LanguageToggle />
         </nav>
 
         {isAdmin ? (
@@ -177,9 +180,16 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
                 </div>
               </>
             ) : (
-              <nav aria-label="Account" className="customer-guest-actions">
-                <a className="customer-login-link" href="/login">Log in</a>
-                <a className="customer-register-link" href="/register">Register</a>
+              <nav
+                aria-label={customerLabel('customer.header.accountNavigation', 'Account')}
+                className="customer-guest-actions"
+              >
+                <a className="customer-login-link" href="/login">
+                  {customerLabel('customer.header.login', 'Log in')}
+                </a>
+                <a className="customer-register-link" href="/register">
+                  {customerLabel('customer.header.register', 'Register')}
+                </a>
               </nav>
             )}
           </div>

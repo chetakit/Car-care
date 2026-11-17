@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createApiClient } from '../Admin/api/client.js'
-import formatMoney from '../Admin/utils/formatMoney.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import {
   formatCustomerBookingStatus,
   formatCustomerBookingPaymentStatus,
   formatCustomerDate,
+  formatCustomerMoney,
   formatCustomerPaymentMethod,
   formatCustomerTime,
   formatCustomerTimestamp,
@@ -17,19 +19,19 @@ import './bookings.css'
 
 const PAGE_SIZE = 10
 const BOOKING_STATUSES = [
-  ['PENDING_PAYMENT', 'Awaiting payment'],
-  ['CONFIRMED', 'Confirmed'],
-  ['CHECKED_IN', 'Checked in'],
-  ['IN_SERVICE', 'In service'],
-  ['COMPLETED', 'Completed'],
-  ['CANCELLED', 'Cancelled'],
-  ['NO_SHOW', 'No show'],
+  'PENDING_PAYMENT',
+  'CONFIRMED',
+  'CHECKED_IN',
+  'IN_SERVICE',
+  'COMPLETED',
+  'CANCELLED',
+  'NO_SHOW',
 ]
 
-function formatOptionalMoney(value) {
+function formatOptionalMoney(value, language) {
   return value === null || value === undefined || value === ''
     ? '—'
-    : formatMoney(value)
+    : formatCustomerMoney(value, language)
 }
 
 function BookingIcon() {
@@ -41,9 +43,9 @@ function BookingIcon() {
   )
 }
 
-function BookingStatus({ status }) {
+function BookingStatus({ status, language }) {
   const normalizedStatus = String(status ?? '').toUpperCase()
-  const label = formatCustomerBookingStatus(normalizedStatus)
+  const label = formatCustomerBookingStatus(normalizedStatus, language)
   const statusClass = normalizedStatus
     ? normalizedStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-')
     : 'unknown'
@@ -69,7 +71,7 @@ function canPayForBooking(booking) {
   )
 }
 
-function BookingDetails({ booking }) {
+function BookingDetails({ booking, language, t }) {
   const vehicle = booking.vehicle
   const vehicleName = [vehicle?.brand_name, vehicle?.model_name]
     .filter(Boolean)
@@ -79,103 +81,103 @@ function BookingDetails({ booking }) {
   return (
     <div className="bookings-details">
       <section aria-labelledby={`booking-vehicle-${booking.booking_id}`}>
-        <h3 id={`booking-vehicle-${booking.booking_id}`}>Vehicle</h3>
+        <h3 id={`booking-vehicle-${booking.booking_id}`}>{t('customer.bookings.vehicle')}</h3>
         {vehicle ? (
           <dl className="bookings-detail-grid">
             <div>
-              <dt>Vehicle</dt>
-              <dd>{vehicleName || 'Vehicle model unavailable'}</dd>
+              <dt>{t('customer.bookings.vehicle')}</dt>
+              <dd>{vehicleName || t('customer.bookings.vehicleModelUnavailable')}</dd>
             </div>
             <div>
-              <dt>License plate</dt>
+              <dt>{t('customer.bookings.licensePlate')}</dt>
               <dd>{vehicle.license_plate || '—'}</dd>
             </div>
             <div>
-              <dt>Year</dt>
+              <dt>{t('customer.bookings.year')}</dt>
               <dd>{vehicle.production_year || '—'}</dd>
             </div>
             <div>
-              <dt>Type</dt>
+              <dt>{t('customer.bookings.type')}</dt>
               <dd>{vehicle.type_name || '—'}</dd>
             </div>
             <div>
-              <dt>Color</dt>
+              <dt>{t('customer.bookings.color')}</dt>
               <dd>{vehicle.color || '—'}</dd>
             </div>
             <div>
-              <dt>Province</dt>
+              <dt>{t('customer.bookings.province')}</dt>
               <dd>{vehicle.province || '—'}</dd>
             </div>
           </dl>
         ) : (
-          <p className="bookings-muted">Vehicle details are unavailable.</p>
+          <p className="bookings-muted">{t('customer.bookings.vehicleDetailsUnavailable')}</p>
         )}
       </section>
 
       <section aria-labelledby={`booking-services-${booking.booking_id}`}>
-        <h3 id={`booking-services-${booking.booking_id}`}>Booked services</h3>
+        <h3 id={`booking-services-${booking.booking_id}`}>{t('customer.bookings.bookedServices')}</h3>
         {services.length > 0 ? (
           <ul className="bookings-service-list">
             {services.map((service) => (
               <li key={service.booking_service_id}>
                 <span>
-                  <strong>{service.service_name || 'Service'}</strong>
+                  <strong>{service.service_name || t('customer.common.service')}</strong>
                   {service.duration_minutes !== null &&
                     service.duration_minutes !== undefined && (
-                      <small>{service.duration_minutes} min</small>
+                      <small>{t('customer.booking.durationMinutes', { minutes: service.duration_minutes })}</small>
                     )}
                 </span>
-                <span>{formatOptionalMoney(service.unit_price)}</span>
+                <span>{formatOptionalMoney(service.unit_price, language)}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="bookings-muted">No service details are available.</p>
+          <p className="bookings-muted">{t('customer.bookings.noServiceDetails')}</p>
         )}
       </section>
 
       <section aria-labelledby={`booking-payment-${booking.booking_id}`}>
-        <h3 id={`booking-payment-${booking.booking_id}`}>Payment</h3>
+        <h3 id={`booking-payment-${booking.booking_id}`}>{t('customer.bookings.payment')}</h3>
         {booking.payment ? (
           <dl className="bookings-detail-grid">
             <div>
-              <dt>Status</dt>
-              <dd>{formatCustomerBookingPaymentStatus(booking.payment)}</dd>
+              <dt>{t('customer.bookings.status')}</dt>
+              <dd>{formatCustomerBookingPaymentStatus(booking.payment, language)}</dd>
             </div>
             <div>
-              <dt>Method</dt>
-              <dd>{formatCustomerPaymentMethod(booking.payment.payment_method)}</dd>
+              <dt>{t('customer.bookings.method')}</dt>
+              <dd>{formatCustomerPaymentMethod(booking.payment.payment_method, language)}</dd>
             </div>
             <div>
-              <dt>Amount</dt>
-              <dd>{formatOptionalMoney(booking.payment.amount)}</dd>
+              <dt>{t('customer.bookings.amount')}</dt>
+              <dd>{formatOptionalMoney(booking.payment.amount, language)}</dd>
             </div>
             {booking.payment.paid_at && (
               <div>
-                <dt>Paid at</dt>
-                <dd>{formatCustomerTimestamp(booking.payment.paid_at)}</dd>
+                <dt>{t('customer.bookings.paidAt')}</dt>
+                <dd>{formatCustomerTimestamp(booking.payment.paid_at, language)}</dd>
               </div>
             )}
           </dl>
         ) : (
-          <p className="bookings-muted">{formatCustomerBookingPaymentStatus(null)}</p>
+          <p className="bookings-muted">{formatCustomerBookingPaymentStatus(null, language)}</p>
         )}
       </section>
 
       <section aria-labelledby={`booking-total-${booking.booking_id}`}>
-        <h3 id={`booking-total-${booking.booking_id}`}>Amount summary</h3>
+        <h3 id={`booking-total-${booking.booking_id}`}>{t('customer.bookings.amountSummary')}</h3>
         <dl className="bookings-detail-grid">
           <div>
-            <dt>Subtotal</dt>
-            <dd>{formatOptionalMoney(booking.total_amount)}</dd>
+            <dt>{t('customer.bookings.subtotal')}</dt>
+            <dd>{formatOptionalMoney(booking.total_amount, language)}</dd>
           </div>
           <div>
-            <dt>Discount</dt>
-            <dd>{formatOptionalMoney(booking.discount_amount)}</dd>
+            <dt>{t('customer.bookings.discount')}</dt>
+            <dd>{formatOptionalMoney(booking.discount_amount, language)}</dd>
           </div>
           <div>
-            <dt>Total</dt>
-            <dd>{formatOptionalMoney(booking.final_amount)}</dd>
+            <dt>{t('customer.bookings.total')}</dt>
+            <dd>{formatOptionalMoney(booking.final_amount, language)}</dd>
           </div>
         </dl>
       </section>
@@ -198,7 +200,7 @@ function cancellationPreview(booking) {
   return { fee: feeCents / 100, refund: (paidCents - feeCents) / 100 }
 }
 
-function CancelBookingDialog({ booking, submitting, error, onConfirm, onClose }) {
+function CancelBookingDialog({ booking, submitting, error, onConfirm, onClose, language, t }) {
   const dialogRef = useRef(null)
   const [reason, setReason] = useState('')
   const preview = cancellationPreview(booking)
@@ -217,27 +219,39 @@ function CancelBookingDialog({ booking, submitting, error, onConfirm, onClose })
       ref={dialogRef}
     >
       <form onSubmit={(event) => { event.preventDefault(); onConfirm(reason.trim()) }}>
-        <h2 id="cancel-booking-title">Cancel booking #{booking.booking_id}?</h2>
+        <h2 id="cancel-booking-title">
+          {t('customer.bookings.cancelTitle', { bookingId: booking.booking_id })}
+        </h2>
         {preview ? (
           <dl className="bookings-cancel-preview">
-            <div><dt>Cancellation fee (20%)</dt><dd>{formatOptionalMoney(preview.fee)}</dd></div>
-            <div><dt>Refund to your Wallet (80%)</dt><dd><strong>{formatOptionalMoney(preview.refund)}</strong></dd></div>
+            <div>
+              <dt>{t('customer.bookings.cancellationFee')}</dt>
+              <dd>{formatOptionalMoney(preview.fee, language)}</dd>
+            </div>
+            <div>
+              <dt>{t('customer.bookings.refundToWallet')}</dt>
+              <dd><strong>{formatOptionalMoney(preview.refund, language)}</strong></dd>
+            </div>
           </dl>
         ) : (
-          <p>This booking has not been paid, so there is no fee.</p>
+          <p>{t('customer.bookings.bookingNotPaid')}</p>
         )}
         <p className="bookings-cancel-note">
-          {preview ? 'Wallet credit can be used to pay for your next booking. ' : ''}This cannot be undone.
+          {preview && t('customer.bookings.walletCreditNote')}
+          {t('customer.bookings.cannotUndo')}
         </p>
         <label>
-          <span>Reason (optional)</span>
+          <span>{t('customer.bookings.reasonOptional')}</span>
           <textarea disabled={submitting} maxLength="500" onChange={(event) => setReason(event.target.value)} rows="2" value={reason} />
         </label>
-        {error && <p className="bookings-cancel-error" role="alert">{error}</p>}
+        {error && <p className="bookings-cancel-error" role="alert">{t(error)}</p>}
         <div className="bookings-cancel-actions">
-          <button className="bookings-detail-toggle" disabled={submitting} onClick={onClose} type="button">Keep booking</button>
+          <LanguageToggle />
+          <button className="bookings-detail-toggle" disabled={submitting} onClick={onClose} type="button">
+            {t('customer.bookings.keepBooking')}
+          </button>
           <button className="bookings-cancel-confirm" disabled={submitting} type="submit">
-            {submitting ? 'Cancelling…' : 'Cancel booking'}
+            {t(submitting ? 'customer.bookings.cancelling' : 'customer.bookings.cancelBooking')}
           </button>
         </div>
       </form>
@@ -245,66 +259,66 @@ function CancelBookingDialog({ booking, submitting, error, onConfirm, onClose })
   )
 }
 
-function BookingCard({ booking, expanded, onToggle, onPay, onCancel }) {
+function BookingCard({ booking, expanded, onToggle, onPay, onCancel, language, t }) {
   const services = Array.isArray(booking.services) ? booking.services : []
   const vehicleName = [booking.vehicle?.brand_name, booking.vehicle?.model_name]
     .filter(Boolean)
     .join(' ')
-  const bookingDate = formatCustomerDate(booking.booking_date)
-  const bookingTime = `${formatCustomerTime(booking.start_time)} – ${formatCustomerTime(booking.end_time)}`
+  const bookingDate = formatCustomerDate(booking.booking_date, language)
+  const bookingTime = `${formatCustomerTime(booking.start_time, language)} – ${formatCustomerTime(booking.end_time, language)}`
   const detailsId = `booking-details-${booking.booking_id}`
 
   return (
     <article className="bookings-card">
       <div className="bookings-card-heading">
         <div>
-          <span className="bookings-card-label">BOOKING</span>
+          <span className="bookings-card-label">{t('customer.bookings.booking')}</span>
           <h2>#{booking.booking_id}</h2>
         </div>
       </div>
 
       <dl className="bookings-card-statuses">
         <div>
-          <dt>Booking status</dt>
-          <dd><BookingStatus status={booking.booking_status} /></dd>
+          <dt>{t('customer.bookings.bookingStatus')}</dt>
+          <dd><BookingStatus language={language} status={booking.booking_status} /></dd>
         </div>
         <div>
-          <dt>Payment status</dt>
-          <dd><span className="bookings-payment-status">{formatCustomerBookingPaymentStatus(booking.payment)}</span></dd>
+          <dt>{t('customer.bookings.paymentStatus')}</dt>
+          <dd><span className="bookings-payment-status">{formatCustomerBookingPaymentStatus(booking.payment, language)}</span></dd>
         </div>
       </dl>
 
       <div className="bookings-card-summary">
         <div>
-          <span className="bookings-summary-label">Date &amp; time</span>
+          <span className="bookings-summary-label">{t('customer.bookings.dateTime')}</span>
           <strong>{bookingDate}</strong>
           <span>{bookingTime}</span>
         </div>
         <div>
-          <span className="bookings-summary-label">Vehicle</span>
-          <strong>{vehicleName || 'Vehicle details unavailable'}</strong>
+          <span className="bookings-summary-label">{t('customer.bookings.vehicle')}</span>
+          <strong>{vehicleName || t('customer.bookings.vehicleDetailsUnavailable')}</strong>
           <span>{booking.vehicle?.license_plate || '—'}</span>
         </div>
         <div className="bookings-card-total">
-          <span className="bookings-summary-label">Total</span>
+          <span className="bookings-summary-label">{t('customer.bookings.total')}</span>
           <strong>
-            {formatOptionalMoney(booking.final_amount ?? booking.total_amount)}
+            {formatOptionalMoney(booking.final_amount ?? booking.total_amount, language)}
           </strong>
         </div>
       </div>
 
       <div className="bookings-card-services">
-        <span className="bookings-summary-label">Booked services</span>
+        <span className="bookings-summary-label">{t('customer.bookings.bookedServices')}</span>
         {services.length > 0 ? (
           <ul>
             {services.map((service) => (
               <li key={service.booking_service_id}>
-                {service.service_name || 'Service'}
+                {service.service_name || t('customer.common.service')}
               </li>
             ))}
           </ul>
         ) : (
-          <p>No service details are available.</p>
+          <p>{t('customer.bookings.noServiceDetails')}</p>
         )}
       </div>
 
@@ -316,7 +330,7 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel }) {
           onClick={() => onToggle(booking.booking_id)}
           type="button"
         >
-          {expanded ? 'Hide details' : 'View details'}
+          {t(expanded ? 'customer.bookings.hideDetails' : 'customer.bookings.viewDetails')}
           <span aria-hidden="true">{expanded ? '−' : '+'}</span>
         </button>
         {canPayForBooking(booking) && (
@@ -325,20 +339,20 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel }) {
             onClick={() => onPay(booking)}
             type="button"
           >
-            Pay Now
+            {t('customer.bookings.payNow')}
             <span aria-hidden="true">→</span>
           </button>
         )}
         {CANCELLABLE_STATUSES.includes(booking.booking_status) && (
           <button className="bookings-cancel-button" onClick={() => onCancel(booking)} type="button">
-            Cancel booking
+            {t('customer.bookings.cancelBooking')}
           </button>
         )}
       </div>
 
       <div hidden={!expanded} id={detailsId}>
         {expanded && (
-          <BookingDetails booking={booking} />
+          <BookingDetails booking={booking} language={language} t={t} />
         )}
       </div>
     </article>
@@ -347,6 +361,7 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel }) {
 
 function MyBookingsPage({ user, onLogout, vehicleId }) {
   const { token, handleUnauthorized } = useAuth()
+  const { language, t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -375,13 +390,20 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
       })
       const refund = response.data?.refund
       setCancelNotice(refund
-        ? `Booking #${cancelTarget.booking_id} was cancelled. ${formatOptionalMoney(refund.refund_amount)} was added to your Wallet.`
-        : `Booking #${cancelTarget.booking_id} was cancelled.`)
+        ? {
+            key: 'customer.bookings.cancelledRefund',
+            bookingId: cancelTarget.booking_id,
+            refundAmount: refund.refund_amount,
+          }
+        : {
+            key: 'customer.bookings.cancelled',
+            bookingId: cancelTarget.booking_id,
+          })
       setCancelTarget(null)
       setReload((current) => current + 1)
       setBookingState('loading')
-    } catch (error) {
-      setCancelError(error instanceof Error ? error.message : 'The booking could not be cancelled.')
+    } catch {
+      setCancelError('customer.bookings.cancelError')
     } finally {
       setCancelling(false)
     }
@@ -474,38 +496,42 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
       <CustomerHeader onLogout={onLogout} user={user} />
       <main className="bookings-main">
         <div className="customer-container">
-          <nav aria-label="Breadcrumb" className="bookings-breadcrumb">
-            <a href="/customer">Home</a>
+          <nav aria-label={t('customer.profile.breadcrumbLabel')} className="bookings-breadcrumb">
+            <a href="/customer">{t('customer.common.home')}</a>
             <span aria-hidden="true">/</span>
             {isVehicleHistory ? (
               <>
-                <a href="/customer/vehicles">My Vehicles</a>
+                <a href="/customer/vehicles">{t('customer.common.myVehicles')}</a>
                 <span aria-hidden="true">/</span>
-                <span aria-current="page">Service History</span>
+                <span aria-current="page">{t('customer.bookings.breadcrumbVehicleHistory')}</span>
               </>
             ) : (
-              <span aria-current="page">My Bookings</span>
+              <span aria-current="page">{t('customer.bookings.title')}</span>
             )}
           </nav>
 
           <header className="bookings-heading">
             <div>
               <span className="customer-eyebrow">
-                {isVehicleHistory ? 'VEHICLE VISITS' : 'YOUR VISITS'}
+                {t(isVehicleHistory
+                  ? 'customer.bookings.eyebrowVehicleVisits'
+                  : 'customer.bookings.eyebrowVisits')}
               </span>
-              <h1>{isVehicleHistory ? 'Service History' : 'My Bookings'}</h1>
+              <h1>{t(isVehicleHistory ? 'customer.bookings.serviceHistory' : 'customer.bookings.title')}</h1>
               <p>
-                {isVehicleHistory
-                  ? 'Review service appointments and booking details for this vehicle.'
-                  : 'Review your service appointments and booking details.'}
+                {t(isVehicleHistory
+                  ? 'customer.bookings.vehicleDescription'
+                  : 'customer.bookings.description')}
               </p>
             </div>
             <label className="bookings-filter">
-              <span>Filter by status</span>
+              <span>{t('customer.bookings.filterStatus')}</span>
               <select onChange={changeStatus} value={bookingStatus}>
-                <option value="">All statuses</option>
-                {BOOKING_STATUSES.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                <option value="">{t('customer.bookings.allStatuses')}</option>
+                {BOOKING_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {formatCustomerBookingStatus(status, language)}
+                  </option>
                 ))}
               </select>
             </label>
@@ -514,13 +540,18 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
           {bookingState === 'loading' && (
             <div aria-live="polite" className="bookings-state">
               <span className="customer-loader" />
-              Loading your bookings…
+              {t('customer.bookings.loading')}
             </div>
           )}
 
           {cancelNotice && (
             <div className="bookings-cancel-notice" role="status">
-              {cancelNotice} <a href="/customer/wallet">View Wallet</a>
+              {t(cancelNotice.key, {
+                bookingId: cancelNotice.bookingId,
+                ...(cancelNotice.refundAmount === undefined
+                  ? {}
+                  : { amount: formatOptionalMoney(cancelNotice.refundAmount, language) }),
+              })} <a href="/customer/wallet">{t('customer.bookings.viewWallet')}</a>
             </div>
           )}
           {cancelTarget && (
@@ -530,34 +561,36 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
               onClose={() => { if (!cancelling) setCancelTarget(null) }}
               onConfirm={confirmCancel}
               submitting={cancelling}
+              language={language}
+              t={t}
             />
           )}
 
           {bookingState === 'error' && (
             <div className="bookings-state bookings-error" role="alert">
-              <span>We couldn’t load your bookings.</span>
-              <p>Check your connection and try again.</p>
-              <button onClick={retryLoading} type="button">Try again</button>
+              <span>{t('customer.bookings.loadError')}</span>
+              <p>{t('customer.bookings.connectionError')}</p>
+              <button onClick={retryLoading} type="button">{t('customer.common.retry')}</button>
             </div>
           )}
 
           {bookingState === 'ready' && bookings.length === 0 && (
             <section aria-labelledby="bookings-empty-title" className="bookings-empty">
               <span className="bookings-empty-icon"><BookingIcon /></span>
-              <span className="customer-eyebrow">NO BOOKINGS YET</span>
+              <span className="customer-eyebrow">{t('customer.bookings.noBookingsEyebrow')}</span>
               <h2 id="bookings-empty-title">
                 {bookingStatus
-                  ? 'No bookings match this status.'
+                  ? t('customer.bookings.noMatchStatus')
                   : isVehicleHistory
-                    ? 'No service history for this vehicle yet.'
-                    : 'Your visits will appear here.'}
+                    ? t('customer.bookings.noVehicleHistory')
+                    : t('customer.bookings.emptyTitle')}
               </h2>
               <p>
                 {bookingStatus
-                  ? 'Try another status filter to see your booking history.'
+                  ? t('customer.bookings.tryAnotherFilter')
                   : isVehicleHistory
-                    ? 'Completed and upcoming bookings for this vehicle will appear here.'
-                    : 'When you have a service booking, you can review its details here.'}
+                    ? t('customer.bookings.vehicleHistoryEmpty')
+                    : t('customer.bookings.historyEmpty')}
               </p>
               {bookingStatus && (
                 <button
@@ -569,7 +602,7 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
                   }}
                   type="button"
                 >
-                  Clear status filter
+                  {t('customer.bookings.clearFilter')}
                 </button>
               )}
             </section>
@@ -579,9 +612,11 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
             <>
               <div className="bookings-list-meta">
                 <span>
-                  {pagination?.total} {pagination?.total === 1 ? 'booking' : 'bookings'}
+                  {t(pagination?.total === 1
+                    ? 'customer.bookings.countSingular'
+                    : 'customer.bookings.count', { count: pagination?.total })}
                 </span>
-                <span>Newest first</span>
+                <span>{t('customer.bookings.newestFirst')}</span>
               </div>
               <div className="bookings-list">
                 {bookings.map((booking) => (
@@ -589,30 +624,35 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
                     booking={booking}
                     expanded={Number(expandedBookingId) === Number(booking.booking_id)}
                     key={booking.booking_id}
+                    language={language}
                     onToggle={toggleDetails}
                     onPay={openPayment}
                     onCancel={(target) => { setCancelError(''); setCancelNotice(''); setCancelTarget(target) }}
+                    t={t}
                   />
                 ))}
               </div>
               {pagination && pagination.totalPages > 1 && (
-                <nav aria-label="Bookings pages" className="bookings-pagination">
+                <nav aria-label={t('customer.bookings.pagesLabel')} className="bookings-pagination">
                   <button
                     disabled={pagination.page <= 1}
                     onClick={() => changePage(pagination.page - 1)}
                     type="button"
                   >
-                    Previous
+                    {t('customer.bookings.previous')}
                   </button>
                   <span>
-                    Page {pagination.page} of {pagination.totalPages}
+                    {t('customer.bookings.pageOf', {
+                      page: pagination.page,
+                      totalPages: pagination.totalPages,
+                    })}
                   </span>
                   <button
                     disabled={pagination.page >= pagination.totalPages}
                     onClick={() => changePage(pagination.page + 1)}
                     type="button"
                   >
-                    Next
+                    {t('customer.bookings.next')}
                   </button>
                 </nav>
               )}

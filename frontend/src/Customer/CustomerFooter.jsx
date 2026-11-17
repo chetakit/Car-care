@@ -1,12 +1,12 @@
 import { BrandMark } from './CustomerHeader.jsx'
-import useAuth from '../auth/useAuth.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 function CustomerFooter() {
-  const { user } = useAuth()
   const { t } = useLanguage()
-  const isCustomer = user?.role === 'CUSTOMER'
-  const customerLabel = (key, fallback) => (isCustomer ? t(key) : fallback)
+  const customerLabel = (key, fallback) => {
+    const translation = t(key)
+    return translation === key ? fallback : translation
+  }
 
   return (
     <footer className="customer-footer">

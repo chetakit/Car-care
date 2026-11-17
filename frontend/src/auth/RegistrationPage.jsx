@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { ApiError, apiRequest } from '../Admin/api/client.js'
 import CustomerHeader from '../Customer/CustomerHeader.jsx'
 import AuthShowcase from './AuthShowcase.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import './auth.css'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -13,25 +15,30 @@ function getRegistrationError({ fullName, email, password, phone }) {
   const passwordLength = Array.from(password).length
 
   if (!normalizedName || !normalizedEmail || passwordLength === 0) {
-    return 'Full name, email, and password are required.'
+    return 'auth.register.validation.required'
   }
+
   if (
     Array.from(normalizedName).length > 100 ||
     normalizedEmail.length > 150 ||
     !EMAIL_PATTERN.test(normalizedEmail)
   ) {
-    return 'Provide a valid name and email address.'
+    return 'auth.register.validation.nameEmail'
   }
+
   if (password.length > 1024) {
-    return 'Password must be 1024 characters or fewer.'
+    return 'auth.register.validation.passwordLength'
   }
+
   if (phone !== '' && !PHONE_PATTERN.test(phone)) {
-    return 'Phone must contain exactly 10 digits.'
+    return 'auth.register.validation.phone'
   }
+
   return ''
 }
 
 function RegistrationPage({ onNavigate }) {
+  const { t } = useLanguage()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -46,6 +53,7 @@ function RegistrationPage({ onNavigate }) {
 
     const formValues = { fullName, email, password, phone }
     const validationError = getRegistrationError(formValues)
+
     if (validationError) {
       setError(validationError)
       return
@@ -54,6 +62,7 @@ function RegistrationPage({ onNavigate }) {
     submissionInProgress.current = true
     setSubmitting(true)
     setError('')
+
     const body = {
       full_name: fullName.trim(),
       email: email.trim(),
@@ -66,30 +75,42 @@ function RegistrationPage({ onNavigate }) {
         method: 'POST',
         body,
       })
+
       if (response.data?.user?.role !== 'CUSTOMER') {
-        throw new Error('The registration response did not include the created customer account.')
+        throw new Error(
+          'The registration response did not include the created customer account.',
+        )
       }
 
       const currentState = window.history.state
+
       window.history.replaceState(
         {
-          ...(currentState && typeof currentState === 'object' ? currentState : {}),
+          ...(currentState && typeof currentState === 'object'
+            ? currentState
+            : {}),
           registrationSuccess: true,
         },
         '',
         '/login',
       )
+
       window.dispatchEvent(new PopStateEvent('popstate'))
     } catch (registrationError) {
       setError(
         registrationError instanceof ApiError
           ? registrationError.message
-          : registrationError.message || 'Unable to create your account. Please try again.',
+          : registrationError.message || 'auth.register.error',
       )
     } finally {
       submissionInProgress.current = false
       setSubmitting(false)
     }
+  }
+
+  function displayError(message) {
+    if (!message) return ''
+    return message.startsWith('auth.') ? t(message) : message
   }
 
   return (
@@ -98,20 +119,34 @@ function RegistrationPage({ onNavigate }) {
       <main className="shared-auth-page">
         <div className="shared-auth-layout">
           <AuthShowcase />
-          <section aria-labelledby="registration-title" className="shared-auth-card">
-            <span className="shared-auth-kicker">JOIN CAR CARE</span>
-            <h1 id="registration-title">Create your account</h1>
+
+          <section
+            aria-labelledby="registration-title"
+            className="shared-auth-card"
+          >
+            <LanguageToggle />
+
+            <span className="shared-auth-kicker">
+              {t('auth.register.eyebrow')}
+            </span>
+
+            <h1 id="registration-title">
+              {t('auth.register.title')}
+            </h1>
+
             <p className="shared-auth-description">
-              Register for a Customer account to book and manage car care services.
+              {t('auth.register.description')}
             </p>
+
             {error && (
               <div className="shared-auth-error" role="alert">
-                {error}
+                {displayError(error)}
               </div>
             )}
+
             <form className="shared-auth-form" noValidate onSubmit={handleSubmit}>
               <label>
-                Full name
+                {t('auth.register.fullName')}
                 <input
                   autoComplete="name"
                   onChange={(event) => {
@@ -122,8 +157,9 @@ function RegistrationPage({ onNavigate }) {
                   value={fullName}
                 />
               </label>
+
               <label>
-                Email address
+                {t('auth.register.email')}
                 <input
                   autoComplete="email"
                   onChange={(event) => {
@@ -134,21 +170,25 @@ function RegistrationPage({ onNavigate }) {
                   value={email}
                 />
               </label>
+
               <label>
-                Phone (optional)
+                {t('auth.register.phoneOptional')}
                 <input
                   autoComplete="tel"
                   inputMode="numeric"
                   onChange={(event) => {
-                    setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 10))
+                    setPhone(
+                      event.target.value.replace(/[^0-9]/g, '').slice(0, 10),
+                    )
                     setError('')
                   }}
                   type="tel"
                   value={phone}
                 />
               </label>
+
               <label>
-                Password
+                {t('auth.register.password')}
                 <input
                   autoComplete="new-password"
                   maxLength={1024}
@@ -160,19 +200,29 @@ function RegistrationPage({ onNavigate }) {
                   value={password}
                 />
               </label>
+
               <button disabled={submitting} type="submit">
-                {submitting ? 'Creating account…' : 'Create Account'}
+                {submitting
+                  ? t('auth.register.submitting')
+                  : t('auth.register.submit')}
                 {!submitting && (
-                  <span aria-hidden="true" className="shared-auth-submit-arrow">
+                  <span
+                    aria-hidden="true"
+                    className="shared-auth-submit-arrow"
+                  >
                     →
                   </span>
                 )}
               </button>
             </form>
+
             <p className="shared-auth-account-link">
-              Already have an account?{' '}
-              <a href="/login" onClick={(event) => onNavigate?.(event, '/login')}>
-                Sign in
+              {t('auth.register.alreadyHaveAccount')}{' '}
+              <a
+                href="/login"
+                onClick={(event) => onNavigate?.(event, '/login')}
+              >
+                {t('auth.register.signIn')}
               </a>
             </p>
           </section>

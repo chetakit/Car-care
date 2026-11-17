@@ -1,5 +1,6 @@
 import AdminIcon from './AdminIcon.jsx'
 import AdminAccountMenu from './AdminAccountMenu.jsx'
+import LanguageToggle from '../../i18n/LanguageToggle.jsx'
 
 function AdminHeader({ pageTitle, user, onMenuClick, onLogout }) {
   return (
@@ -26,6 +27,7 @@ function AdminHeader({ pageTitle, user, onMenuClick, onLogout }) {
       </div>
 
       <div className="admin-header-actions">
+        <LanguageToggle />
         <AdminAccountMenu onLogout={onLogout} user={user} />
       </div>
     </header>

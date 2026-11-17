@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, createApiClient } from '../Admin/api/client.js'
+import { createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import './customer.css'
@@ -29,7 +31,7 @@ function VehicleIcon() {
   )
 }
 
-function VehicleCard({ vehicle, onEdit, onDelete }) {
+function VehicleCard({ vehicle, onEdit, onDelete, t }) {
   const vehicleName = [vehicle.brand_name, vehicle.model_name]
     .filter(Boolean)
     .join(' ')
@@ -51,7 +53,7 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
           </span>
         )}
       </div>
-      <h2>{vehicleName || 'Vehicle'}</h2>
+      <h2>{vehicleName || t('customer.common.vehicle')}</h2>
       <p className="vehicles-license-plate">{vehicle.license_plate}</p>
       {vehicleDetails.length > 0 && (
         <p className="vehicles-card-details">{vehicleDetails.join(' · ')}</p>
@@ -64,22 +66,24 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
           className="vehicles-edit-button"
           href={`/customer/vehicles/${vehicle.vehicle_id}/bookings`}
         >
-          Service history
+          {t('customer.vehicles.serviceHistory')}
         </a>
         <button
           className="vehicles-edit-button"
           onClick={(event) => onEdit(vehicle, event)}
           type="button"
         >
-          Edit details
+          {t('customer.vehicles.edit')}
         </button>
         <button
-          aria-label={`Delete ${vehicleName || vehicle.license_plate}`}
+          aria-label={t('customer.vehicles.deleteLabel', {
+            vehicle: vehicleName || vehicle.license_plate,
+          })}
           className="vehicles-delete-button"
           onClick={(event) => onDelete(vehicle, event)}
           type="button"
         >
-          Delete
+          {t('customer.vehicles.delete')}
         </button>
       </div>
     </article>
@@ -94,10 +98,12 @@ function VehicleFormDialog({
   models,
   onChange,
   onClose,
+  onValidationError,
   onSubmit,
   submitting,
   vehicleBrands,
   vehicleTypes,
+  t,
 }) {
   const dialogRef = useRef(null)
   const availableModels = models.filter((model) =>
@@ -144,14 +150,14 @@ function VehicleFormDialog({
     >
         <div className="vehicles-dialog-heading">
           <div>
-            <span className="customer-eyebrow">YOUR GARAGE</span>
+            <span className="customer-eyebrow">{t('customer.vehicles.eyebrow')}</span>
             <h2 id="vehicles-form-title">
-              {editingVehicle ? 'Edit vehicle' : 'Add a vehicle'}
+              {t(editingVehicle ? 'customer.vehicles.editTitle' : 'customer.vehicles.addTitle')}
             </h2>
-            <p id="vehicles-form-description">Keep your vehicle details up to date.</p>
+            <p id="vehicles-form-description">{t('customer.vehicles.dialogDescription')}</p>
           </div>
           <button
-            aria-label="Close dialog"
+            aria-label={t('customer.vehicles.closeDialog')}
             className="vehicles-dialog-close"
             disabled={submitting}
             onClick={onClose}
@@ -163,20 +169,19 @@ function VehicleFormDialog({
 
         {catalogState === 'error' && (
           <p className="vehicles-inline-note">
-            Vehicle catalog details could not be loaded. You can still update
-            other fields, but a model change requires an active catalog model.
+            {t('customer.vehicles.catalogLoadNote')}
           </p>
         )}
 
         <form className="vehicles-form" onSubmit={onSubmit}>
           <div className="vehicles-form-grid">
             <label>
-              Vehicle type
+              {t('customer.vehicles.type')}
               <select
                 onChange={(event) => onChange('vehicle_type_id', event.target.value)}
                 value={form.vehicle_type_id}
               >
-                <option value="">All types</option>
+                <option value="">{t('customer.vehicles.allTypes')}</option>
                 {vehicleTypes.map((type) => (
                   <option key={type.vehicle_type_id} value={type.vehicle_type_id}>
                     {type.type_name}
@@ -185,12 +190,12 @@ function VehicleFormDialog({
               </select>
             </label>
             <label>
-              Brand
+              {t('customer.vehicles.brand')}
               <select
                 onChange={(event) => onChange('brand_id', event.target.value)}
                 value={form.brand_id}
               >
-                <option value="">All brands</option>
+                <option value="">{t('customer.vehicles.allBrands')}</option>
                 {vehicleBrands.map((brand) => (
                   <option key={brand.brand_id} value={brand.brand_id}>
                     {brand.brand_name}
@@ -199,20 +204,26 @@ function VehicleFormDialog({
               </select>
             </label>
             <label className="vehicles-form-wide">
-              Model <span aria-hidden="true">*</span>
+              {t('customer.vehicles.model')} <span aria-hidden="true">*</span>
               <select
                 autoFocus
                 onChange={(event) => onChange('model_id', event.target.value)}
+                onInvalid={(event) => {
+                  event.preventDefault()
+                  onValidationError('customer.vehicles.selectVehicleModel')
+                }}
                 required
                 value={form.model_id}
               >
-                <option value="">Select a model</option>
+                <option value="">{t('customer.vehicles.selectModel')}</option>
                 {existingModelMissing && (
                   <option disabled value={form.model_id}>
-                    Current model: {[editingVehicle.brand_name, editingVehicle.model_name]
-                      .filter(Boolean)
-                      .join(' ') || editingVehicle.model_id}
-                    {catalogState === 'ready' ? ' (not in active catalog)' : ' (current model)'}
+                    {t('customer.vehicles.currentModel', {
+                      model: [editingVehicle.brand_name, editingVehicle.model_name]
+                        .filter(Boolean)
+                        .join(' ') || editingVehicle.model_id,
+                    })}
+                    {catalogState === 'ready' && ` (${t('customer.vehicles.notActiveCatalog')})`}
                   </option>
                 )}
                 {availableModels.map((model) => (
@@ -223,64 +234,83 @@ function VehicleFormDialog({
                 ))}
               </select>
               {catalogState === 'loading' && (
-                <small className="vehicles-field-note">Loading active models…</small>
+                <small className="vehicles-field-note">{t('customer.vehicles.loadingModels')}</small>
               )}
             </label>
             <label>
-              License plate <span aria-hidden="true">*</span>
+              {t('customer.vehicles.licensePlate')} <span aria-hidden="true">*</span>
               <input
                 autoComplete="off"
                 onChange={(event) => onChange('license_plate', event.target.value)}
+                onInvalid={(event) => {
+                  event.preventDefault()
+                  onValidationError('customer.vehicles.enterPlate')
+                }}
                 required
                 value={form.license_plate}
               />
             </label>
             <label>
-              Production year
+              {t('customer.vehicles.productionYear')}
               <input
                 max="2155"
                 min="1901"
                 onChange={(event) => onChange('production_year', event.target.value)}
+                onInvalid={(event) => {
+                  event.preventDefault()
+                  onValidationError('customer.vehicles.invalidYear')
+                }}
                 type="number"
                 value={form.production_year}
               />
-              <small className="vehicles-field-note">Optional · 1901–2155</small>
+              <small className="vehicles-field-note">
+                {t('customer.vehicles.yearRange', { min: 1901, max: 2155 })}
+              </small>
             </label>
             <label>
-              Province
+              {t('customer.vehicles.province')}
               <input
                 onChange={(event) => onChange('province', event.target.value)}
                 value={form.province}
               />
-              <small className="vehicles-field-note">Optional</small>
+              <small className="vehicles-field-note">{t('customer.common.optional')}</small>
             </label>
             <label>
-              Color
+              {t('customer.vehicles.color')}
               <input
                 onChange={(event) => onChange('color', event.target.value)}
                 value={form.color}
               />
-              <small className="vehicles-field-note">Optional</small>
+              <small className="vehicles-field-note">{t('customer.common.optional')}</small>
             </label>
           </div>
 
-          {error && <p className="vehicles-form-error" role="alert">{error}</p>}
+          {error && (
+            <p className="vehicles-form-error" role="alert">
+              {t(error, { min: 1901, max: 2155 })}
+            </p>
+          )}
 
           <div className="vehicles-dialog-actions">
+            <LanguageToggle />
             <button
               className="vehicles-cancel-button"
               disabled={submitting}
               onClick={onClose}
               type="button"
             >
-              Cancel
+              {t('customer.vehicles.cancel')}
             </button>
             <button
               className="customer-button customer-button-primary"
               disabled={submitting || (catalogState === 'loading' && !editingVehicle)}
               type="submit"
             >
-              {submitting ? 'Saving…' : editingVehicle ? 'Save changes' : 'Add vehicle'}
+              {t(submitting
+                ? 'customer.vehicles.saving'
+                : editingVehicle
+                  ? 'customer.vehicles.saveChanges'
+                  : 'customer.vehicles.add')}
             </button>
           </div>
         </form>
@@ -288,7 +318,7 @@ function VehicleFormDialog({
   )
 }
 
-function DeleteVehicleDialog({ error, onCancel, onConfirm, submitting, vehicle }) {
+function DeleteVehicleDialog({ error, onCancel, onConfirm, submitting, vehicle, t }) {
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -324,13 +354,13 @@ function DeleteVehicleDialog({ error, onCancel, onConfirm, submitting, vehicle }
         role="dialog"
     >
         <span className="vehicles-delete-symbol" aria-hidden="true">!</span>
-        <h2 id="vehicles-delete-title">Remove this vehicle?</h2>
+        <h2 id="vehicles-delete-title">{t('customer.vehicles.removeTitle')}</h2>
         <p id="vehicles-delete-description">
-          This will remove <strong>{vehicle.license_plate}</strong> from your
-          vehicles. Vehicles with existing bookings cannot be deleted.
+          {t('customer.vehicles.removeDescription', { plate: vehicle.license_plate })}
         </p>
-        {error && <p className="vehicles-form-error" role="alert">{error}</p>}
+        {error && <p className="vehicles-form-error" role="alert">{t(error)}</p>}
         <div className="vehicles-dialog-actions">
+          <LanguageToggle />
           <button
             autoFocus
             className="vehicles-cancel-button"
@@ -338,7 +368,7 @@ function DeleteVehicleDialog({ error, onCancel, onConfirm, submitting, vehicle }
             onClick={onCancel}
             type="button"
           >
-            Keep vehicle
+            {t('customer.vehicles.keep')}
           </button>
           <button
             className="vehicles-confirm-delete"
@@ -346,7 +376,7 @@ function DeleteVehicleDialog({ error, onCancel, onConfirm, submitting, vehicle }
             onClick={onConfirm}
             type="button"
           >
-            {submitting ? 'Removing…' : 'Remove vehicle'}
+            {t(submitting ? 'customer.vehicles.removing' : 'customer.vehicles.remove')}
           </button>
         </div>
     </dialog>
@@ -355,6 +385,7 @@ function DeleteVehicleDialog({ error, onCancel, onConfirm, submitting, vehicle }
 
 function MyVehiclesPage({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
+  const { t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -508,11 +539,11 @@ function MyVehiclesPage({ user, onLogout }) {
 
     const licensePlate = normalizeText(form.license_plate)
     if (!licensePlate) {
-      setFormError('Enter a license plate.')
+      setFormError('customer.vehicles.enterPlate')
       return
     }
     if (!form.model_id) {
-      setFormError('Select a vehicle model.')
+      setFormError('customer.vehicles.selectVehicleModel')
       return
     }
 
@@ -523,7 +554,7 @@ function MyVehiclesPage({ user, onLogout }) {
       (model) => Number(model.model_id) === Number(form.model_id),
     )
     if (!selectedActiveModel && !currentModelUnchanged) {
-      setFormError('Select an active model from the catalog.')
+      setFormError('customer.vehicles.selectActiveModel')
       return
     }
 
@@ -535,7 +566,7 @@ function MyVehiclesPage({ user, onLogout }) {
         productionYear < 1901 ||
         productionYear > 2155)
     ) {
-      setFormError('Production year must be an integer from 1901 to 2155.')
+      setFormError('customer.vehicles.invalidYear')
       return
     }
 
@@ -575,7 +606,7 @@ function MyVehiclesPage({ user, onLogout }) {
     }
 
     if (editingVehicle && Object.keys(payload).length === 0) {
-      setFormError('Update at least one vehicle detail before saving.')
+      setFormError('customer.vehicles.updateAtLeastOne')
       return
     }
 
@@ -592,7 +623,8 @@ function MyVehiclesPage({ user, onLogout }) {
       )
       const savedVehicle = response.data?.vehicle
       if (!savedVehicle) {
-        throw new Error('The vehicle could not be confirmed by the server.')
+        setFormError('customer.vehicles.serverUnconfirmed')
+        return
       }
 
       setVehicles((current) =>
@@ -605,16 +637,12 @@ function MyVehiclesPage({ user, onLogout }) {
           : [savedVehicle, ...current],
       )
       setVehicleState('ready')
-      setNotice(editingVehicle ? 'Vehicle details updated.' : 'Vehicle added.')
+      setNotice(editingVehicle ? 'customer.vehicles.updated' : 'customer.vehicles.added')
       restoreDialogFocus()
       setFormOpen(false)
       setEditingVehicle(null)
-    } catch (error) {
-      setFormError(
-        error instanceof ApiError
-          ? error.message
-          : error.message || 'Unable to save this vehicle.',
-      )
+    } catch {
+      setFormError('customer.vehicles.saveError')
     } finally {
       setSubmitting(false)
     }
@@ -637,13 +665,9 @@ function MyVehiclesPage({ user, onLogout }) {
       dialogTriggerRef.current = null
       restoreDialogFocus()
       setPendingDelete(null)
-      setNotice('Vehicle removed.')
-    } catch (error) {
-      setDeleteError(
-        error instanceof ApiError
-          ? error.message
-          : error.message || 'Unable to remove this vehicle.',
-      )
+      setNotice('customer.vehicles.removed')
+    } catch {
+      setDeleteError('customer.vehicles.removeError')
     } finally {
       setDeleting(false)
     }
@@ -654,17 +678,17 @@ function MyVehiclesPage({ user, onLogout }) {
       <CustomerHeader onLogout={onLogout} user={user} />
       <main className="vehicles-main">
         <div className="customer-container">
-          <nav aria-label="Breadcrumb" className="vehicles-breadcrumb">
-            <a href="/customer">Home</a>
+          <nav aria-label={t('customer.profile.breadcrumbLabel')} className="vehicles-breadcrumb">
+            <a href="/customer">{t('customer.common.home')}</a>
             <span aria-hidden="true">/</span>
-            <span aria-current="page">My Vehicles</span>
+            <span aria-current="page">{t('customer.vehicles.title')}</span>
           </nav>
 
           <div className="vehicles-heading">
             <div>
-              <span className="customer-eyebrow">YOUR GARAGE</span>
-              <h1 ref={vehiclesHeadingRef} tabIndex="-1">My Vehicles</h1>
-              <p>Manage the vehicles connected to your Car Care account.</p>
+              <span className="customer-eyebrow">{t('customer.vehicles.eyebrow')}</span>
+              <h1 ref={vehiclesHeadingRef} tabIndex="-1">{t('customer.vehicles.title')}</h1>
+              <p>{t('customer.vehicles.description')}</p>
             </div>
             <button
               className="customer-button customer-button-primary"
@@ -674,26 +698,26 @@ function MyVehiclesPage({ user, onLogout }) {
               type="button"
             >
               <span aria-hidden="true" className="vehicles-plus">+</span>
-              Add a vehicle
+              {t('customer.vehicles.add')}
             </button>
           </div>
 
           {notice && (
             <p className="vehicles-success" role="status">
               <span aria-hidden="true">✓</span>
-              {notice}
+              {t(notice)}
             </p>
           )}
 
           {catalogState === 'loading' && (
             <div aria-live="polite" className="vehicles-catalog-state">
               <span className="customer-loader" />
-              Loading active vehicle types, brands, and models…
+              {t('customer.vehicles.catalogLoading')}
             </div>
           )}
           {catalogState === 'error' && (
             <div className="vehicles-catalog-state vehicles-error-state" role="alert">
-              <span>Vehicle catalog options could not be loaded.</span>
+              <span>{t('customer.vehicles.catalogError')}</span>
               <button
                 onClick={() => {
                   setCatalogState('loading')
@@ -701,25 +725,25 @@ function MyVehiclesPage({ user, onLogout }) {
                 }}
                 type="button"
               >
-                Try again
+                {t('customer.common.retry')}
               </button>
             </div>
           )}
           {catalogState === 'ready' && vehicleModels.length === 0 && (
             <div className="vehicles-catalog-state">
-              No active vehicle models are available to add right now.
+              {t('customer.vehicles.noActiveModels')}
             </div>
           )}
 
           {vehicleState === 'loading' && (
             <div aria-live="polite" className="vehicles-list-state">
               <span className="customer-loader" />
-              Loading your vehicles…
+              {t('customer.vehicles.loadingVehicles')}
             </div>
           )}
           {vehicleState === 'error' && (
             <div className="vehicles-list-state vehicles-error-state" role="alert">
-              <p>We couldn’t load your vehicles.</p>
+              <p>{t('customer.vehicles.loadError')}</p>
               <button
                 onClick={() => {
                   setVehicleState('loading')
@@ -727,7 +751,7 @@ function MyVehiclesPage({ user, onLogout }) {
                 }}
                 type="button"
               >
-                Try again
+                {t('customer.common.retry')}
               </button>
             </div>
           )}
@@ -736,16 +760,16 @@ function MyVehiclesPage({ user, onLogout }) {
               <span className="vehicles-empty-icon">
                 <VehicleIcon />
               </span>
-              <span className="customer-eyebrow">A FRESH START</span>
-              <h2 id="vehicles-empty-title">Your garage is waiting.</h2>
-              <p>Add a vehicle to keep its details together in one place.</p>
+              <span className="customer-eyebrow">{t('customer.vehicles.emptyEyebrow')}</span>
+              <h2 id="vehicles-empty-title">{t('customer.vehicles.emptyTitle')}</h2>
+              <p>{t('customer.vehicles.emptyDescription')}</p>
               <button
                 className="customer-button customer-button-primary"
                 disabled={catalogState !== 'ready' || vehicleModels.length === 0}
                 onClick={openAddDialog}
                 type="button"
               >
-                Add your first vehicle
+                {t('customer.vehicles.addFirst')}
               </button>
             </section>
           )}
@@ -760,6 +784,7 @@ function MyVehiclesPage({ user, onLogout }) {
                     setDeleteError('')
                   }}
                   onEdit={openEditDialog}
+                  t={t}
                   vehicle={vehicle}
                 />
               ))}
@@ -779,10 +804,12 @@ function MyVehiclesPage({ user, onLogout }) {
           models={vehicleModels}
           onChange={updateForm}
           onClose={closeForm}
+          onValidationError={setFormError}
           onSubmit={saveVehicle}
           submitting={submitting}
           vehicleBrands={vehicleBrands}
           vehicleTypes={vehicleTypes}
+          t={t}
         />
       )}
       {pendingDelete && (
@@ -795,6 +822,7 @@ function MyVehiclesPage({ user, onLogout }) {
           }}
           onConfirm={confirmDelete}
           submitting={deleting}
+          t={t}
           vehicle={pendingDelete}
         />
       )}

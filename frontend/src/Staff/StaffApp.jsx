@@ -11,6 +11,7 @@ import StaffBookingDetailPage from './pages/StaffBookingDetailPage.jsx'
 import StaffHistoryPage from './pages/StaffHistoryPage.jsx'
 import StaffQueuePage from './pages/StaffQueuePage.jsx'
 import { StaffLink } from './components/StaffUi.jsx'
+import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import './styles/staff.css'
 
 function navigate(path) {
@@ -74,6 +75,7 @@ export default function StaffApp({ user, onLogout }) {
           <StaffLink className={isHistory ? 'active' : ''} navigate={navigate} to="/staff/history">
             ประวัติการให้บริการ
           </StaffLink>
+          <LanguageToggle />
         </nav>
         <div className="staff-user">
           <span className="staff-avatar">{user?.full_name?.[0] ?? 'S'}</span>

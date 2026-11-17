@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, createApiClient } from '../Admin/api/client.js'
 import formatMoney from '../Admin/utils/formatMoney.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import './customer.css'
@@ -9,10 +10,10 @@ import './booking.css'
 
 const BOOKING_WINDOW_DAYS = 14
 const STEPS = [
-  ['Vehicle', 'Choose your vehicle'],
-  ['Services', 'Choose services'],
-  ['Date & time', 'Choose an available slot'],
-  ['Summary', 'Review and confirm'],
+  ['customer.booking.step.vehicle', 'customer.booking.step.chooseVehicle'],
+  ['customer.booking.step.services', 'customer.booking.step.chooseServices'],
+  ['customer.booking.step.dateTime', 'customer.booking.step.chooseSlot'],
+  ['customer.booking.step.summary', 'customer.booking.step.reviewConfirm'],
 ]
 
 function localDateString(date) {
@@ -34,17 +35,17 @@ function normalizeScheduleDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : ''
 }
 
-function formatDate(value, options = { day: 'numeric', month: 'short', year: 'numeric' }) {
+function formatDate(value, language, t, options = { day: 'numeric', month: 'short', year: 'numeric' }) {
   const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) return 'Date unavailable'
-  return new Intl.DateTimeFormat(undefined, options).format(
+  if (!year || !month || !day) return t('customer.formatter.dateUnavailable')
+  return new Intl.DateTimeFormat(language === 'TH' ? 'th-TH' : 'en-GB', options).format(
     new Date(year, month - 1, day),
   )
 }
 
-function formatTime(value) {
+function formatTime(value, t) {
   const time = String(value ?? '').slice(0, 5)
-  return time || 'Time unavailable'
+  return time || t('customer.formatter.timeUnavailable')
 }
 
 function priceToCents(value) {
@@ -58,11 +59,12 @@ function formatCents(cents) {
   return formatMoney(Number(cents) / 100)
 }
 
-function formatDuration(minutes) {
+function formatDuration(minutes, t) {
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
-  if (!hours) return `${rest} min`
-  return rest ? `${hours} h ${rest} min` : `${hours} h`
+  if (!hours) return t('customer.booking.durationMinutes', { minutes: rest })
+  if (!rest) return t('customer.booking.durationHours', { hours })
+  return t('customer.booking.durationHoursMinutes', { hours, minutes: rest })
 }
 
 function centsToAmount(cents) {
@@ -74,8 +76,9 @@ function amountToCents(value) {
   return match ? BigInt(match[1]) * 100n + BigInt((match[2] ?? '').padEnd(2, '0')) : null
 }
 
-function vehicleLabel(vehicle) {
-  return [vehicle.brand_name, vehicle.model_name].filter(Boolean).join(' ') || 'Vehicle'
+function vehicleLabel(vehicle, t) {
+  return [vehicle.brand_name, vehicle.model_name].filter(Boolean).join(' ') ||
+    t('customer.booking.vehicle')
 }
 
 function scheduleIsSelectable(schedule) {
@@ -83,29 +86,29 @@ function scheduleIsSelectable(schedule) {
   return status === 'AVAILABLE' && Number(schedule.remaining_capacity) > 0
 }
 
-function getBookingErrorMessage(error) {
-  const message = error.message || 'Unable to create your booking. Please try again.'
-  if (!(error instanceof ApiError)) return message
+function getBookingErrorMessage(error, t) {
+  const message = error.message || ''
+  if (!(error instanceof ApiError)) return t('customer.booking.createError')
 
   if (error.status === 409 && /schedule|capacity/i.test(message)) {
-    return 'That time is no longer available. Choose another open time to continue.'
+    return t('customer.booking.scheduleUnavailable')
   }
   if (error.status === 409 && /vehicle|model|type/i.test(message)) {
-    return 'This vehicle is no longer available for booking. Choose another active vehicle.'
+    return t('customer.booking.vehicleNoLongerAvailable')
   }
   if (error.status === 409 && /price/i.test(message)) {
-    return 'A selected service no longer has a price for this vehicle. Review the services before continuing.'
+    return t('customer.booking.priceNoLongerAvailable')
   }
   if (error.status === 400 && /schedule duration/i.test(message)) {
-    return 'The selected services take longer than this time slot. Choose fewer services or another slot.'
+    return t('customer.booking.scheduleTooShort')
   }
   if (error.status === 400 && /final_amount|greater than zero/i.test(message)) {
-    return 'Your service total must be greater than zero. Select a service with a positive price.'
+    return t('customer.booking.priceMustBePositive')
   }
-  return message
+  return t('customer.booking.createError')
 }
 
-function PageState({ children, error = false, onRetry, retryLabel = 'Try again' }) {
+function PageState({ children, error = false, onRetry, retryLabel }) {
   return (
     <div className={`booking-state${error ? ' is-error' : ''}`} role={error ? 'alert' : undefined}>
       {children}
@@ -129,6 +132,7 @@ function VehicleIcon() {
 
 function CustomerBookingPage({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
+  const { language, t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -389,9 +393,9 @@ function CustomerBookingPage({ user, onLogout }) {
         finalCents,
       })
       setCouponInput(response.data.coupon_code)
-    } catch (error) {
+    } catch {
       setAppliedCoupon(null)
-      setCouponError(error instanceof Error ? error.message : 'This coupon could not be checked.')
+      setCouponError(t('customer.booking.couponCheckError'))
     } finally {
       setCouponChecking(false)
     }
@@ -529,10 +533,10 @@ function CustomerBookingPage({ user, onLogout }) {
 
       setBookingResult({ bookingId: response.data.booking_id })
     } catch (error) {
-      setSubmitError(getBookingErrorMessage(error))
+      setSubmitError(getBookingErrorMessage(error, t))
       if (error instanceof ApiError && /coupon/i.test(error.message)) {
         setAppliedCoupon(null)
-        setCouponError(error.message)
+        setCouponError(t('customer.booking.couponCheckError'))
       }
       if (
         error instanceof ApiError &&
@@ -575,25 +579,28 @@ function CustomerBookingPage({ user, onLogout }) {
       <CustomerHeader onLogout={onLogout} user={user} />
       <main className="booking-main">
         <div className="customer-container">
-          <nav aria-label="Breadcrumb" className="booking-breadcrumb">
-            <a href="/customer">Home</a>
+          <nav
+            aria-label={t('customer.profile.breadcrumbLabel')}
+            className="booking-breadcrumb"
+          >
+            <a href="/customer">{t('customer.common.home')}</a>
             <span aria-hidden="true">/</span>
-            <span aria-current="page">Book a service</span>
+            <span aria-current="page">{t('customer.booking.title')}</span>
           </nav>
 
           <header className="booking-heading">
             {bookingResult ? (
               <div>
-                <span className="customer-eyebrow">AWAITING PAYMENT</span>
-                <h1>Booking created</h1>
-                <p>Reference #{bookingResult.bookingId}. Pay within 15 minutes to confirm it.</p>
+                <span className="customer-eyebrow">{t('customer.booking.createdEyebrow')}</span>
+                <h1>{t('customer.booking.createdTitle')}</h1>
+                <p>{t('customer.booking.referenceDue', { bookingId: bookingResult.bookingId })}</p>
               </div>
             ) : (
               <>
                 <div>
-                  <span className="customer-eyebrow">CARE THAT FITS YOUR JOURNEY</span>
-                  <h1>Book a service</h1>
-                  <p>Choose your vehicle, select services, and find a time that works for you.</p>
+                  <span className="customer-eyebrow">{t('customer.booking.eyebrow')}</span>
+                  <h1>{t('customer.booking.title')}</h1>
+                  <p>{t('customer.booking.description')}</p>
                 </div>
                 <span className="booking-heading-mark"><BrandMark /></span>
               </>
@@ -609,38 +616,48 @@ function CustomerBookingPage({ user, onLogout }) {
             >
               <span aria-hidden="true" className="booking-success-mark">✓</span>
               <div>
-                <h2 id="booking-success-title">Your slot is held for 15 minutes.</h2>
+                <h2 id="booking-success-title">{t('customer.booking.heldTitle')}</h2>
                 <p>
-                  The booking is confirmed only after payment. If it is not paid within
-                  15 minutes, it is cancelled automatically and the slot is released.
+                  {t('customer.booking.paymentRequired')}
                 </p>
                 <div className="booking-success-actions">
                   <a
                     className="customer-button customer-button-primary"
                     href={`/customer/payment/${encodeURIComponent(bookingResult.bookingId)}`}
                   >
-                    Pay now
+                    {t('customer.booking.payNow')}
                     <span aria-hidden="true">→</span>
                   </a>
                   <a className="booking-secondary-link" href="/customer/bookings">
-                    View My Bookings
+                    {t('customer.booking.viewBookings')}
                   </a>
                 </div>
               </div>
             </section>
           ) : (
             <>
-          <nav aria-label="Booking steps" className="booking-steps">
-            {STEPS.map(([title, description], index) => {
+          <nav
+            aria-label={t('customer.booking.stepsNavigationLabel')}
+            className="booking-steps"
+          >
+            {STEPS.map(([titleKey, descriptionKey], index) => {
+              const title = t(titleKey)
+              const description = t(descriptionKey)
               const stepNumber = index + 1
               const complete = stepNumber < step
               return (
                 <button
-                  aria-label={`Step ${stepNumber} of ${STEPS.length}: ${title}. ${description}${complete ? '. Completed' : ''}`}
+                  aria-label={t('customer.booking.stepLabel', {
+                    step: stepNumber,
+                    total: STEPS.length,
+                    title,
+                    description,
+                    completed: complete ? t('customer.booking.completed') : '',
+                  })}
                   aria-current={stepNumber === step ? 'step' : undefined}
                   className={`booking-step${stepNumber === step ? ' is-current' : ''}${complete ? ' is-complete' : ''}`}
                   disabled={stepNumber >= step}
-                  key={title}
+                  key={titleKey}
                   onClick={() => goToStep(stepNumber)}
                   type="button"
                 >
@@ -670,26 +687,39 @@ function CustomerBookingPage({ user, onLogout }) {
           >
             <div className="booking-panel-heading">
               <div>
-                <span className="booking-panel-kicker">STEP 0{step} / 04</span>
-                <h2 id="booking-panel-title">{STEPS[step - 1][1]}</h2>
+                <span className="booking-panel-kicker">
+                  {t('customer.booking.panelStep', { step: String(step).padStart(2, '0') })}
+                </span>
+                <h2 id="booking-panel-title">{t(STEPS[step - 1][1])}</h2>
               </div>
-              <span className="booking-panel-note">Your booking is confirmed once it is paid.</span>
+              <span className="booking-panel-note">
+                {t('customer.booking.paymentConfirmationNote')}
+              </span>
             </div>
 
             {step === 1 && (
               <div className="booking-step-content">
                 {vehicleState === 'loading' && (
-                  <PageState><span className="customer-loader" /> Loading your vehicles…</PageState>
+                  <PageState>
+                    <span className="customer-loader" />
+                    {t('customer.booking.loadingVehicles')}
+                  </PageState>
                 )}
                 {vehicleState === 'error' && (
-                  <PageState error onRetry={retryVehicles}>
-                    We couldn’t load your vehicles and vehicle models.
+                  <PageState
+                    error
+                    onRetry={retryVehicles}
+                    retryLabel={t('customer.common.retry')}
+                  >
+                    {t('customer.booking.vehicleLoadError')}
                   </PageState>
                 )}
                 {vehicleState === 'ready' && availableVehicles.length === 0 && (
                   <PageState>
-                    No vehicles are registered to your account yet.
-                    <a className="booking-text-link" href="/customer/vehicles">Add a vehicle</a>
+                    {t('customer.booking.noVehicles')}{' '}
+                    <a className="booking-text-link" href="/customer/vehicles">
+                      {t('customer.booking.addVehicle')}
+                    </a>
                   </PageState>
                 )}
                 {vehicleState === 'ready' && availableVehicles.length > 0 && (
@@ -712,9 +742,11 @@ function CustomerBookingPage({ user, onLogout }) {
                             />
                             <span className="booking-card-icon"><VehicleIcon /></span>
                             <span className="booking-vehicle-details">
-                              <strong>{vehicleLabel(vehicle)}</strong>
+                              <strong>{vehicleLabel(vehicle, t)}</strong>
                               {selected && (
-                                <span className="booking-selection-label">Selected vehicle</span>
+                                <span className="booking-selection-label">
+                                  {t('customer.booking.selectedVehicle')}
+                                </span>
                               )}
                               <small>{vehicle.license_plate}</small>
                               <span>
@@ -725,8 +757,8 @@ function CustomerBookingPage({ user, onLogout }) {
                               {!vehicle.selectable && (
                                 <em>
                                   {vehicle.status !== 'ACTIVE'
-                                    ? 'This vehicle is not active.'
-                                    : 'This vehicle model is not active in the catalog.'}
+                                    ? t('customer.booking.vehicleInactive')
+                                    : t('customer.booking.modelInactive')}
                                 </em>
                               )}
                             </span>
@@ -737,14 +769,16 @@ function CustomerBookingPage({ user, onLogout }) {
                     </div>
                     {selectedVehicle && !vehicleTypeId && (
                       <p className="booking-inline-note" role="status">
-                        The selected vehicle’s active model details could not be found. Choose another vehicle or update it in My Vehicles.
+                        {t('customer.booking.vehicleModelUnavailable')}
                       </p>
                     )}
                     {availableVehicles.length > 0 &&
                       !availableVehicles.some((vehicle) => vehicle.selectable) && (
                         <p className="booking-inline-note" role="status">
-                          None of your vehicles can be booked right now. Update a vehicle or add one with an active model in{' '}
-                          <a className="booking-text-link" href="/customer/vehicles">My Vehicles</a>.
+                          {t('customer.booking.noBookableVehicles')}{' '}
+                          <a className="booking-text-link" href="/customer/vehicles">
+                            {t('customer.vehicles.title')}
+                          </a>.
                         </p>
                       )}
                   </>
@@ -755,28 +789,42 @@ function CustomerBookingPage({ user, onLogout }) {
             {step === 2 && (
               <div className="booking-step-content">
                 {serviceState === 'loading' && (
-                  <PageState><span className="customer-loader" /> Loading available services…</PageState>
+                  <PageState>
+                    <span className="customer-loader" />
+                    {t('customer.booking.loadingServices')}
+                  </PageState>
                 )}
                 {serviceState === 'error' && (
-                  <PageState error onRetry={retryServices}>
-                    We couldn’t load the service catalog.
+                  <PageState
+                    error
+                    onRetry={retryServices}
+                    retryLabel={t('customer.common.retry')}
+                  >
+                    {t('customer.booking.serviceLoadError')}
                   </PageState>
                 )}
                 {serviceState === 'ready' && services.length === 0 && (
-                  <PageState>No active services are available right now.</PageState>
+                  <PageState>{t('customer.booking.noActiveServices')}</PageState>
                 )}
                 {serviceState === 'ready' && services.length > 0 && priceState === 'loading' && (
-                  <PageState><span className="customer-loader" /> Loading prices for your vehicle…</PageState>
+                  <PageState>
+                    <span className="customer-loader" />
+                    {t('customer.booking.loadingPrices')}
+                  </PageState>
                 )}
                 {serviceState === 'ready' && services.length > 0 && priceState === 'error' && (
-                  <PageState error onRetry={retryPrices}>
-                    We couldn’t load prices for your vehicle type.
+                  <PageState
+                    error
+                    onRetry={retryPrices}
+                    retryLabel={t('customer.common.retry')}
+                  >
+                    {t('customer.booking.priceLoadError')}
                   </PageState>
                 )}
                 {serviceState === 'ready' && services.length > 0 && priceState === 'ready' && (
                   <>
                     <p className="booking-section-intro">
-                      Select one or more services. Prices and durations are confirmed by the service catalog.
+                      {t('customer.booking.serviceSelectionIntro')}
                     </p>
                     <div className="booking-service-list">
                       {services.map((service) => {
@@ -799,12 +847,20 @@ function CustomerBookingPage({ user, onLogout }) {
                             <span className="booking-service-copy">
                               <strong>{service.service_name}</strong>
                               {selected && (
-                                <small className="booking-selection-label">Selected service</small>
+                                <small className="booking-selection-label">
+                                  {t('customer.booking.selectedService')}
+                                </small>
                               )}
-                              <span>{service.description?.trim() || 'No additional service details are listed.'}</span>
-                              <small>{service.duration_minutes} min</small>
+                              <span>
+                                {service.description?.trim() || t('customer.booking.noServiceDetails')}
+                              </span>
+                              <small>
+                                {t('customer.booking.durationMinutes', {
+                                  minutes: service.duration_minutes,
+                                })}
+                              </small>
                               {!hasPrice && (
-                                <em>Not available for this vehicle type</em>
+                                <em>{t('customer.booking.unavailableVehicleType')}</em>
                               )}
                             </span>
                             <span className="booking-service-price">
@@ -816,19 +872,27 @@ function CustomerBookingPage({ user, onLogout }) {
                     </div>
                     <div className="booking-total-bar">
                       <span>
-                        {selectedServiceIds.length} {selectedServiceIds.length === 1 ? 'service' : 'services'} selected
-                        {totalDurationMinutes > 0 && ` · about ${formatDuration(totalDurationMinutes)}`}
+                        {t(
+                          selectedServiceIds.length === 1
+                            ? 'customer.booking.serviceSelected'
+                            : 'customer.booking.servicesSelected',
+                          { count: selectedServiceIds.length },
+                        )}
+                        {totalDurationMinutes > 0 &&
+                          ` · ${t('customer.booking.durationAbout', {
+                            duration: formatDuration(totalDurationMinutes, t),
+                          })}`}
                       </span>
                       <strong>{formatCents(totalCents)}</strong>
                     </div>
                     {selectedServiceIds.length > 0 && totalCents === 0n && (
                       <p className="booking-inline-note" role="status">
-                        The booking total must be greater than zero. Select at least one service with a positive price.
+                        {t('customer.booking.totalMustBePositive')}
                       </p>
                     )}
                     {selectedServiceIds.length === 0 && (
                       <p className="booking-inline-note" role="status">
-                        Choose at least one service with a listed price to continue.
+                        {t('customer.booking.selectPricedService')}
                       </p>
                     )}
                   </>
@@ -840,12 +904,14 @@ function CustomerBookingPage({ user, onLogout }) {
               <div className="booking-step-content">
                 <div className="booking-range-control">
                   <div>
-                    <strong>{formatDate(scheduleRangeStart)} – {formatDate(rangeEnd)}</strong>
-                    <small>Available dates and times</small>
+                    <strong>
+                      {formatDate(scheduleRangeStart, language, t)} – {formatDate(rangeEnd, language, t)}
+                    </strong>
+                    <small>{t('customer.booking.availableDatesTimes')}</small>
                   </div>
                   <div className="booking-range-buttons">
                     <button
-                      aria-label="Browse previous dates"
+                      aria-label={t('customer.booking.browsePreviousDates')}
                       disabled={scheduleRangeStart <= today}
                       onClick={() => changeScheduleRange(-1)}
                       type="button"
@@ -854,16 +920,16 @@ function CustomerBookingPage({ user, onLogout }) {
                     </button>
                     {scheduleRangeStart > today && (
                       <button
-                        aria-label="Return to dates starting today"
+                        aria-label={t('customer.booking.returnToday')}
                         className="booking-today-button"
                         onClick={showToday}
                         type="button"
                       >
-                        Today
+                        {t('customer.booking.today')}
                       </button>
                     )}
                     <button
-                      aria-label="Browse later dates"
+                      aria-label={t('customer.booking.browseLaterDates')}
                       onClick={() => changeScheduleRange(1)}
                       type="button"
                     >
@@ -873,22 +939,29 @@ function CustomerBookingPage({ user, onLogout }) {
                 </div>
 
                 {scheduleState === 'loading' && (
-                  <PageState><span className="customer-loader" /> Checking available dates…</PageState>
+                  <PageState>
+                    <span className="customer-loader" />
+                    {t('customer.booking.checkingDates')}
+                  </PageState>
                 )}
                 {scheduleState === 'error' && (
-                  <PageState error onRetry={retrySchedules}>
-                    We couldn’t load available times.
+                  <PageState
+                    error
+                    onRetry={retrySchedules}
+                    retryLabel={t('customer.common.retry')}
+                  >
+                    {t('customer.booking.timeLoadError')}
                   </PageState>
                 )}
                 {scheduleState === 'ready' && schedules.length === 0 && (
                   <PageState>
-                    No available times in this date range. Browse later dates to continue.
+                    {t('customer.booking.noTimesInRange')}
                   </PageState>
                 )}
                 {scheduleState === 'ready' && schedules.length > 0 && (
                   <>
                     <div
-                      aria-label="Dates with returned time slots"
+                      aria-label={t('customer.booking.datesWithSlots')}
                       className="booking-date-list"
                       role="group"
                     >
@@ -908,23 +981,37 @@ function CustomerBookingPage({ user, onLogout }) {
                             }}
                             type="button"
                           >
-                            <strong>{formatDate(date, { weekday: 'short' })}</strong>
-                            <span>{formatDate(date, { day: 'numeric', month: 'short' })}</span>
+                            <strong>
+                              {formatDate(date, language, t, { weekday: 'short' })}
+                            </strong>
+                            <span>
+                              {formatDate(date, language, t, { day: 'numeric', month: 'short' })}
+                            </span>
                             <small>
                               {availableSlotCount > 0
-                                ? `${availableSlotCount} ${availableSlotCount === 1 ? 'time' : 'times'} available`
-                                : 'No availability'}
+                                ? t(
+                                  availableSlotCount === 1
+                                    ? 'customer.booking.timeAvailable'
+                                    : 'customer.booking.timesAvailable',
+                                  { count: availableSlotCount },
+                                )
+                                : t('customer.booking.noAvailability')}
                             </small>
                           </button>
                         )
                       })}
                     </div>
                     <h3 className="booking-time-heading">
-                      Available times · {selectedDate ? formatDate(selectedDate) : 'selected date'}
+                      {t('customer.booking.availableTimes')} ·{' '}
+                      {selectedDate
+                        ? formatDate(selectedDate, language, t)
+                        : t('customer.booking.selectedDate')}
                     </h3>
                     {totalDurationMinutes > 90 && (
                       <p className="booking-inline-note" role="status">
-                        Your services take about {formatDuration(totalDurationMinutes)}, so each visit uses more than one time slot. Only start times with enough free time after them are shown.
+                        {t('customer.booking.servicesLongNotice', {
+                          duration: formatDuration(totalDurationMinutes, t),
+                        })}
                       </p>
                     )}
                     <div className="booking-slot-grid">
@@ -934,15 +1021,20 @@ function CustomerBookingPage({ user, onLogout }) {
                         const full = Number(schedule.remaining_capacity) === 0
                         const unavailable =
                           String(schedule.status ?? 'AVAILABLE').toUpperCase() !== 'AVAILABLE'
+                        const availabilityLabel = full
+                          ? t('customer.booking.fullyBooked')
+                          : unavailable
+                            ? t('customer.booking.slotUnavailable')
+                            : t('customer.booking.spotsAvailable', {
+                              count: schedule.remaining_capacity,
+                            })
                         return (
                           <button
-                            aria-label={`${formatTime(schedule.start_time)} to ${formatTime(schedule.end_time)}. ${
-                              full
-                                ? 'Fully booked'
-                                : unavailable
-                                  ? 'Unavailable'
-                                  : `${schedule.remaining_capacity} spots available`
-                            }`}
+                            aria-label={t('customer.booking.slotLabel', {
+                              startTime: formatTime(schedule.start_time, t),
+                              endTime: formatTime(schedule.end_time, t),
+                              availability: availabilityLabel,
+                            })}
                             aria-pressed={selected}
                             className={`booking-slot${selectable ? ' is-available' : ''}${selected ? ' is-selected' : ''}${full ? ' is-full' : ''}${unavailable && !full ? ' is-unavailable' : ''}`}
                             disabled={!selectable}
@@ -950,27 +1042,30 @@ function CustomerBookingPage({ user, onLogout }) {
                             onClick={() => chooseSchedule(schedule)}
                             type="button"
                           >
-                            <strong>{formatTime(schedule.start_time)}</strong>
-                            <span>to {formatTime(schedule.end_time)}</span>
+                            <strong>{formatTime(schedule.start_time, t)}</strong>
+                            <span>– {formatTime(schedule.end_time, t)}</span>
                             <small>
                               {full
-                                ? 'Fully booked'
+                                ? t('customer.booking.fullyBooked')
                                 : unavailable
-                                  ? 'Unavailable'
-                                  : `${schedule.remaining_capacity} ${
-                                      Number(schedule.remaining_capacity) === 1 ? 'spot' : 'spots'
-                                    } left`}
+                                  ? t('customer.booking.slotUnavailable')
+                                  : t(
+                                    Number(schedule.remaining_capacity) === 1
+                                      ? 'customer.booking.spotLeft'
+                                      : 'customer.booking.spotsLeft',
+                                    { count: schedule.remaining_capacity },
+                                  )}
                             </small>
                           </button>
                         )
                       })}
                     </div>
                     <div aria-live="polite" className="booking-selected-appointment">
-                      <strong>Selected appointment</strong>
+                      <strong>{t('customer.booking.selectedAppointment')}</strong>
                       <span>
                         {selectedSchedule
-                          ? `${formatDate(selectedSchedule.schedule_date)} · ${formatTime(selectedSchedule.start_time)} – ${formatTime(selectedSchedule.end_time)}`
-                          : 'Choose an available time to continue.'}
+                          ? `${formatDate(selectedSchedule.schedule_date, language, t)} · ${formatTime(selectedSchedule.start_time, t)} – ${formatTime(selectedSchedule.end_time, t)}`
+                          : t('customer.booking.chooseTime')}
                       </span>
                     </div>
                   </>
@@ -979,7 +1074,7 @@ function CustomerBookingPage({ user, onLogout }) {
                   schedules.length > 0 &&
                   dateSchedules.length === 0 && (
                     <PageState>
-                      No time slots are listed for this date. Choose another date or browse a later range.
+                      {t('customer.booking.noSlotsForDate')}
                     </PageState>
                   )}
               </div>
@@ -988,25 +1083,31 @@ function CustomerBookingPage({ user, onLogout }) {
             {step === 4 && (
               <div className="booking-step-content">
                 <p className="booking-section-intro">
-                  Please review the details before confirming your appointment.
+                  {t('customer.booking.reviewBeforeConfirming')}
                 </p>
                 <div className="booking-summary">
                   <section className="booking-summary-section">
                     <div className="booking-summary-heading">
                       <span>01</span>
-                      <h3>Vehicle</h3>
-                      <button onClick={() => goToStep(1)} type="button">Change</button>
+                      <h3>{t('customer.booking.vehicle')}</h3>
+                      <button onClick={() => goToStep(1)} type="button">
+                        {t('customer.booking.change')}
+                      </button>
                     </div>
                     <div className="booking-summary-vehicle">
                       <span className="booking-card-icon"><VehicleIcon /></span>
                       <span>
-                        <strong>{selectedVehicle ? vehicleLabel(selectedVehicle) : 'Vehicle unavailable'}</strong>
+                        <strong>
+                          {selectedVehicle
+                            ? vehicleLabel(selectedVehicle, t)
+                            : t('customer.booking.vehicleUnavailable')}
+                        </strong>
                         <small>
                           {selectedVehicle
                             ? [selectedVehicle.license_plate, selectedVehicle.type_name]
                               .filter(Boolean)
                               .join(' · ')
-                            : 'Go back and select a vehicle.'}
+                            : t('customer.booking.selectVehicleAgain')}
                         </small>
                       </span>
                     </div>
@@ -1015,15 +1116,21 @@ function CustomerBookingPage({ user, onLogout }) {
                   <section className="booking-summary-section">
                     <div className="booking-summary-heading">
                       <span>02</span>
-                      <h3>Services</h3>
-                      <button onClick={() => goToStep(2)} type="button">Change</button>
+                      <h3>{t('customer.booking.services')}</h3>
+                      <button onClick={() => goToStep(2)} type="button">
+                        {t('customer.booking.change')}
+                      </button>
                     </div>
                     <ul className="booking-summary-services">
                       {selectedServices.map((service) => (
                         <li key={service.service_id}>
                           <span>
                             <strong>{service.service_name}</strong>
-                            <small>{service.duration_minutes} min</small>
+                            <small>
+                              {t('customer.booking.durationMinutes', {
+                                minutes: service.duration_minutes,
+                              })}
+                            </small>
                           </span>
                           <span>{formatCents(servicePrices[String(service.service_id)])}</span>
                         </li>
@@ -1034,20 +1141,22 @@ function CustomerBookingPage({ user, onLogout }) {
                   <section className="booking-summary-section">
                     <div className="booking-summary-heading">
                       <span>03</span>
-                      <h3>Date &amp; time</h3>
-                      <button onClick={() => goToStep(3)} type="button">Change</button>
+                      <h3>{t('customer.booking.dateTime')}</h3>
+                      <button onClick={() => goToStep(3)} type="button">
+                        {t('customer.booking.change')}
+                      </button>
                     </div>
                     <p className="booking-summary-appointment">
                       {selectedSchedule
-                        ? `${formatDate(selectedSchedule.schedule_date)} · ${formatTime(selectedSchedule.start_time)} – ${formatTime(selectedSchedule.end_time)}`
-                        : 'Go back and choose an available time.'}
+                        ? `${formatDate(selectedSchedule.schedule_date, language, t)} · ${formatTime(selectedSchedule.start_time, t)} – ${formatTime(selectedSchedule.end_time, t)}`
+                        : t('customer.booking.chooseAvailableTime')}
                     </p>
                   </section>
 
                   <section className="booking-summary-section booking-coupon">
                     <div className="booking-summary-heading">
                       <span>04</span>
-                      <h3>Coupon</h3>
+                      <h3>{t('customer.booking.coupon')}</h3>
                     </div>
                     {activeCoupon ? (
                       <div className="booking-coupon-applied">
@@ -1055,11 +1164,15 @@ function CustomerBookingPage({ user, onLogout }) {
                           <strong>{activeCoupon.code}</strong>
                           {activeCoupon.description && <small>{activeCoupon.description}</small>}
                         </span>
-                        <button disabled={submitting} onClick={removeCoupon} type="button">Remove</button>
+                        <button disabled={submitting} onClick={removeCoupon} type="button">
+                          {t('customer.booking.removeCoupon')}
+                        </button>
                       </div>
                     ) : (
                       <div className="booking-coupon-form">
-                        <label className="booking-visually-hidden" htmlFor="booking-coupon-code">Coupon code</label>
+                        <label className="booking-visually-hidden" htmlFor="booking-coupon-code">
+                          {t('customer.booking.couponCode')}
+                        </label>
                         <input
                           autoComplete="off"
                           disabled={couponChecking || submitting}
@@ -1069,7 +1182,7 @@ function CustomerBookingPage({ user, onLogout }) {
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') { event.preventDefault(); void applyCoupon() }
                           }}
-                          placeholder="Have a coupon code?"
+                          placeholder={t('customer.booking.couponPlaceholder')}
                           value={couponInput}
                         />
                         <button
@@ -1077,7 +1190,9 @@ function CustomerBookingPage({ user, onLogout }) {
                           onClick={() => void applyCoupon()}
                           type="button"
                         >
-                          {couponChecking ? 'Checking…' : 'Apply'}
+                          {couponChecking
+                            ? t('customer.booking.checkingCoupon')
+                            : t('customer.booking.applyCoupon')}
                         </button>
                       </div>
                     )}
@@ -1086,17 +1201,19 @@ function CustomerBookingPage({ user, onLogout }) {
 
                   {activeCoupon && (
                     <div className="booking-summary-breakdown">
-                      <span>Subtotal</span><span>{formatCents(totalCents)}</span>
-                      <span>Coupon discount</span><span>−{formatCents(activeCoupon.discountCents)}</span>
+                      <span>{t('customer.booking.subtotal')}</span>
+                      <span>{formatCents(totalCents)}</span>
+                      <span>{t('customer.booking.couponDiscount')}</span>
+                      <span>−{formatCents(activeCoupon.discountCents)}</span>
                     </div>
                   )}
                   <div className="booking-summary-total">
-                    <span>Amount due</span>
+                    <span>{t('customer.booking.amountDue')}</span>
                     <strong>{formatCents(payableCents)}</strong>
                   </div>
                 </div>
                 <p className="booking-payment-note">
-                  After booking, pay online within 15 minutes to confirm your slot. Unpaid bookings are cancelled automatically.
+                  {t('customer.booking.paymentNote')}
                 </p>
               </div>
             )}
@@ -1113,7 +1230,7 @@ function CustomerBookingPage({ user, onLogout }) {
                 </button>
               ) : (
                 <a className="booking-secondary-link" href="/customer">
-                  Cancel
+                  {t('customer.common.cancel')}
                 </a>
               )}
               {step < 4 ? (
@@ -1123,7 +1240,7 @@ function CustomerBookingPage({ user, onLogout }) {
                   onClick={() => moveToStep(step + 1)}
                   type="button"
                 >
-                  Continue
+                  {t('customer.booking.continue')}
                   <span aria-hidden="true">→</span>
                 </button>
               ) : (
@@ -1141,7 +1258,9 @@ function CustomerBookingPage({ user, onLogout }) {
                   onClick={confirmBooking}
                   type="button"
                 >
-                  {submitting ? 'Confirming…' : 'Confirm booking'}
+                  {submitting
+                    ? t('customer.booking.confirming')
+                    : t('customer.booking.confirm')}
                   {!submitting && <span aria-hidden="true">→</span>}
                 </button>
               )}
@@ -1149,7 +1268,7 @@ function CustomerBookingPage({ user, onLogout }) {
           </section>
           <p className="booking-security-note">
             <span aria-hidden="true">✓</span>
-            Your appointment details are verified securely before booking.
+            {t('customer.booking.securityNote')}
           </p>
             </>
           )}

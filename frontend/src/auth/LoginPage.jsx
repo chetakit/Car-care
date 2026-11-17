@@ -3,31 +3,65 @@ import { ApiError } from '../Admin/api/client.js'
 import CustomerHeader from '../Customer/CustomerHeader.jsx'
 import useAuth from './useAuth.js'
 import AuthShowcase from './AuthShowcase.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import './auth.css'
 
 function LoginPage({ registrationSuccess = false, onNavigate }) {
   const { login, authError, clearAuthError } = useAuth()
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  function clearValidationError() {
+    setError((currentError) =>
+      currentError.startsWith('auth.login.validation.') ? '' : currentError,
+    )
+  }
+
+  function handleEmailInvalid(event) {
+    event.preventDefault()
+    setError(
+      event.currentTarget.validity.valueMissing
+        ? 'auth.login.validation.emailRequired'
+        : 'auth.login.validation.emailInvalid',
+    )
+  }
+
+  function handlePasswordInvalid(event) {
+    event.preventDefault()
+    setError((currentError) =>
+      currentError === 'auth.login.validation.emailRequired' ||
+      currentError === 'auth.login.validation.emailInvalid'
+        ? currentError
+        : 'auth.login.validation.passwordRequired',
+    )
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
     setSubmitting(true)
     setError('')
     clearAuthError()
+
     try {
       await login(email, password)
     } catch (loginError) {
       setError(
         loginError instanceof ApiError
           ? loginError.message
-          : loginError.message || 'Unable to sign in. Please try again.',
+          : loginError.message || 'auth.login.error',
       )
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function displayError(message) {
+    if (!message) return ''
+    return message.startsWith('auth.') ? t(message) : message
   }
 
   return (
@@ -37,58 +71,84 @@ function LoginPage({ registrationSuccess = false, onNavigate }) {
         <div className="shared-auth-layout">
           <AuthShowcase />
           <section aria-labelledby="login-title" className="shared-auth-card">
-            <span className="shared-auth-kicker">MEMBER ACCESS</span>
-            <h1 id="login-title">Welcome back</h1>
+            <LanguageToggle />
+            <span className="shared-auth-kicker">
+              {t('auth.login.eyebrow')}
+            </span>
+            <h1 id="login-title">{t('auth.login.title')}</h1>
             <p className="shared-auth-description">
-              Sign in with your Car Care account to continue.
+              {t('auth.login.description')}
             </p>
+
             {registrationSuccess && (
               <div className="shared-auth-success" role="status">
-                Your account has been created. You can sign in now.
+                {t('auth.login.registrationSuccess')}
               </div>
             )}
+
             {(error || authError) && (
               <div className="shared-auth-error" role="alert">
-                {error || authError}
+                {displayError(error || authError)}
               </div>
             )}
+
             <form className="shared-auth-form" onSubmit={handleSubmit}>
               <label>
-                Email address
+                {t('auth.login.email')}
                 <input
                   autoComplete="username"
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value)
+                    clearValidationError()
+                  }}
+                  onInvalid={handleEmailInvalid}
                   required
                   type="email"
                   value={email}
                 />
               </label>
+
               <label>
-                Password
+                {t('auth.login.password')}
                 <input
                   autoComplete="current-password"
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    clearValidationError()
+                  }}
+                  onInvalid={handlePasswordInvalid}
                   required
                   type="password"
                   value={password}
                 />
               </label>
+
               <button disabled={submitting} type="submit">
-                {submitting ? 'Signing in…' : 'Sign in'}
+                {submitting
+                  ? t('auth.login.submitting')
+                  : t('auth.login.submit')}
                 {!submitting && (
-                  <span aria-hidden="true" className="shared-auth-submit-arrow">
+                  <span
+                    aria-hidden="true"
+                    className="shared-auth-submit-arrow"
+                  >
                     →
                   </span>
                 )}
               </button>
             </form>
+
             <p className="shared-auth-footnote">
-              Your account role determines which Car Care workspace you can access.
+              {t('auth.login.accessNote')}
             </p>
+
             <p className="shared-auth-account-link">
-              New to Car Care?{' '}
-              <a href="/register" onClick={(event) => onNavigate?.(event, '/register')}>
-                Create Account
+              {t('auth.login.newToCarCare')}{' '}
+              <a
+                href="/register"
+                onClick={(event) => onNavigate?.(event, '/register')}
+              >
+                {t('auth.login.createAccount')}
               </a>
             </p>
           </section>

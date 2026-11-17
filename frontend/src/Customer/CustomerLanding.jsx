@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
@@ -56,6 +57,7 @@ function BenefitMark({ kind }) {
 
 function CustomerLanding({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
+  const { t } = useLanguage()
   const catalogPath = user?.role === 'CUSTOMER'
     ? '/api/customer/catalog/services'
     : '/api/public/catalog/services'
@@ -116,33 +118,36 @@ function CustomerLanding({ user, onLogout }) {
             <div className="customer-hero-copy">
               <span className="customer-eyebrow">
                 <span className="customer-eyebrow-dot" />
-                CAR CARE · ONLINE BOOKING
+                {t('customer.landing.eyebrow')}
               </span>
               <h1 id="customer-hero-title">
-                ดูแลรถของคุณ
-                <span> ให้ง่ายกว่าที่เคย</span>
+                {t('customer.landing.heroTitle')}
+                <span> {t('customer.landing.heroTitleAccent')}</span>
               </h1>
               <p>
                 {serviceState === 'empty'
-                  ? 'ขณะนี้ยังไม่มีบริการให้จอง โปรดกลับมาตรวจสอบอีกครั้งในภายหลัง'
-                  : 'เลือกบริการที่เหมาะกับรถของคุณ ตรวจสอบรายละเอียดและราคาตามประเภทรถ แล้วเลือกวันเวลาที่สะดวกผ่านระบบจองออนไลน์'}
+                  ? t('customer.landing.noServicesDescription')
+                  : t('customer.landing.heroDescription')}
               </p>
               <div className="customer-hero-actions">
                 {serviceState !== 'empty' && (
                   <a className="customer-button customer-button-primary" href={bookingHref}>
-                    จองบริการ
+                    {t('customer.common.bookService')}
                     <ArrowIcon />
                   </a>
                 )}
                 <a className="customer-text-link" href="#services">
-                  ดูบริการทั้งหมด
+                  {t('customer.landing.viewServices')}
                   <ArrowIcon diagonal />
                 </a>
               </div>
-              <ul className="customer-hero-note" aria-label="Booking benefits">
-                <li>เลือกรถและบริการ</li>
-                <li>เลือกรอบเวลาที่ว่าง</li>
-                <li>ตรวจสอบก่อนยืนยัน</li>
+              <ul
+                aria-label={t('customer.landing.bookingBenefits')}
+                className="customer-hero-note"
+              >
+                <li>{t('customer.landing.chooseVehicleAndService')}</li>
+                <li>{t('customer.landing.chooseAvailableTime')}</li>
+                <li>{t('customer.landing.reviewBeforeConfirming')}</li>
               </ul>
             </div>
 
@@ -159,7 +164,7 @@ function CustomerLanding({ user, onLogout }) {
                   </div>
                 ) : (
                   <img
-                    alt="รถยนต์ในภาพแนะนำบริการ Car Care"
+                    alt={t('customer.landing.carCareImageAlt')}
                     className="customer-hero-image"
                     decoding="async"
                     fetchPriority="high"
@@ -172,8 +177,8 @@ function CustomerLanding({ user, onLogout }) {
               </div>
               <div className="customer-image-caption">
                 <span>
-                  <strong>ดูแลรถในแบบของคุณ</strong>
-                  <small>เลือกบริการและเวลาที่เหมาะกับคุณ</small>
+                  <strong>{t('customer.landing.personalizedCare')}</strong>
+                  <small>{t('customer.landing.chooseConvenientService')}</small>
                 </span>
               </div>
             </div>
@@ -184,13 +189,17 @@ function CustomerLanding({ user, onLogout }) {
           <div className="customer-container">
             <div className="customer-section-heading">
               <div>
-                <span className="customer-eyebrow">บริการที่เลือกได้</span>
-                <h2 id="customer-services-title">ค้นหาบริการที่ใช่สำหรับรถคุณ</h2>
-                <p>รายการบริการจากแคตตาล็อก Car Care ที่เปิดให้จองในขณะนี้</p>
+                <span className="customer-eyebrow">
+                  {t('customer.landing.availableServicesEyebrow')}
+                </span>
+                <h2 id="customer-services-title">
+                  {t('customer.landing.servicesTitle')}
+                </h2>
+                <p>{t('customer.landing.catalogDescription')}</p>
               </div>
               {serviceState !== 'empty' && (
                 <a className="customer-section-cta" href={bookingHref}>
-                  ไปที่หน้าจองบริการ
+                  {t('customer.landing.bookingPageLink')}
                   <ArrowIcon />
                 </a>
               )}
@@ -198,7 +207,7 @@ function CustomerLanding({ user, onLogout }) {
 
             {serviceState !== 'empty' && (
               <p className="customer-pricing-note">
-                ราคาขึ้นอยู่กับประเภทรถ เลือกรถในขั้นตอนจองเพื่อดูราคาที่ใช้กับรถของคุณ
+                {t('customer.landing.priceByVehicleNote')}
               </p>
             )}
 
@@ -211,7 +220,7 @@ function CustomerLanding({ user, onLogout }) {
                   </div>
                 ) : (
                   <img
-                    alt="ภาพรถยนต์ประกอบการแนะนำบริการดูแลรถ"
+                    alt={t('customer.landing.serviceImageAlt')}
                     className="customer-services-image"
                     decoding="async"
                     loading="lazy"
@@ -220,8 +229,8 @@ function CustomerLanding({ user, onLogout }) {
                   />
                 )}
                 <figcaption>
-                  <span>CAR CARE SERVICE</span>
-                  <strong>รายละเอียดบริการที่เลือกได้</strong>
+                  <span>{t('customer.landing.serviceCategory')}</span>
+                  <strong>{t('customer.landing.serviceDetailsCaption')}</strong>
                 </figcaption>
               </figure>
 
@@ -229,12 +238,12 @@ function CustomerLanding({ user, onLogout }) {
                 {serviceState === 'loading' && (
                   <div aria-live="polite" className="customer-catalog-message">
                     <span className="customer-loader" />
-                    <span>กำลังโหลดบริการที่เปิดให้จอง…</span>
+                    <span>{t('customer.landing.loadingServices')}</span>
                   </div>
                 )}
                 {serviceState === 'error' && (
                   <div className="customer-catalog-message customer-catalog-error" role="alert">
-                    <span>ไม่สามารถโหลดรายการบริการได้</span>
+                    <span>{t('customer.landing.loadServicesError')}</span>
                     <button
                       onClick={() => {
                         setServiceState('loading')
@@ -242,7 +251,7 @@ function CustomerLanding({ user, onLogout }) {
                       }}
                       type="button"
                     >
-                      ลองอีกครั้ง
+                      {t('customer.common.retry')}
                     </button>
                   </div>
                 )}
@@ -253,7 +262,7 @@ function CustomerLanding({ user, onLogout }) {
                     className="customer-catalog-message"
                     role="status"
                   >
-                    ขณะนี้ยังไม่มีบริการให้จอง โปรดลองกลับมาตรวจสอบอีกครั้ง
+                    {t('customer.landing.noServicesAvailable')}
                   </div>
                 )}
                 {serviceState === 'ready' && (
@@ -265,12 +274,14 @@ function CustomerLanding({ user, onLogout }) {
                           <h3>{service.service_name}</h3>
                           <p>
                             {service.description?.trim() ||
-                              'ยังไม่มีรายละเอียดเพิ่มเติมสำหรับบริการนี้'}
+                              t('customer.landing.noServiceDescription')}
                           </p>
                         </div>
                         {service.duration_minutes !== null && service.duration_minutes !== undefined && (
                           <span className="customer-service-duration">
-                            {service.duration_minutes} นาที
+                            {t('customer.landing.durationMinutes', {
+                              minutes: service.duration_minutes,
+                            })}
                           </span>
                         )}
                       </article>
@@ -281,15 +292,15 @@ function CustomerLanding({ user, onLogout }) {
             </div>
 
             <a className="customer-section-cta customer-view-all-services" href="/services">
-              View All Services
+              {t('customer.landing.viewAllServices')}
               <ArrowIcon />
             </a>
 
             {serviceState === 'ready' && (
               <div className="customer-services-action">
-                <p>พร้อมเลือกบริการสำหรับรถของคุณแล้วหรือยัง?</p>
+                <p>{t('customer.landing.readyToChoose')}</p>
                 <a className="customer-button customer-button-primary" href={bookingHref}>
-                  เริ่มจองบริการ
+                  {t('customer.landing.startBooking')}
                   <ArrowIcon />
                 </a>
               </div>
@@ -305,31 +316,35 @@ function CustomerLanding({ user, onLogout }) {
           <div className="customer-container">
             <div className="customer-section-heading">
               <div>
-                <span className="customer-eyebrow">ขั้นตอนการจอง</span>
-                <h2 id="customer-process-title">เริ่มต้นได้ใน 3 ขั้นตอน</h2>
-                <p>ขั้นตอนสั้น ๆ ที่ตรงกับระบบจองบริการของ Car Care</p>
+                <span className="customer-eyebrow">
+                  {t('customer.landing.bookingSteps')}
+                </span>
+                <h2 id="customer-process-title">
+                  {t('customer.landing.threeStepsTitle')}
+                </h2>
+                <p>{t('customer.landing.stepsDescription')}</p>
               </div>
             </div>
             <ol className="customer-process-list">
               <li>
                 <span className="customer-process-number">01</span>
                 <div>
-                  <h3>เลือกรถและบริการ</h3>
-                  <p>เลือกรถที่ลงทะเบียนไว้ แล้วเลือกบริการที่ต้องการ</p>
+                  <h3>{t('customer.landing.stepVehicleTitle')}</h3>
+                  <p>{t('customer.landing.stepVehicleDescription')}</p>
                 </div>
               </li>
               <li>
                 <span className="customer-process-number">02</span>
                 <div>
-                  <h3>เลือกวันและเวลา</h3>
-                  <p>เลือกวันที่และรอบเวลาที่ยังเปิดให้จอง</p>
+                  <h3>{t('customer.landing.stepTimeTitle')}</h3>
+                  <p>{t('customer.landing.stepTimeDescription')}</p>
                 </div>
               </li>
               <li>
                 <span className="customer-process-number">03</span>
                 <div>
-                  <h3>ตรวจสอบและยืนยัน</h3>
-                  <p>ทบทวนรายละเอียดและยอดตามรถที่เลือกก่อนส่งการจอง</p>
+                  <h3>{t('customer.landing.stepReviewTitle')}</h3>
+                  <p>{t('customer.landing.stepReviewDescription')}</p>
                 </div>
               </li>
             </ol>
@@ -344,26 +359,30 @@ function CustomerLanding({ user, onLogout }) {
           <div className="customer-container">
             <div className="customer-section-heading customer-benefits-heading">
               <div>
-                <span className="customer-eyebrow">เลือกได้อย่างมั่นใจ</span>
-                <h2 id="customer-about-title">ทุกขั้นตอนชัดเจนก่อนจอง</h2>
-                <p>ข้อมูลและตัวเลือกที่มีอยู่จริงในระบบ ช่วยให้คุณวางแผนได้ง่ายขึ้น</p>
+                <span className="customer-eyebrow">
+                  {t('customer.landing.confidentChoice')}
+                </span>
+                <h2 id="customer-about-title">
+                  {t('customer.landing.clearStepsTitle')}
+                </h2>
+                <p>{t('customer.landing.clearStepsDescription')}</p>
               </div>
             </div>
             <div className="customer-benefit-grid">
               <article className="customer-benefit-card">
                 <BenefitMark kind="service" />
-                <h3>เห็นรายละเอียดบริการ</h3>
-                <p>ตรวจสอบชื่อ รายละเอียด และระยะเวลาเมื่อมีข้อมูลในแคตตาล็อก</p>
+                <h3>{t('customer.landing.serviceDetailsTitle')}</h3>
+                <p>{t('customer.landing.serviceDetailsDescription')}</p>
               </article>
               <article className="customer-benefit-card">
                 <BenefitMark kind="schedule" />
-                <h3>เลือกรอบที่ยังว่าง</h3>
-                <p>เลือกวันและเวลาจากตารางที่ระบบเปิดให้จอง</p>
+                <h3>{t('customer.landing.availableSlotsTitle')}</h3>
+                <p>{t('customer.landing.availableSlotsDescription')}</p>
               </article>
               <article className="customer-benefit-card">
                 <BenefitMark kind="clear" />
-                <h3>ทบทวนก่อนยืนยัน</h3>
-                <p>ตรวจสอบบริการและราคาตามประเภทรถก่อนส่งรายการจอง</p>
+                <h3>{t('customer.landing.reviewTitle')}</h3>
+                <p>{t('customer.landing.reviewDescription')}</p>
               </article>
             </div>
           </div>
@@ -378,22 +397,22 @@ function CustomerLanding({ user, onLogout }) {
             <div className="customer-promo-copy">
               <span className="customer-eyebrow customer-eyebrow-light">
                 {serviceState === 'empty'
-                  ? 'อัปเดตรายการบริการ'
-                  : 'เริ่มดูแลรถของคุณ'}
+                  ? t('customer.landing.updateServices')
+                  : t('customer.landing.startCare')}
               </span>
               <h2 id="customer-booking-title">
                 {serviceState === 'empty'
-                  ? 'ขณะนี้ยังไม่มีบริการให้จอง'
-                  : 'พร้อมเลือกบริการที่เหมาะกับรถของคุณหรือยัง?'}
+                  ? t('customer.landing.noServicesTitle')
+                  : t('customer.landing.readyToBookTitle')}
               </h2>
               <p>
                 {serviceState === 'empty'
-                  ? 'โปรดกลับมาตรวจสอบอีกครั้งเมื่อมีบริการเปิดให้จอง'
-                  : 'ไปที่หน้าจองเพื่อเลือกรถ บริการ และช่วงเวลาที่สะดวก ระบบจะแสดงราคาตามประเภทรถก่อนยืนยัน'}
+                  ? t('customer.landing.noServicesReturn')
+                  : t('customer.landing.bookingDescription')}
               </p>
               {serviceState !== 'empty' && (
                 <a className="customer-button customer-button-light" href={bookingHref}>
-                  ไปที่หน้าจองบริการ
+                  {t('customer.landing.bookingPageLink')}
                   <ArrowIcon />
                 </a>
               )}
