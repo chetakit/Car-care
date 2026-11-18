@@ -16,6 +16,24 @@ const HERO_IMAGE_SRCSET = [
   `${HERO_IMAGE_URL}?auto=format&fit=crop&w=960&q=85 960w`,
   `${HERO_IMAGE_URL}?auto=format&fit=crop&w=1600&q=85 1600w`,
 ].join(', ')
+// How booking works, in the order the system enforces it.
+const PROCESS_STEPS = [
+  { key: 'vehicle' },
+  { key: 'service' },
+  { key: 'time' },
+  { key: 'pay' },
+  { key: 'visit' },
+]
+
+// Matches the server rules: free cancel before payment, 20% fee after,
+// no cancelling once the appointment starts, no refund for a no-show.
+const POLICY_RULES = [
+  { key: 'unpaid', figure: '0%', tone: 'good' },
+  { key: 'paid', figure: '80%', tone: 'info' },
+  { key: 'started', figure: '—', tone: 'muted' },
+  { key: 'noShow', figure: '0 ฿', tone: 'warn' },
+]
+
 function ArrowIcon({ diagonal = false }) {
   return (
     <svg
@@ -326,29 +344,48 @@ function CustomerLanding({ user, onLogout }) {
                 <p>{t('customer.landing.stepsDescription')}</p>
               </div>
             </div>
-            <ol className="customer-process-list">
-              <li>
-                <span className="customer-process-number">01</span>
-                <div>
-                  <h3>{t('customer.landing.stepVehicleTitle')}</h3>
-                  <p>{t('customer.landing.stepVehicleDescription')}</p>
-                </div>
-              </li>
-              <li>
-                <span className="customer-process-number">02</span>
-                <div>
-                  <h3>{t('customer.landing.stepTimeTitle')}</h3>
-                  <p>{t('customer.landing.stepTimeDescription')}</p>
-                </div>
-              </li>
-              <li>
-                <span className="customer-process-number">03</span>
-                <div>
-                  <h3>{t('customer.landing.stepReviewTitle')}</h3>
-                  <p>{t('customer.landing.stepReviewDescription')}</p>
-                </div>
-              </li>
+            <ol className="customer-timeline">
+              {PROCESS_STEPS.map((step, index) => (
+                <li className={step.key === 'pay' ? 'is-key' : undefined} key={step.key}>
+                  <span aria-hidden="true" className="customer-timeline-node">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <div className="customer-timeline-body">
+                    <h3>
+                      {t(`customer.landing.step.${step.key}.title`)}
+                      {step.key === 'pay' && (
+                        <span className="customer-timeline-timer">
+                          <svg aria-hidden="true" fill="none" viewBox="0 0 16 16">
+                            <circle cx="8" cy="9" r="5.5" />
+                            <path d="M8 6v3l2 1.5M6.5 1.5h3" />
+                          </svg>
+                          15:00
+                        </span>
+                      )}
+                    </h3>
+                    <p>{t(`customer.landing.step.${step.key}.description`)}</p>
+                  </div>
+                </li>
+              ))}
             </ol>
+
+            <div className="customer-policy">
+              <div className="customer-policy-heading">
+                <h3>{t('customer.landing.policy.title')}</h3>
+                <p>{t('customer.landing.policy.description')}</p>
+              </div>
+              <ul className="customer-policy-grid">
+                {POLICY_RULES.map((rule) => (
+                  <li className={`customer-policy-card is-${rule.tone}`} key={rule.key}>
+                    <span className="customer-policy-figure">{rule.figure}</span>
+                    <div>
+                      <h4>{t(`customer.landing.policy.${rule.key}.title`)}</h4>
+                      <p>{t(`customer.landing.policy.${rule.key}.description`)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
 
