@@ -162,10 +162,12 @@ function CustomerBookingPage({ user, onLogout }) {
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedScheduleId, setSelectedScheduleId] = useState('')
   const [submitError, setSubmitError] = useState('')
-  const [couponInput, setCouponInput] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponChecking, setCouponChecking] = useState(false)
   const [couponError, setCouponError] = useState('')
+  const [availableCoupons, setAvailableCoupons] = useState([])
+  const [couponsState, setCouponsState] = useState('idle')
+  const [couponReload, setCouponReload] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [bookingResult, setBookingResult] = useState(null)
   const submissionInProgress = useRef(false)
@@ -319,6 +321,14 @@ function CustomerBookingPage({ user, onLogout }) {
             !date ||
             schedule.schedule_id === null ||
             schedule.schedule_id === undefined ||
+            schedule.capacity === null ||
+            schedule.capacity === undefined ||
+            !Number.isInteger(Number(schedule.capacity)) ||
+            Number(schedule.capacity) < 0 ||
+            schedule.booked_count === null ||
+            schedule.booked_count === undefined ||
+            !Number.isInteger(Number(schedule.booked_count)) ||
+            Number(schedule.booked_count) < 0 ||
             schedule.remaining_capacity === null ||
             schedule.remaining_capacity === undefined ||
             !Number.isInteger(Number(schedule.remaining_capacity)) ||
@@ -342,6 +352,28 @@ function CustomerBookingPage({ user, onLogout }) {
 
     return () => controller.abort()
   }, [api, rangeEnd, scheduleRangeStart, scheduleReload, scheduleState, step, totalDurationMinutes])
+
+  useEffect(() => {
+    if (step !== 4 || couponsState === 'ready' || couponsState === 'error') {
+      return undefined
+    }
+
+    const controller = new AbortController()
+    api('/api/customer/coupons/available', { signal: controller.signal })
+      .then((response) => {
+        const items = response.data?.items
+        if (!Array.isArray(items)) {
+          throw new Error('The available coupons response is incomplete.')
+        }
+        setAvailableCoupons(items)
+        setCouponsState('ready')
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') setCouponsState('error')
+      })
+
+    return () => controller.abort()
+  }, [api, couponReload, couponsState, step])
 
   const availableVehicles = vehicles.map((vehicle) => {
     const model = vehicleModels.find(
@@ -372,8 +404,7 @@ function CustomerBookingPage({ user, onLogout }) {
     appliedCoupon && appliedCoupon.subtotalCents === totalCents ? appliedCoupon : null
   const payableCents = activeCoupon ? activeCoupon.finalCents : totalCents
 
-  async function applyCoupon() {
-    const code = couponInput.trim()
+  async function applyCoupon(code) {
     if (!code || couponChecking || totalCents <= 0n) return
     setCouponChecking(true)
     setCouponError('')
@@ -392,13 +423,17 @@ function CustomerBookingPage({ user, onLogout }) {
         discountCents,
         finalCents,
       })
-      setCouponInput(response.data.coupon_code)
     } catch {
       setAppliedCoupon(null)
       setCouponError(t('customer.booking.couponCheckError'))
     } finally {
       setCouponChecking(false)
     }
+  }
+
+  function retryCoupons() {
+    setCouponsState('idle')
+    setCouponReload((current) => current + 1)
   }
 
   function removeCoupon() {
@@ -1014,51 +1049,101 @@ function CustomerBookingPage({ user, onLogout }) {
                         })}
                       </p>
                     )}
-                    <div className="booking-slot-grid">
-                      {dateSchedules.map((schedule) => {
-                        const selected = selectedScheduleId === String(schedule.schedule_id)
-                        const selectable = scheduleIsSelectable(schedule)
-                        const full = Number(schedule.remaining_capacity) === 0
-                        const unavailable =
-                          String(schedule.status ?? 'AVAILABLE').toUpperCase() !== 'AVAILABLE'
-                        const availabilityLabel = full
-                          ? t('customer.booking.fullyBooked')
-                          : unavailable
-                            ? t('customer.booking.slotUnavailable')
-                            : t('customer.booking.spotsAvailable', {
-                              count: schedule.remaining_capacity,
-                            })
-                        return (
-                          <button
-                            aria-label={t('customer.booking.slotLabel', {
-                              startTime: formatTime(schedule.start_time, t),
-                              endTime: formatTime(schedule.end_time, t),
-                              availability: availabilityLabel,
-                            })}
-                            aria-pressed={selected}
-                            className={`booking-slot${selectable ? ' is-available' : ''}${selected ? ' is-selected' : ''}${full ? ' is-full' : ''}${unavailable && !full ? ' is-unavailable' : ''}`}
-                            disabled={!selectable}
-                            key={schedule.schedule_id}
-                            onClick={() => chooseSchedule(schedule)}
-                            type="button"
-                          >
-                            <strong>{formatTime(schedule.start_time, t)}</strong>
-                            <span>– {formatTime(schedule.end_time, t)}</span>
-                            <small>
-                              {full
-                                ? t('customer.booking.fullyBooked')
+                    <div className="booking-slot-table-wrap">
+                      <table aria-label={t('customer.booking.availableTimes')} className="booking-slot-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">{t('customer.booking.timeColumn')}</th>
+                            <th scope="col">{t('customer.booking.bookedColumn')}</th>
+                            <th scope="col">{t('customer.booking.statusColumn')}</th>
+                            <th scope="col">{t('customer.booking.actionColumn')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dateSchedules.map((schedule) => {
+                            const selected = selectedScheduleId === String(schedule.schedule_id)
+                            const selectable = scheduleIsSelectable(schedule)
+                            const status = String(schedule.status ?? 'AVAILABLE').toUpperCase()
+                            const full = status === 'FULL' ||
+                              (status === 'AVAILABLE' && Number(schedule.remaining_capacity) === 0)
+                            const past = status === 'PAST'
+                            const unavailable = status !== 'AVAILABLE' && !full
+                            const availabilityLabel = full
+                              ? t('customer.booking.fullyBooked')
+                              : past
+                                ? t('customer.booking.slotPast')
                                 : unavailable
                                   ? t('customer.booking.slotUnavailable')
-                                  : t(
-                                    Number(schedule.remaining_capacity) === 1
-                                      ? 'customer.booking.spotLeft'
-                                      : 'customer.booking.spotsLeft',
-                                    { count: schedule.remaining_capacity },
-                                  )}
-                            </small>
-                          </button>
-                        )
-                      })}
+                                  : t('customer.booking.spotsAvailable', {
+                                    count: schedule.remaining_capacity,
+                                  })
+                            const bookedCount = Number(schedule.booked_count)
+                            const capacity = Number(schedule.capacity)
+                            const occupancy = capacity > 0
+                              ? Math.min(100, Math.round((bookedCount / capacity) * 100))
+                              : 100
+                            const statusClass = full
+                              ? 'is-full'
+                              : past
+                                ? 'is-past'
+                                : unavailable
+                                  ? 'is-unavailable'
+                                  : 'is-available'
+                            return (
+                              <tr
+                                className={`booking-slot-row${selected ? ' is-selected' : ''}`}
+                                key={schedule.schedule_id}
+                              >
+                                <td className="booking-slot-time">
+                                  <strong>{formatTime(schedule.start_time, t)}</strong>
+                                  <span>– {formatTime(schedule.end_time, t)}</span>
+                                </td>
+                                <td>
+                                  <div className="booking-occupancy">
+                                    <strong
+                                      aria-label={t('customer.booking.bookedCapacity', {
+                                        booked: bookedCount,
+                                        capacity,
+                                      })}
+                                    >
+                                      {bookedCount} / {capacity}
+                                    </strong>
+                                    <span
+                                      aria-hidden="true"
+                                      className="booking-occupancy-meter"
+                                    >
+                                      <span style={{ width: `${occupancy}%` }} />
+                                    </span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span className={`booking-slot-status ${statusClass}`}>
+                                    {availabilityLabel}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button
+                                    aria-label={t('customer.booking.slotLabel', {
+                                      startTime: formatTime(schedule.start_time, t),
+                                      endTime: formatTime(schedule.end_time, t),
+                                      availability: availabilityLabel,
+                                    })}
+                                    aria-pressed={selected}
+                                    className={`booking-slot booking-slot-select${selected ? ' is-selected' : ''}`}
+                                    disabled={!selectable}
+                                    onClick={() => chooseSchedule(schedule)}
+                                    type="button"
+                                  >
+                                    {t(selected
+                                      ? 'customer.booking.selectedTime'
+                                      : 'customer.booking.selectTime')}
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                     <div aria-live="polite" className="booking-selected-appointment">
                       <strong>{t('customer.booking.selectedAppointment')}</strong>
@@ -1169,32 +1254,63 @@ function CustomerBookingPage({ user, onLogout }) {
                         </button>
                       </div>
                     ) : (
-                      <div className="booking-coupon-form">
-                        <label className="booking-visually-hidden" htmlFor="booking-coupon-code">
-                          {t('customer.booking.couponCode')}
-                        </label>
-                        <input
-                          autoComplete="off"
-                          disabled={couponChecking || submitting}
-                          id="booking-coupon-code"
-                          maxLength="50"
-                          onChange={(event) => { setCouponInput(event.target.value); setCouponError('') }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') { event.preventDefault(); void applyCoupon() }
-                          }}
-                          placeholder={t('customer.booking.couponPlaceholder')}
-                          value={couponInput}
-                        />
-                        <button
-                          disabled={!couponInput.trim() || couponChecking || submitting}
-                          onClick={() => void applyCoupon()}
-                          type="button"
-                        >
-                          {couponChecking
-                            ? t('customer.booking.checkingCoupon')
-                            : t('customer.booking.applyCoupon')}
-                        </button>
-                      </div>
+                      <>
+                        {couponsState === 'idle' && (
+                          <p className="booking-coupon-state" role="status">
+                            {t('customer.booking.loadingCoupons')}
+                          </p>
+                        )}
+                        {couponsState === 'error' && (
+                          <div className="booking-coupon-state is-error" role="alert">
+                            <span>{t('customer.booking.couponsLoadError')}</span>
+                            <button onClick={retryCoupons} type="button">
+                              {t('customer.common.retry')}
+                            </button>
+                          </div>
+                        )}
+                        {couponsState === 'ready' && availableCoupons.length === 0 && (
+                          <p className="booking-coupon-state">
+                            {t('customer.booking.noCoupons')}
+                          </p>
+                        )}
+                        {couponsState === 'ready' && availableCoupons.length > 0 && (
+                          <div className="booking-coupon-options">
+                            {availableCoupons.map((coupon) => {
+                              const discountLabel = coupon.discount_type === 'PERCENT'
+                                ? `${coupon.discount_value}%`
+                                : formatCents(amountToCents(coupon.discount_value) ?? 0n)
+                              const minimumCents = amountToCents(coupon.min_order_amount)
+                              return (
+                                <article className="booking-coupon-option" key={coupon.coupon_id}>
+                                  <div>
+                                    <strong>{discountLabel}</strong>
+                                    <span>{coupon.description || coupon.coupon_code}</span>
+                                    {minimumCents !== null && minimumCents > 0n && (
+                                      <small>
+                                        {t('customer.booking.couponMinimum', {
+                                          amount: formatCents(minimumCents),
+                                        })}
+                                      </small>
+                                    )}
+                                  </div>
+                                  <button
+                                    disabled={couponChecking || submitting}
+                                    onClick={() => {
+                                      setCouponError('')
+                                      void applyCoupon(coupon.coupon_code)
+                                    }}
+                                    type="button"
+                                  >
+                                    {couponChecking
+                                      ? t('customer.booking.checkingCoupon')
+                                      : t('customer.booking.useCoupon')}
+                                  </button>
+                                </article>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
                     {couponError && <p className="booking-coupon-error" role="alert">{couponError}</p>}
                   </section>

@@ -223,3 +223,200 @@
     width: calc(100% - 32px);
   }
 }
+
+.customer-home.customer-home {
+  --customer-teal: #d72d37;
+  --customer-teal-dark: #b8242d;
+  --customer-pale: #fff3f3;
+  --car-care-accent-rgb: 215 45 55;
+}
+
+.customer-home > main {
+  animation: customer-page-enter 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.customer-home :is(
+  .customer-benefit-card,
+  .customer-service-card,
+  .services-page-card,
+  .dashboard-section,
+  .profile-card,
+  .wallet-balance,
+  .wallet-panel,
+  .bookings-card,
+  .vehicles-card,
+  .payment-booking-card,
+  .payment-options-card,
+  .booking-panel,
+  .booking-steps
+) {
+  border-radius: 14px;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.customer-home :is(
+  .customer-benefit-card,
+  .customer-service-card,
+  .services-page-card,
+  .profile-card,
+  .wallet-panel,
+  .bookings-card,
+  .vehicles-card,
+  .payment-booking-card,
+  .payment-options-card
+):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgb(28 36 36 / 9%);
+}
+
+.customer-home :is(
+  .dashboard-heading,
+  .vehicles-heading,
+  .bookings-heading,
+  .booking-heading,
+  .payment-heading,
+  .wallet-heading,
+  .profile-heading,
+  .services-page-intro
+) {
+  border-radius: 14px;
+}
+
+.customer-home :is(
+  .customer-button,
+  .customer-nav a,
+  .customer-footer a,
+  .profile-field input,
+  .bookings-filter select,
+  .booking-slot-select,
+  .wallet-refresh,
+  .payment-back-link
+) {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.customer-home :is(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid rgb(215 45 55 / 28%);
+  outline-offset: 3px;
+}
+
+.customer-home .customer-button-primary {
+  box-shadow: 0 7px 17px rgb(176 33 42 / 18%);
+}
+
+.customer-home .customer-button-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 22px rgb(176 33 42 / 24%);
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-main,
+  .vehicles-main,
+  .bookings-main,
+  .booking-main,
+  .payment-main,
+  .wallet-main,
+  .profile-main
+) {
+  background:
+    radial-gradient(ellipse at 92% 3%, rgb(215 45 55 / 5%), transparent 29%),
+    #f5f6f7;
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .dashboard-heading,
+  .vehicles-heading,
+  .bookings-heading,
+  .booking-heading,
+  .payment-heading,
+  .wallet-heading,
+  .profile-heading
+) {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 16px;
+  background: linear-gradient(125deg, #171a1b 0%, #232425 72%, #332124 100%);
+  box-shadow: 0 15px 34px rgb(24 27 28 / 13%);
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .vehicles-card,
+  .bookings-card,
+  .booking-panel,
+  .booking-steps,
+  .booking-success,
+  .payment-booking-card,
+  .payment-options-card,
+  .payment-state,
+  .profile-card,
+  .wallet-panel
+) {
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(26 33 33 / 5%);
+}
+
+.customer-home:has(.customer-header-customer) :is(
+  .vehicles-card,
+  .bookings-card,
+  .profile-card,
+  .wallet-panel,
+  .payment-booking-card,
+  .payment-options-card
+):hover {
+  transform: translateY(-2px);
+  border-color: #e7bfc2;
+  box-shadow: 0 14px 32px rgb(26 33 33 / 9%);
+}
+
+.customer-home:has(.customer-header-customer) .customer-header {
+  background: rgb(20 23 24 / 96%);
+  box-shadow: 0 8px 25px rgb(0 0 0 / 13%);
+}
+
+.customer-home:has(.customer-header-customer) .wallet-balance {
+  background: linear-gradient(125deg, #171a1b, #312124);
+  box-shadow: 0 14px 30px rgb(24 27 28 / 14%);
+}
+
+.customer-home:has(.customer-header-customer) .booking-slot-select.is-selected {
+  border-color: #991e26;
+  color: #fff;
+  background: #991e26;
+}
+
+.customer-home:has(.customer-header-customer) .booking-slot-select:hover:not(:disabled) {
+  color: #fff;
+  background: #b8242d;
+}
+
+@keyframes customer-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-home *,
+  .customer-home *::before,
+  .customer-home *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

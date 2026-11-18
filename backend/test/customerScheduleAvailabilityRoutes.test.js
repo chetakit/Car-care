@@ -77,7 +77,8 @@ test("Customer can retrieve available schedules with remaining capacity", async 
       end_time: "10:30:00",
       capacity: 4,
       booked_count: 1,
-      remaining_capacity: 3,
+      status: "AVAILABLE",
+      has_started: 0,
     },
     {
       schedule_id: 8,
@@ -86,16 +87,17 @@ test("Customer can retrieve available schedules with remaining capacity", async 
       end_time: "12:30:00",
       capacity: 2,
       booked_count: 0,
-      remaining_capacity: 2,
+      status: "AVAILABLE",
+      has_started: 0,
     },
   ];
   pool.execute = async (sql, values) => {
     assert.match(sql, /s\.schedule_date BETWEEN \? AND \?/);
-    assert.match(sql, /s\.status = 'AVAILABLE'/);
-    assert.match(sql, /s\.schedule_date > CURRENT_DATE\(\)/);
+    assert.match(sql, /s\.status,/);
+    assert.match(sql, /s\.schedule_date < CURRENT_DATE\(\)/);
     assert.match(
       sql,
-      /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time > CURRENT_TIME\(\)/,
+      /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time <= CURRENT_TIME\(\)/,
     );
     assert.match(sql, /b\.booking_status <> 'CANCELLED'/);
     // Counts bookings that overlap each slot in time, so multi-slot bookings are included.
@@ -114,16 +116,31 @@ test("Customer can retrieve available schedules with remaining capacity", async 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.payload, {
       status: "success",
-      data: { items: schedules },
+      data: {
+        items: schedules.map(({ has_started, ...schedule }) => ({
+          ...schedule,
+          remaining_capacity: schedule.capacity - schedule.booked_count,
+          end_time: schedule.end_time,
+        })),
+      },
     });
   });
 });
 
-test("Past dates and elapsed same-day slots are excluded using database time", async () => {
+test("Past dates and elapsed same-day slots are returned as unavailable using database time", async () => {
   let query;
   pool.execute = async (sql) => {
     query = sql;
-    return [[]];
+    return [[{
+      schedule_id: 3,
+      schedule_date: "2026-11-13",
+      start_time: "09:00:00",
+      end_time: "10:30:00",
+      capacity: 2,
+      booked_count: 1,
+      status: "AVAILABLE",
+      has_started: 1,
+    }]];
   };
 
   await withServer(async (port) => {
@@ -133,13 +150,13 @@ test("Past dates and elapsed same-day slots are excluded using database time", a
       createToken(),
     );
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.payload.data.items, []);
+    assert.equal(response.payload.data.items[0].status, "PAST");
+    assert.equal(response.payload.data.items[0].booked_count, 1);
   });
 
-  assert.match(query, /s\.schedule_date > CURRENT_DATE\(\)/);
   assert.match(
     query,
-    /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time > CURRENT_TIME\(\)/,
+    /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time <= CURRENT_TIME\(\)/,
   );
 });
 
@@ -188,13 +205,15 @@ test("Reversed date ranges are rejected before database access", async () => {
   assert.equal(queryCount, 0);
 });
 
-test("Fully booked schedules are excluded", async () => {
+test("Fully booked schedules are returned with no remaining capacity", async () => {
   let query;
   pool.execute = async (sql) => {
     query = sql;
     return [[{
       schedule_id: 4, schedule_date: "2026-11-20", start_time: "09:00:00",
       end_time: "10:30:00", capacity: 2, booked_count: 2,
+      status: "AVAILABLE",
+      has_started: 0,
     }]];
   };
 
@@ -205,12 +224,13 @@ test("Fully booked schedules are excluded", async () => {
       createToken(),
     );
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.payload.data.items, []);
+    assert.equal(response.payload.data.items[0].status, "FULL");
+    assert.equal(response.payload.data.items[0].remaining_capacity, 0);
   });
   assert.match(query, /b\.booking_date = s\.schedule_date/);
 });
 
-test("With duration_minutes, only start times with enough back-to-back free slots are offered", async () => {
+test("With duration_minutes, unfit start times are included as unavailable", async () => {
   const slot = (id, start, end, booked = 0) => ({
     schedule_id: id, schedule_date: "2026-11-20", start_time: start, end_time: end, capacity: 2, booked_count: booked,
   });
@@ -229,10 +249,21 @@ test("With duration_minutes, only start times with enough back-to-back free slot
     );
     assert.equal(response.statusCode, 200);
     assert.deepEqual(
-      response.payload.data.items.map((item) => [item.schedule_id, item.end_time, item.remaining_capacity]),
-      // 09:00 uses slots 1+2 (one place left in slot 2); 10:30 would run into full slot 3;
+      response.payload.data.items.map((item) => [
+        item.schedule_id,
+        item.end_time,
+        item.remaining_capacity,
+        item.status,
+      ]),
+      // 09:00 uses slots 1+2; 10:30 and 12:00 run into full slot 3;
       // 13:30 uses 4+5; 15:00 has no slot after it.
-      [[1, "12:00:00", 1], [4, "16:30:00", 2]],
+      [
+        [1, "12:00:00", 1, "AVAILABLE"],
+        [2, "12:00:00", 0, "UNAVAILABLE"],
+        [3, "13:30:00", 0, "FULL"],
+        [4, "16:30:00", 2, "AVAILABLE"],
+        [5, "16:30:00", 0, "UNAVAILABLE"],
+      ],
     );
   });
 });
@@ -264,19 +295,32 @@ test("Cancelled bookings do not consume schedule capacity", async () => {
   });
 });
 
-test("Closed and unavailable schedules are excluded", async () => {
+test("Closed schedules are included with unavailable status", async () => {
   let query;
   pool.execute = async (sql) => {
     query = sql;
-    return [[{
-      schedule_id: 10,
-      schedule_date: "2026-11-20",
-      start_time: "15:00:00",
-      end_time: "16:30:00",
-      capacity: 3,
-      booked_count: 0,
-      remaining_capacity: 3,
-    }]];
+    return [[
+      {
+        schedule_id: 10,
+        schedule_date: "2026-11-20",
+        start_time: "15:00:00",
+        end_time: "16:30:00",
+        capacity: 3,
+        booked_count: 0,
+        status: "AVAILABLE",
+        has_started: 0,
+      },
+      {
+        schedule_id: 11,
+        schedule_date: "2026-11-20",
+        start_time: "16:30:00",
+        end_time: "18:00:00",
+        capacity: 3,
+        booked_count: 0,
+        status: "CLOSED",
+        has_started: 0,
+      },
+    ]];
   };
 
   await withServer(async (port) => {
@@ -287,11 +331,11 @@ test("Closed and unavailable schedules are excluded", async () => {
     );
     assert.equal(response.statusCode, 200);
     assert.deepEqual(
-      response.payload.data.items.map((schedule) => schedule.schedule_id),
-      [10],
+      response.payload.data.items.map((schedule) => [schedule.schedule_id, schedule.status]),
+      [[10, "AVAILABLE"], [11, "CLOSED"]],
     );
   });
-  assert.match(query, /s\.status = 'AVAILABLE'/);
+  assert.match(query, /s\.status,/);
 });
 
 test("Only authenticated customers can retrieve schedule availability", async () => {

@@ -11,6 +11,28 @@ const coupons = require("../../shared/services/couponPricing");
 
 const router = express.Router();
 
+router.get("/available", authenticateToken, requireCustomer, async (req, res) => {
+  try {
+    const [items] = await pool.execute(
+      `SELECT coupon_id, coupon_code, description, discount_type, discount_value,
+        max_discount, min_order_amount
+      FROM coupons
+      WHERE status = 'ACTIVE'
+        AND NOW() >= start_date
+        AND NOW() <= end_date
+        AND (usage_limit IS NULL OR used_count < usage_limit)
+      ORDER BY coupon_code ASC, coupon_id ASC`,
+    );
+    return res.status(200).json({ status: "success", data: { items } });
+  } catch (error) {
+    console.error("Available customer coupons request failed.");
+    return res.status(500).json({
+      status: "error",
+      message: "Unable to retrieve available coupons.",
+    });
+  }
+});
+
 router.get("/preview", authenticateToken, requireCustomer, async (req, res) => {
   const code = coupons.normalizeCouponCode(req.query.code);
   if (!code) {
