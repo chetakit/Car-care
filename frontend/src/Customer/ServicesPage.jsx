@@ -4,11 +4,12 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
+import { formatCustomerMoney } from './customerFormatters.js'
 import { SERVICE_IMAGE_URL } from './serviceAssets.js'
 import './customer.css'
 
 function ServicesPage({ user, onLogout }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const [services, setServices] = useState([])
   const [serviceState, setServiceState] = useState('loading')
   const [serviceReload, setServiceReload] = useState(0)
@@ -109,13 +110,35 @@ function ServicesPage({ user, onLogout }) {
                       {service.description?.trim() ||
                         t('customer.landing.noServiceDescription')}
                     </p>
-                    <span className="services-page-duration">
-                      {service.duration_minutes !== null && service.duration_minutes !== undefined
-                        ? t('customer.services.duration', {
-                            minutes: service.duration_minutes,
-                          })
-                        : t('customer.services.durationUnavailable')}
-                    </span>
+                    <div className="services-page-meta">
+                      <span className="services-page-duration">
+                        {service.duration_minutes !== null && service.duration_minutes !== undefined
+                          ? t('customer.services.duration', {
+                              minutes: service.duration_minutes,
+                            })
+                          : t('customer.services.durationUnavailable')}
+                      </span>
+                      {service.prices?.length > 0 && (
+                        <span className="services-page-from">
+                          {t('customer.services.priceFrom', {
+                            amount: formatCustomerMoney(service.prices[0].price, language),
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    {service.prices?.length > 0 && (
+                      <details className="services-page-prices">
+                        <summary>{t('customer.services.pricesByType')}</summary>
+                        <dl>
+                          {service.prices.map((item) => (
+                            <div key={item.vehicle_type_id}>
+                              <dt>{item.type_name}</dt>
+                              <dd>{formatCustomerMoney(item.price, language)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </details>
+                    )}
                     <a className="services-page-book" href="/customer/booking">
                       {t('customer.common.bookService')}
                     </a>

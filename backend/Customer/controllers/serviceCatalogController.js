@@ -31,6 +31,9 @@ async function list(req, res) {
 async function publicList(req, res) {
   try {
     const services = await serviceCatalogService.listActiveServices();
+    const pricesByService = await serviceCatalogService.listPublicPrices(
+      services.map((service) => service.service_id),
+    );
     const items = services.map(({
       service_id,
       service_name,
@@ -41,6 +44,7 @@ async function publicList(req, res) {
       service_name,
       description,
       duration_minutes,
+      prices: pricesByService.get(Number(service_id)) ?? [],
     }));
     return res.status(200).json({
       status: "success",

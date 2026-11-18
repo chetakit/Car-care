@@ -187,6 +187,21 @@ function BookingDetails({ booking, language, t }) {
 
 const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'CONFIRMED']
 
+// True once the appointment's start time has passed in Thailand. Customers
+// can't pay for or cancel it any more (the server enforces the cancel rule).
+function appointmentStarted(booking) {
+  const date = /^\d{4}-\d{2}-\d{2}/.exec(String(booking.booking_date ?? ''))?.[0]
+  const time = /^\d{2}:\d{2}/.exec(String(booking.start_time ?? ''))?.[0]
+  if (!date || !time) return false
+  return new Date(`${date}T${time}:00+07:00`).getTime() <= Date.now()
+}
+
+// Still ahead and still on: not started, not cancelled, not finished.
+function isUpcoming(booking) {
+  return !appointmentStarted(booking) &&
+    !['CANCELLED', 'NO_SHOW', 'COMPLETED'].includes(booking.booking_status)
+}
+
 function toCents(value) {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(value ?? ''))
   return match ? Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0')) : 0
@@ -268,36 +283,43 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel, language, t
   const bookingTime = `${formatCustomerTime(booking.start_time, language)} – ${formatCustomerTime(booking.end_time, language)}`
   const detailsId = `booking-details-${booking.booking_id}`
 
+  const started = appointmentStarted(booking)
+
   return (
-    <article className="bookings-card">
+    <article className={`bookings-card${started ? ' is-past' : ''}`}>
       <div className="bookings-card-heading">
-        <div>
-          <span className="bookings-card-label">{t('customer.bookings.booking')}</span>
-          <h2>#{booking.booking_id}</h2>
+        <div className="bookings-card-when">
+          <span className="bookings-card-id">#{booking.booking_id}</span>
+          <h2>{bookingDate}</h2>
+          <span>{bookingTime}</span>
+        </div>
+        <div className="bookings-card-badges">
+          <span className="visually-hidden">{t('customer.bookings.bookingStatus')}</span>
+          <BookingStatus language={language} status={booking.booking_status} />
+          <span className="visually-hidden">{t('customer.bookings.paymentStatus')}</span>
+          <span className="bookings-payment-status">{formatCustomerBookingPaymentStatus(booking.payment, language)}</span>
         </div>
       </div>
 
-      <dl className="bookings-card-statuses">
-        <div>
-          <dt>{t('customer.bookings.bookingStatus')}</dt>
-          <dd><BookingStatus language={language} status={booking.booking_status} /></dd>
-        </div>
-        <div>
-          <dt>{t('customer.bookings.paymentStatus')}</dt>
-          <dd><span className="bookings-payment-status">{formatCustomerBookingPaymentStatus(booking.payment, language)}</span></dd>
-        </div>
-      </dl>
-
       <div className="bookings-card-summary">
-        <div>
-          <span className="bookings-summary-label">{t('customer.bookings.dateTime')}</span>
-          <strong>{bookingDate}</strong>
-          <span>{bookingTime}</span>
-        </div>
         <div>
           <span className="bookings-summary-label">{t('customer.bookings.vehicle')}</span>
           <strong>{vehicleName || t('customer.bookings.vehicleDetailsUnavailable')}</strong>
           <span>{booking.vehicle?.license_plate || '—'}</span>
+        </div>
+        <div className="bookings-card-services">
+          <span className="bookings-summary-label">{t('customer.bookings.bookedServices')}</span>
+          {services.length > 0 ? (
+            <ul>
+              {services.map((service) => (
+                <li key={service.booking_service_id}>
+                  {service.service_name || t('customer.common.service')}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>{t('customer.bookings.noServiceDetails')}</p>
+          )}
         </div>
         <div className="bookings-card-total">
           <span className="bookings-summary-label">{t('customer.bookings.total')}</span>
@@ -305,21 +327,6 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel, language, t
             {formatOptionalMoney(booking.final_amount ?? booking.total_amount, language)}
           </strong>
         </div>
-      </div>
-
-      <div className="bookings-card-services">
-        <span className="bookings-summary-label">{t('customer.bookings.bookedServices')}</span>
-        {services.length > 0 ? (
-          <ul>
-            {services.map((service) => (
-              <li key={service.booking_service_id}>
-                {service.service_name || t('customer.common.service')}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>{t('customer.bookings.noServiceDetails')}</p>
-        )}
       </div>
 
       <div className="bookings-card-actions">
@@ -333,7 +340,7 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel, language, t
           {t(expanded ? 'customer.bookings.hideDetails' : 'customer.bookings.viewDetails')}
           <span aria-hidden="true">{expanded ? '−' : '+'}</span>
         </button>
-        {canPayForBooking(booking) && (
+        {!started && canPayForBooking(booking) && (
           <button
             className="bookings-pay-now"
             onClick={() => onPay(booking)}
@@ -343,7 +350,7 @@ function BookingCard({ booking, expanded, onToggle, onPay, onCancel, language, t
             <span aria-hidden="true">→</span>
           </button>
         )}
-        {CANCELLABLE_STATUSES.includes(booking.booking_status) && (
+        {!started && CANCELLABLE_STATUSES.includes(booking.booking_status) && (
           <button className="bookings-cancel-button" onClick={() => onCancel(booking)} type="button">
             {t('customer.bookings.cancelBooking')}
           </button>
@@ -618,20 +625,31 @@ function MyBookingsPage({ user, onLogout, vehicleId }) {
                 </span>
                 <span>{t('customer.bookings.newestFirst')}</span>
               </div>
-              <div className="bookings-list">
-                {bookings.map((booking) => (
-                  <BookingCard
-                    booking={booking}
-                    expanded={Number(expandedBookingId) === Number(booking.booking_id)}
-                    key={booking.booking_id}
-                    language={language}
-                    onToggle={toggleDetails}
-                    onPay={openPayment}
-                    onCancel={(target) => { setCancelError(''); setCancelNotice(''); setCancelTarget(target) }}
-                    t={t}
-                  />
-                ))}
-              </div>
+              {[
+                { key: 'upcoming', title: t('customer.bookings.groupUpcoming'), items: bookings.filter(isUpcoming) },
+                { key: 'past', title: t('customer.bookings.groupPast'), items: bookings.filter((booking) => !isUpcoming(booking)) },
+              ].filter((group) => group.items.length > 0).map((group) => (
+                <section aria-labelledby={`bookings-group-${group.key}`} className="bookings-group" key={group.key}>
+                  <h2 className="bookings-group-title" id={`bookings-group-${group.key}`}>
+                    {group.title}
+                    <span>{group.items.length}</span>
+                  </h2>
+                  <div className="bookings-list">
+                    {group.items.map((booking) => (
+                      <BookingCard
+                        booking={booking}
+                        expanded={Number(expandedBookingId) === Number(booking.booking_id)}
+                        key={booking.booking_id}
+                        language={language}
+                        onToggle={toggleDetails}
+                        onPay={openPayment}
+                        onCancel={(target) => { setCancelError(''); setCancelNotice(''); setCancelTarget(target) }}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
               {pagination && pagination.totalPages > 1 && (
                 <nav aria-label={t('customer.bookings.pagesLabel')} className="bookings-pagination">
                   <button

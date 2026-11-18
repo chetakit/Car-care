@@ -1,5 +1,6 @@
 const pool = require("../../shared/config/db");
 const { releaseCouponForBooking } = require("../../shared/services/couponPricing");
+const { SHOP_NOW_SQL } = require("../../shared/services/shopTime");
 
 class CancellationNotFoundError extends Error {}
 class CancellationConflictError extends Error {}
@@ -99,7 +100,8 @@ const CANCELLABLE_STATUSES = ["PENDING_PAYMENT", "CONFIRMED"];
 
 async function lockBooking(connection, bookingId, user) {
   const [rows] = await connection.execute(
-    `SELECT booking_id, user_id, booking_status
+    `SELECT booking_id, user_id, booking_status,
+      TIMESTAMP(booking_date, start_time) <= ${SHOP_NOW_SQL} AS has_started
     FROM bookings
     WHERE booking_id = ?
     FOR UPDATE`,
@@ -113,6 +115,13 @@ async function lockBooking(connection, bookingId, user) {
   if (!CANCELLABLE_STATUSES.includes(booking.booking_status)) {
     throw new CancellationConflictError(
       "Only unpaid or confirmed bookings can be cancelled.",
+    );
+  }
+  // Customers cannot cancel once the appointment time has started; an admin
+  // still can (for example to clean up a booking nobody showed up for).
+  if (user.role !== "ADMIN" && Number(booking.has_started) === 1) {
+    throw new CancellationConflictError(
+      "This appointment has already started and can no longer be cancelled.",
     );
   }
   return booking;

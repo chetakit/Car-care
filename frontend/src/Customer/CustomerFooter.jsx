@@ -1,5 +1,6 @@
 import { BrandMark } from './CustomerHeader.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { SHOP_LINE_ID, SHOP_PHONE, SHOP_PHONE_HREF } from './shopInfo.js'
 
 function CustomerFooter() {
   const { t } = useLanguage()
@@ -32,18 +33,17 @@ function CustomerFooter() {
           </div>
 
           <section
-            aria-labelledby="customer-footer-social-heading"
+            aria-labelledby="customer-footer-contact-heading"
             className="customer-footer-social"
           >
-            <h2 id="customer-footer-social-heading">
-              {customerLabel('customer.footer.followUs', 'FOLLOW US')}
+            <h2 id="customer-footer-contact-heading">
+              {customerLabel('customer.footer.contactUs', 'CONTACT US')}
             </h2>
-            <p>
-              {customerLabel(
-                'customer.footer.noSocialAccounts',
-                'No official social accounts are listed in this project.',
-              )}
-            </p>
+            <ul className="customer-footer-contact">
+              <li><a href={SHOP_PHONE_HREF}>{SHOP_PHONE}</a></li>
+              <li>LINE {SHOP_LINE_ID}</li>
+              <li>{customerLabel('customer.contact.hoursValue', 'Mon–Sat 09:00–18:00')}</li>
+            </ul>
           </section>
         </div>
 

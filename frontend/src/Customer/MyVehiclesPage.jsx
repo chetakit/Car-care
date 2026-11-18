@@ -47,10 +47,9 @@ function VehicleCard({ vehicle, onEdit, onDelete, t }) {
         <span className="vehicles-card-icon">
           <VehicleIcon />
         </span>
-        {vehicle.status && (
-          <span className={`vehicles-status${vehicle.status === 'ACTIVE' ? ' is-active' : ''}`}>
-            {vehicle.status}
-          </span>
+        {/* Only flag the unusual case; every listed car is normally active. */}
+        {vehicle.status && vehicle.status !== 'ACTIVE' && (
+          <span className="vehicles-status">{t('customer.vehicles.inactive')}</span>
         )}
       </div>
       <h2>{vehicleName || t('customer.common.vehicle')}</h2>

@@ -6,6 +6,7 @@ import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
 import { SERVICE_IMAGE_URL } from './serviceAssets.js'
+import { SHOP_LINE_ID, SHOP_PHONE, SHOP_PHONE_HREF } from './shopInfo.js'
 import './customer.css'
 
 const HERO_IMAGE_URL = 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7'
@@ -417,6 +418,30 @@ function CustomerLanding({ user, onLogout }) {
                 </a>
               )}
             </div>
+            <address className="customer-contact-card">
+              <h3>{t('customer.contact.title')}</h3>
+              <dl>
+                <div>
+                  <dt>{t('customer.contact.address')}</dt>
+                  <dd>{t('customer.contact.addressValue')}</dd>
+                </div>
+                <div>
+                  <dt>{t('customer.contact.phone')}</dt>
+                  <dd><a href={SHOP_PHONE_HREF}>{SHOP_PHONE}</a></dd>
+                </div>
+                <div>
+                  <dt>LINE</dt>
+                  <dd>{SHOP_LINE_ID}</dd>
+                </div>
+                <div>
+                  <dt>{t('customer.contact.hours')}</dt>
+                  <dd>
+                    {t('customer.contact.hoursValue')}
+                    <small>{t('customer.contact.closed')}</small>
+                  </dd>
+                </div>
+              </dl>
+            </address>
           </div>
         </section>
       </main>

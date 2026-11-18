@@ -92,7 +92,7 @@ All catalog endpoints return active records in `data.items`.
 
 | Method and URL | Query parameters | Success | Errors |
 |---|---|---|---|
-| `GET /api/public/catalog/services` | None accepted; public read-only catalog access | `200`, `data: { items: PublicService[] }`; items include `service_id`, `service_name`, `description`, `duration_minutes`. Active services only. | `400` query supplied, `500`. |
+| `GET /api/public/catalog/services` | None accepted; public read-only catalog access | `200`, `data: { items: PublicService[] }`; items include `service_id`, `service_name`, `description`, `duration_minutes`, and `prices` (one `{ vehicle_type_id, type_name, price }` per active vehicle type, cheapest first). Active services only. | `400` query supplied, `500`. |
 | `GET /api/customer/catalog/services` | None accepted | `200`, `data: { items: Service[] }`; items include `service_id`, `service_name`, `description`, `duration_minutes`, `status`, `created_at`, `updated_at`. Active services only. | `400` query supplied, `401`, `403`, `500`. |
 | `GET /api/customer/catalog/services/:serviceId/prices` | Required `vehicle_type_id` (positive integer); no other query parameter accepted | `200`, `data: { items: Price[] }`; each item includes `service_price_id`, `service_id`, `vehicle_type_id`, `type_name`, `price`, `created_at`, `updated_at`. | `400` invalid/missing ID or filter, `401`, `403`, `404` service missing/inactive, `500`. A valid service/type with no price returns an empty `items` array. |
 

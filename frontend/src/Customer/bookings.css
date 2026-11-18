@@ -612,3 +612,122 @@
 .bookings-cancel-confirm:disabled, .bookings-cancel-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .bookings-cancel-notice { margin: 0 0 16px; padding: 12px 14px; border: 1px solid #cde5d8; border-radius: 10px; color: #32634a; background: #f5fbf7; font-size: 13px; }
 .bookings-cancel-notice a { color: inherit; font-weight: 700; }
+
+/* Compact card: date + status on one line, then vehicle | services | total. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.bookings-group + .bookings-group {
+  margin-top: 26px;
+}
+
+.bookings-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--customer-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bookings-group-title span {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  color: #65726f;
+  background: #eef1f0;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bookings-card {
+  padding: 16px 20px 0;
+}
+
+.bookings-card.is-past {
+  background: #fbfbfb;
+}
+
+.bookings-card.is-past .bookings-card-when h2 {
+  color: #5c6664;
+}
+
+.bookings-card-heading {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.bookings-card-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.bookings-card-id {
+  color: #8a9693;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bookings-card-when h2 {
+  margin: 0;
+  color: var(--customer-ink);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.bookings-card-when > span:last-child {
+  color: #647170;
+  font-size: 13px;
+}
+
+.bookings-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bookings-card-summary {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto;
+  margin-top: 12px;
+  padding: 12px 0;
+}
+
+.bookings-card-summary .bookings-card-services {
+  padding: 0;
+  border-top: 0;
+}
+
+.bookings-card-summary .bookings-card-services ul {
+  margin-top: 4px;
+}
+
+@media (max-width: 700px) {
+  .bookings-card {
+    padding: 14px 16px 0;
+  }
+
+  .bookings-card-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bookings-card-summary .bookings-card-services {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .bookings-card-total {
+    text-align: right;
+  }
+}

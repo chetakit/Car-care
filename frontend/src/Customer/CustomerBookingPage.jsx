@@ -1391,7 +1391,7 @@ function CustomerBookingPage({ user, onLogout }) {
                   onClick={() => goToStep(step - 1)}
                   type="button"
                 >
-                  Back
+                  {t('customer.booking.back')}
                 </button>
               ) : (
                 <a className="booking-secondary-link" href="/customer">

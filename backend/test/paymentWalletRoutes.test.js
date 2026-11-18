@@ -807,6 +807,35 @@ test("Cancelling an unpaid booking has no fee or refund", async () => {
   });
 });
 
+test("Customers cannot cancel once the appointment has started; admins still can", async () => {
+  const customerDatabase = createDatabase({
+    booking: { booking_status: "CONFIRMED", has_started: 1 },
+    payments: [{ payment_status: "PAID" }],
+  });
+  useDatabase(customerDatabase);
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/cancellations/77", createToken());
+    assert.equal(response.statusCode, 409);
+    assert.match(response.payload.message, /already started/);
+    assert.equal(customerDatabase.state.booking.booking_status, "CONFIRMED");
+    assert.equal(customerDatabase.state.refunds.length, 0);
+  });
+  // The appointment time is compared in Thai time, not the UTC database clock.
+  const bookingQuery = customerDatabase.state.queries.find(({ sql }) => /FROM bookings[\s\S]*FOR UPDATE/i.test(sql));
+  assert.match(bookingQuery.sql, /TIMESTAMP\(booking_date, start_time\) <= \(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\)/);
+
+  const adminDatabase = createDatabase({
+    booking: { booking_status: "CONFIRMED", has_started: 1 },
+    payments: [{}],
+  });
+  useDatabase(adminDatabase);
+  await withServer(async (port) => {
+    const response = await sendRequest(port, "POST", "/api/cancellations/77", createToken("ADMIN", 9));
+    assert.equal(response.statusCode, 200);
+    assert.equal(adminDatabase.state.booking.booking_status, "CANCELLED");
+  });
+});
+
 test("A wallet payment refunds its original wallet only once", async () => {
   const database = createDatabase();
   useDatabase(database);

@@ -186,7 +186,8 @@ export function formatCustomerTimestamp(value, language) {
 export function formatCustomerMoney(value, language) {
   const locale = getLocale(language)
   const amount = Number(value)
+  // Amount first, baht sign after ("1,500.00 ฿"), the same as the admin pages.
   return Number.isFinite(amount)
-    ? new Intl.NumberFormat(locale, { style: 'currency', currency: 'THB' }).format(amount)
+    ? `${new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)} ฿`
     : '—'
 }

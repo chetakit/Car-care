@@ -108,9 +108,18 @@ test("Customer can list active services with both slash forms", async () => {
 test("Guests can list active services from the read-only public catalog", async () => {
   let queryCount = 0;
   pool.execute = async (sql, values) => {
+    queryCount += 1;
+    if (sql.includes("FROM service_prices")) {
+      // Only prices for active vehicle types are public.
+      assert.match(sql, /vt\.status = 'ACTIVE'/);
+      assert.deepEqual(values, [7]);
+      return [[
+        { service_id: 7, vehicle_type_id: 2, type_name: "Hatchback", price: "300.00" },
+        { service_id: 7, vehicle_type_id: 3, type_name: "SUV", price: "450.00" },
+      ]];
+    }
     assert.match(sql, /FROM services/);
     assert.match(sql, /status = \?/);
-    queryCount += 1;
     if (sql.includes("COUNT(*)")) {
       assert.deepEqual(values, ["ACTIVE"]);
       return [[{ total: 1 }]];
@@ -139,9 +148,13 @@ test("Guests can list active services from the read-only public catalog", async 
       service_name: "Oil change",
       description: "Engine oil service",
       duration_minutes: 45,
+      prices: [
+        { vehicle_type_id: 2, type_name: "Hatchback", price: "300.00" },
+        { vehicle_type_id: 3, type_name: "SUV", price: "450.00" },
+      ],
     }]);
   });
-  assert.equal(queryCount, 2);
+  assert.equal(queryCount, 3);
 });
 
 test("Customer prices are filtered by service and vehicle type", async () => {
