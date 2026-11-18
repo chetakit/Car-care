@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
@@ -8,12 +9,17 @@ import formatMoney from '../utils/formatMoney.js'
 
 const MATCH_LIMIT = 8
 
+function messageText(message, t) {
+  return message?.key ? t(message.key, message.params) : message
+}
+
 function isValidUserId(value) {
   const id = String(value ?? '')
   return /^[1-9]\d*$/.test(id) && Number.isSafeInteger(Number(id))
 }
 
 function WalletPage() {
+  const { language, t } = useLanguage()
   const initialUserId = new URLSearchParams(window.location.search).get('user_id') ?? ''
   const initiallyValid = isValidUserId(initialUserId)
   const [lookupText, setLookupText] = useState(initialUserId)
@@ -25,7 +31,7 @@ function WalletPage() {
   const [section, setSection] = useState('balance')
   const [type, setType] = useState('')
   const [lookupError, setLookupError] = useState(
-    initialUserId && !initiallyValid ? 'Enter a name, email, phone number, or User ID.' : '',
+    initialUserId && !initiallyValid ? { key: 'admin.wallet.validation.lookup' } : '',
   )
   const api = useApi()
   const query = new URLSearchParams({ user_id: appliedUserId, page: String(page), limit: '20' })
@@ -46,7 +52,7 @@ function WalletPage() {
     event.preventDefault()
     const text = lookupText.trim()
     if (!text) {
-      setLookupError('Enter a name, email, phone number, or User ID.')
+      setLookupError({ key: 'admin.wallet.validation.lookup' })
       return
     }
     setLookupError('')
@@ -79,33 +85,33 @@ function WalletPage() {
   const dataRows = data?.items ?? []
   return (
     <div>
-      <PageHeading description="Find a customer by name, email, phone number, or User ID to review their Wallet balance, transactions, and refund history." eyebrow="FINANCE" title="Wallet" action={appliedUserId && <button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">Refresh</button>} />
+      <PageHeading description={t('admin.wallet.description')} eyebrow={t('admin.wallet.eyebrow')} title={t('admin.wallet.title')} action={appliedUserId && <button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">{t('admin.wallet.refresh')}</button>} />
       <form className="admin-filter-bar" onSubmit={lookup}>
         <label className="admin-lookup-field admin-wallet-lookup" htmlFor="wallet-lookup">
-          Customer
+          {t('admin.wallet.lookup.label')}
           <input
             aria-describedby="wallet-lookup-hint"
             autoComplete="off"
             id="wallet-lookup"
             maxLength="100"
             onChange={(event) => { setLookupText(event.target.value); setLookupError('') }}
-            placeholder="Name, email, phone or User ID"
+            placeholder={t('admin.wallet.lookup.placeholder')}
             type="search"
             value={lookupText}
           />
-          <small id="wallet-lookup-hint">A number is treated as a User ID.</small>
+          <small id="wallet-lookup-hint">{t('admin.wallet.lookup.hint')}</small>
         </label>
-        <button className="admin-primary-button" disabled={searching} type="submit">{searching ? 'Searching…' : 'Find wallet'}</button>
+        <button className="admin-primary-button" disabled={searching} type="submit">{searching ? t('admin.wallet.lookup.searching') : t('admin.wallet.lookup.submit')}</button>
       </form>
-      {lookupError && <div className="admin-alert admin-alert-error" role="alert">{lookupError}</div>}
+      {lookupError && <div className="admin-alert admin-alert-error" role="alert">{messageText(lookupError, t)}</div>}
       {matches && (
-        <section aria-label="Matching customers" className="admin-panel admin-wallet-matches">
+        <section aria-label={t('admin.wallet.matches.ariaLabel')} className="admin-panel admin-wallet-matches">
           {matches.items.length ? (
             <>
               <p className="admin-wallet-matches-note">
                 {matches.total > matches.items.length
-                  ? `Showing ${matches.items.length} of ${matches.total} matches. Refine the search to narrow it down.`
-                  : `${matches.items.length} people match. Choose one.`}
+                  ? t('admin.wallet.matches.showing', { count: matches.items.length, total: matches.total })
+                  : t('admin.wallet.matches.choose', { count: matches.items.length })}
               </p>
               <ul>
                 {matches.items.map((member) => (
@@ -113,56 +119,62 @@ function WalletPage() {
                     <button onClick={() => selectMember(member)} type="button">
                       <strong>{member.full_name || '—'}</strong>
                       <span>{[member.email, member.phone].filter(Boolean).join(' · ')}</span>
-                      <small>#{member.user_id}{member.role !== 'CUSTOMER' ? ` · ${member.role.toLowerCase()}` : ''}{member.status !== 'ACTIVE' ? ' · inactive' : ''}</small>
+                      <small>#{member.user_id}{member.role !== 'CUSTOMER' ? ` · ${member.role.toLowerCase()}` : ''}{member.status !== 'ACTIVE' ? ` · ${t('admin.status.inactive')}` : ''}</small>
                     </button>
                   </li>
                 ))}
               </ul>
             </>
           ) : (
-            <RequestState empty emptyDescription="Try another name, email, or phone number." emptyTitle="No customers match" />
+            <RequestState empty emptyDescription={t('admin.wallet.matches.emptyDescription')} emptyTitle={t('admin.wallet.matches.emptyTitle')} />
           )}
         </section>
       )}
       {appliedUserId && (
         <p className="admin-wallet-selected-customer" role="status">
-          Viewing wallet for {selectedMember?.full_name ? `${selectedMember.full_name} (User #${appliedUserId})` : `User #${appliedUserId}`}.
+          {t('admin.wallet.selectedCustomer', {
+            customer: selectedMember?.full_name ? `${selectedMember.full_name} (User #${appliedUserId})` : `User #${appliedUserId}`,
+          })}
         </p>
       )}
       {appliedUserId && (
         <>
-          <div aria-label="Wallet view" className="admin-tabs">
-            {['balance', 'transactions', 'refunds'].map((name) => (
-              <button aria-pressed={section === name} className={section === name ? 'is-selected' : ''} key={name} onClick={() => { setSection(name); setPage(1) }} type="button">{name === 'balance' ? 'Balance' : name === 'transactions' ? 'Transactions' : 'Refund history'}</button>
+          <div aria-label={t('admin.wallet.view.ariaLabel')} className="admin-tabs">
+            {[
+              { id: 'balance', label: 'admin.wallet.view.balance' },
+              { id: 'transactions', label: 'admin.wallet.view.transactions' },
+              { id: 'refunds', label: 'admin.wallet.view.refunds' },
+            ].map(({ id, label }) => (
+              <button aria-pressed={section === id} className={section === id ? 'is-selected' : ''} key={id} onClick={() => { setSection(id); setPage(1) }} type="button">{t(label)}</button>
             ))}
           </div>
           <section className="admin-panel admin-data-panel">
             <RequestState error={error} loading={loading} onRetry={refresh} />
             {!loading && !error && section === 'balance' && (
               data?.balance !== undefined
-                ? <div className="admin-wallet-balance"><span>Wallet balance · user #{appliedUserId}</span><strong>{formatMoney(data.balance)}</strong></div>
-                : <RequestState empty emptyDescription="No wallet balance was returned for this User ID." emptyTitle="Wallet balance unavailable" />
+                ? <div className="admin-wallet-balance"><span>{t('admin.wallet.balance.label', { id: appliedUserId })}</span><strong>{formatMoney(data.balance, language)}</strong></div>
+                : <RequestState empty emptyDescription={t('admin.wallet.balance.emptyDescription')} emptyTitle={t('admin.wallet.balance.emptyTitle')} />
             )}
             {!loading && !error && section === 'transactions' && (
               <>
                 <div className="admin-panel-heading">
-                  <div><h3>Wallet transactions</h3><p>Newest first</p></div>
-                  <select aria-label="Transaction type" onChange={(event) => { setType(event.target.value); setPage(1) }} value={type}><option value="">All types</option>{['CREDIT', 'DEBIT'].map((value) => <option key={value} value={value}>{formatStatusLabel(value)}</option>)}</select>
+                  <div><h3>{t('admin.wallet.transactions.title')}</h3><p>{t('admin.wallet.transactions.order')}</p></div>
+                  <select aria-label={t('admin.wallet.transactions.typeLabel')} onChange={(event) => { setType(event.target.value); setPage(1) }} value={type}><option value="">{t('admin.wallet.transactions.typeAll')}</option>{['CREDIT', 'DEBIT'].map((value) => <option key={value} value={value}>{formatStatusLabel(value, language)}</option>)}</select>
                 </div>
                 <RequestState
                   empty={!dataRows.length}
-                  emptyDescription="No transactions were returned for this User ID and transaction type."
-                  emptyTitle="No wallet transactions"
+                  emptyDescription={t('admin.wallet.transactions.emptyDescription')}
+                  emptyTitle={t('admin.wallet.transactions.emptyTitle')}
                 />
                 {!!dataRows.length && <>
                   <DataTable columns={[
-                    { key: 'wallet_transaction_id', label: 'Transaction' },
-                    { key: 'transaction_type', label: 'Type', render: (row) => <StatusBadge value={row.transaction_type} /> },
-                    { key: 'amount', label: 'Amount', render: (row) => formatMoney(row.amount) },
-                    { key: 'description', label: 'Description', wrap: true },
-                    { key: 'refund_id', label: 'Refund ID' },
-                    { key: 'booking_id', label: 'Booking ID' },
-                    { key: 'created_at', label: 'Date', render: (row) => formatDateTime(row.created_at) },
+                    { key: 'wallet_transaction_id', label: t('admin.wallet.transactions.table.transaction') },
+                    { key: 'transaction_type', label: t('admin.wallet.transactions.table.type'), render: (row) => <StatusBadge value={row.transaction_type} /> },
+                    { key: 'amount', label: t('admin.wallet.transactions.table.amount'), render: (row) => formatMoney(row.amount, language) },
+                    { key: 'description', label: t('admin.wallet.transactions.table.description'), wrap: true },
+                    { key: 'refund_id', label: t('admin.wallet.transactions.table.refundId') },
+                    { key: 'booking_id', label: t('admin.wallet.transactions.table.bookingId') },
+                    { key: 'created_at', label: t('admin.wallet.transactions.table.date'), render: (row) => formatDateTime(row.created_at, language) },
                   ]} rows={dataRows} />
                   <Pagination onPageChange={setPage} pagination={data?.pagination} />
                 </>}
@@ -172,19 +184,19 @@ function WalletPage() {
               <>
                 <RequestState
                   empty={!dataRows.length}
-                  emptyDescription="No refund records were returned for this User ID."
-                  emptyTitle="No wallet refunds"
+                  emptyDescription={t('admin.wallet.refunds.emptyDescription')}
+                  emptyTitle={t('admin.wallet.refunds.emptyTitle')}
                 />
                 {!!dataRows.length && <>
                   <DataTable columns={[
-                    { key: 'refund_id', label: 'Refund' },
-                    { key: 'booking_id', label: 'Booking' },
-                    { key: 'payment_id', label: 'Payment' },
-                    { key: 'refund_amount', label: 'Refund amount', render: (row) => formatMoney(row.refund_amount) },
-                    { key: 'cancellation_fee', label: 'Fee', render: (row) => formatMoney(row.cancellation_fee) },
-                    { key: 'refund_reason', label: 'Reason', render: (row) => row.refund_reason || '—', wrap: true },
-                    { key: 'refund_status', label: 'Status', render: (row) => <StatusBadge value={row.refund_status} /> },
-                    { key: 'processed_at', label: 'Processed', render: (row) => formatDateTime(row.processed_at) },
+                    { key: 'refund_id', label: t('admin.wallet.refunds.table.refund') },
+                    { key: 'booking_id', label: t('admin.wallet.refunds.table.booking') },
+                    { key: 'payment_id', label: t('admin.wallet.refunds.table.payment') },
+                    { key: 'refund_amount', label: t('admin.wallet.refunds.table.amount'), render: (row) => formatMoney(row.refund_amount, language) },
+                    { key: 'cancellation_fee', label: t('admin.wallet.refunds.table.fee'), render: (row) => formatMoney(row.cancellation_fee, language) },
+                    { key: 'refund_reason', label: t('admin.wallet.refunds.table.reason'), render: (row) => row.refund_reason || '—', wrap: true },
+                    { key: 'refund_status', label: t('admin.wallet.refunds.table.status'), render: (row) => <StatusBadge value={row.refund_status} /> },
+                    { key: 'processed_at', label: t('admin.wallet.refunds.table.processed'), render: (row) => formatDateTime(row.processed_at, language) },
                   ]} rows={dataRows} />
                   <Pagination onPageChange={setPage} pagination={data?.pagination} />
                 </>}
@@ -195,8 +207,8 @@ function WalletPage() {
       )}
       {!appliedUserId && !lookupError && !matches && (
         <div className="admin-request-state">
-          <strong>Look up a customer wallet</strong>
-          <span>Search by name, email, phone number, or User ID to review a balance, transactions, or refunds.</span>
+          <strong>{t('admin.wallet.initial.title')}</strong>
+          <span>{t('admin.wallet.initial.description')}</span>
         </div>
       )}
     </div>

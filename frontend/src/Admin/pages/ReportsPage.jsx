@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import usePagedRows from '../hooks/usePagedRows.js'
 import useRemoteData from '../hooks/useRemoteData.js'
@@ -18,38 +19,42 @@ function daysAgo(days) {
 
 // Quick ranges cover what an Admin usually asks; "Custom" opens the date fields.
 const RANGES = [
-  { id: '7d', label: 'Last 7 days', range: () => ({ dateFrom: daysAgo(6), dateTo: toKey(new Date()), groupBy: 'day' }) },
-  { id: '30d', label: 'Last 30 days', range: () => ({ dateFrom: daysAgo(29), dateTo: toKey(new Date()), groupBy: 'day' }) },
+  { id: '7d', label: 'admin.reports.range.last7Days', range: () => ({ dateFrom: daysAgo(6), dateTo: toKey(new Date()), groupBy: 'day' }) },
+  { id: '30d', label: 'admin.reports.range.last30Days', range: () => ({ dateFrom: daysAgo(29), dateTo: toKey(new Date()), groupBy: 'day' }) },
   {
     id: 'month',
-    label: 'This month',
+    label: 'admin.reports.range.thisMonth',
     range: () => {
       const now = new Date()
       return { dateFrom: toKey(new Date(now.getFullYear(), now.getMonth(), 1)), dateTo: toKey(now), groupBy: 'day' }
     },
   },
-  { id: 'all', label: 'All time', range: () => ({ dateFrom: '', dateTo: '', groupBy: 'month' }) },
-  { id: 'custom', label: 'Custom' },
+  { id: 'all', label: 'admin.reports.range.allTime', range: () => ({ dateFrom: '', dateTo: '', groupBy: 'month' }) },
+  { id: 'custom', label: 'admin.reports.range.custom' },
 ]
 
 // Bookings move through these statuses in this order.
 const STATUS_ORDER = ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
 
-function formatPeriod(period, groupBy) {
+function formatPeriod(period, groupBy, language) {
   if (!period) return '—'
   if (groupBy === 'month') {
     const [year, month] = String(period).split('-').map(Number)
-    return new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    return new Intl.DateTimeFormat(language === 'TH' ? 'th-TH' : 'en-GB', {
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date(year, month - 1, 1))
   }
-  return formatDate(period)
+  return formatDate(period, language)
 }
 
-function rangeSummary({ dateFrom, dateTo }) {
-  if (!dateFrom && !dateTo) return 'All time'
-  return `${dateFrom ? formatDate(dateFrom) : 'Start'} – ${dateTo ? formatDate(dateTo) : 'today'}`
+function rangeSummary({ dateFrom, dateTo }, language, t) {
+  if (!dateFrom && !dateTo) return t('admin.reports.range.allTime')
+  return `${dateFrom ? formatDate(dateFrom, language) : t('admin.reports.range.start')} – ${dateTo ? formatDate(dateTo, language) : t('admin.reports.range.today')}`
 }
 
 function ReportsPage() {
+  const { language, t } = useLanguage()
   const [rangeId, setRangeId] = useState('30d')
   const [applied, setApplied] = useState(() => RANGES[1].range())
   const [custom, setCustom] = useState(applied)
@@ -77,7 +82,7 @@ function ReportsPage() {
   function applyCustom(event) {
     event.preventDefault()
     if (custom.dateFrom && custom.dateTo && custom.dateTo < custom.dateFrom) {
-      setFilterError('The end date must be the same as or later than the start date.')
+      setFilterError({ key: 'admin.reports.validation.dateRange' })
       return
     }
     setFilterError('')
@@ -116,66 +121,66 @@ function ReportsPage() {
   return (
     <div className="admin-reports">
       <PageHeading
-        action={<button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>}
-        description="How many bookings came in, how they ended, and how much was earned."
-        eyebrow="ANALYTICS"
-        title="Reports"
+        action={<button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">{t('admin.reports.refresh')}</button>}
+        description={t('admin.reports.description')}
+        eyebrow={t('admin.reports.eyebrow')}
+        title={t('admin.reports.title')}
       />
 
-      <div aria-label="Report period" className="admin-report-ranges" role="group">
+      <div aria-label={t('admin.reports.range.ariaLabel')} className="admin-report-ranges" role="group">
         {RANGES.map((range) => (
           <button aria-pressed={rangeId === range.id} className={rangeId === range.id ? 'is-selected' : ''} key={range.id} onClick={() => chooseRange(range)} type="button">
-            {range.label}
+            {t(range.label)}
           </button>
         ))}
       </div>
       {rangeId === 'custom' && (
         <form className="admin-filter-bar" onSubmit={applyCustom}>
-          <label>From<input onChange={(event) => { setCustom({ ...custom, dateFrom: event.target.value }); setFilterError('') }} type="date" value={custom.dateFrom} /></label>
-          <label>To<input onChange={(event) => { setCustom({ ...custom, dateTo: event.target.value }); setFilterError('') }} type="date" value={custom.dateTo} /></label>
-          <label>Show<select onChange={(event) => setCustom({ ...custom, groupBy: event.target.value })} value={custom.groupBy}><option value="day">Per day</option><option value="month">Per month</option></select></label>
-          <button className="admin-primary-button" type="submit">Show report</button>
+          <label>{t('admin.reports.custom.from')}<input onChange={(event) => { setCustom({ ...custom, dateFrom: event.target.value }); setFilterError('') }} type="date" value={custom.dateFrom} /></label>
+          <label>{t('admin.reports.custom.to')}<input onChange={(event) => { setCustom({ ...custom, dateTo: event.target.value }); setFilterError('') }} type="date" value={custom.dateTo} /></label>
+          <label>{t('admin.reports.custom.groupBy')}<select onChange={(event) => setCustom({ ...custom, groupBy: event.target.value })} value={custom.groupBy}><option value="day">{t('admin.reports.custom.perDay')}</option><option value="month">{t('admin.reports.custom.perMonth')}</option></select></label>
+          <button className="admin-primary-button" type="submit">{t('admin.reports.custom.submit')}</button>
         </form>
       )}
-      {filterError && <div className="admin-alert admin-alert-error" role="alert">{filterError}</div>}
-      <p aria-live="polite" className="admin-report-range-label">{rangeSummary(applied)}</p>
+      {filterError && <div className="admin-alert admin-alert-error" role="alert">{t(filterError.key)}</div>}
+      <p aria-live="polite" className="admin-report-range-label">{rangeSummary(applied, language, t)}</p>
 
-      <RequestState error={error} loading={loading} loadingMessage="Loading report…" onRetry={refresh} />
+      <RequestState error={error} loading={loading} loadingMessage={t('admin.reports.loading')} onRetry={refresh} />
       {!loading && !error && (
         <>
-          <section aria-label="Summary" className="admin-report-stats">
+          <section aria-label={t('admin.reports.summary.ariaLabel')} className="admin-report-stats">
             <article>
-              <span>Bookings</span>
+              <span>{t('admin.reports.summary.bookings')}</span>
               <strong>{totalBookings}</strong>
-              <small>by visit date</small>
+              <small>{t('admin.reports.summary.bookingDateBasis')}</small>
             </article>
             <article>
-              <span>Completed</span>
+              <span>{t('admin.reports.summary.completed')}</span>
               <strong>{completed}</strong>
-              <small>{percent(completed)}% of bookings</small>
+              <small>{t('admin.reports.summary.percentOfBookings', { percent: percent(completed) })}</small>
             </article>
             <article>
-              <span>Cancelled or no-show</span>
+              <span>{t('admin.reports.summary.cancelledOrNoShow')}</span>
               <strong>{lost}</strong>
-              <small>{percent(lost)}% of bookings</small>
+              <small>{t('admin.reports.summary.percentOfBookings', { percent: percent(lost) })}</small>
             </article>
             <article>
-              <span>Revenue</span>
-              <strong>{formatMoney(revenue.data?.totalRevenue)}</strong>
-              <small>{revenue.data?.successfulPayments ?? 0} paid bookings</small>
+              <span>{t('admin.reports.summary.revenue')}</span>
+              <strong>{formatMoney(revenue.data?.totalRevenue, language)}</strong>
+              <small>{t('admin.reports.summary.paidBookings', { count: revenue.data?.successfulPayments ?? 0 })}</small>
             </article>
           </section>
 
           <section className="admin-panel admin-report-panel">
             <div className="admin-panel-heading">
-              <div><h3>Bookings by status</h3><p>Where each booking in this period ended up</p></div>
+              <div><h3>{t('admin.reports.status.title')}</h3><p>{t('admin.reports.status.description')}</p></div>
             </div>
             {totalBookings === 0 ? (
-              <RequestState empty emptyDescription="Try a longer period." emptyTitle="No bookings in this period" />
+              <RequestState empty emptyDescription={t('admin.reports.empty.tryLongerPeriod')} emptyTitle={t('admin.reports.status.emptyTitle')} />
             ) : (
               <ul className="admin-status-bars">
                 {statusRows.map((row) => (
-                  <li className={row.count ? '' : 'is-empty'} key={row.status} title={`${row.count} bookings (${percent(row.count)}%)`}>
+                  <li className={row.count ? '' : 'is-empty'} key={row.status} title={t('admin.reports.status.tooltip', { count: row.count, percent: percent(row.count) })}>
                     <span className="admin-status-bars-label"><StatusBadge value={row.status} /></span>
                     <span aria-hidden="true" className="admin-status-bars-track">
                       <span style={{ width: `${(row.count / maxStatusCount) * 100}%` }} />
@@ -190,18 +195,18 @@ function ReportsPage() {
           <section className="admin-panel admin-data-panel admin-report-panel">
             <div className="admin-panel-heading">
               <div>
-                <h3>{applied.groupBy === 'month' ? 'Month by month' : 'Day by day'}</h3>
-                <p>Bookings are counted on the visit date, revenue on the day it was paid · newest first</p>
+                <h3>{t(applied.groupBy === 'month' ? 'admin.reports.period.monthByMonth' : 'admin.reports.period.dayByDay')}</h3>
+                <p>{t('admin.reports.period.description')}</p>
               </div>
             </div>
             {periodRows.length ? (
               <>
                 <DataTable
                   columns={[
-                    { key: 'period', label: applied.groupBy === 'month' ? 'Month' : 'Date', render: (row) => formatPeriod(row.period, applied.groupBy) },
-                    { key: 'bookings', label: 'Bookings' },
-                    { key: 'revenue', label: 'Revenue', render: (row) => formatMoney(row.revenue) },
-                    { key: 'payments', label: 'Paid bookings' },
+                    { key: 'period', label: t(applied.groupBy === 'month' ? 'admin.reports.table.month' : 'admin.reports.table.date'), render: (row) => formatPeriod(row.period, applied.groupBy, language) },
+                    { key: 'bookings', label: t('admin.reports.table.bookings') },
+                    { key: 'revenue', label: t('admin.reports.table.revenue'), render: (row) => formatMoney(row.revenue, language) },
+                    { key: 'payments', label: t('admin.reports.table.paidBookings') },
                   ]}
                   rowKey={(row) => row.period}
                   rows={pagedPeriods.pageRows}
@@ -209,7 +214,7 @@ function ReportsPage() {
                 <Pagination onPageChange={pagedPeriods.setPage} pagination={pagedPeriods.pagination} />
               </>
             ) : (
-              <RequestState empty emptyDescription="Try a longer period." emptyTitle="Nothing to show for this period" />
+              <RequestState empty emptyDescription={t('admin.reports.empty.tryLongerPeriod')} emptyTitle={t('admin.reports.period.emptyTitle')} />
             )}
           </section>
         </>

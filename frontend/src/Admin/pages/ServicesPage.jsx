@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import AdminModal from '../components/AdminModal.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
@@ -9,6 +10,10 @@ import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 const initialForm = { service_name: '', description: '', duration_minutes: '' }
 const VEHICLE_TYPE_PAGE_SIZE = 100
 
+function messageText(message, t) {
+  return message?.key ? t(message.key, message.params) : message
+}
+
 function isValidServicePrice(value) {
   const match = String(value).trim().match(/^(\d+)(?:\.(\d{1,2}))?$/)
   if (!match) return false
@@ -16,6 +21,7 @@ function isValidServicePrice(value) {
 }
 
 function ServicePricesPanel({ serviceId, api, onClose }) {
+  const { language, t } = useLanguage()
   const { data, loading, error, refresh } = useRemoteData(
     `/api/admin/services/${serviceId}/prices`,
     Boolean(serviceId),
@@ -54,7 +60,14 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
             !Number.isSafeInteger(reportedTotalPages) ||
             reportedTotalPages < 0
           ) {
-            throw new Error('The vehicle type list returned an invalid response.')
+            if (!cancelled) {
+              setVehicleTypeState({
+                data: null,
+                loading: false,
+                error: { key: 'admin.services.prices.invalidVehicleTypesResponse' },
+              })
+            }
+            return
           }
 
           vehicleTypes.push(...pageData.items)
@@ -134,7 +147,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
     setSaveMessage('')
 
     if (priceRows.length === 0) {
-      setSaveError('Add a vehicle type before saving service prices.')
+      setSaveError({ key: 'admin.services.prices.validation.noRows' })
       return
     }
 
@@ -142,24 +155,27 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
     for (const row of priceRows) {
       const vehicleTypeId = Number(row.vehicle_type_id)
       const vehicleType = vehicleTypesById.get(vehicleTypeId)
-      const typeName = vehicleType?.type_name || 'Selected vehicle type'
+      const typeName = vehicleType?.type_name
 
       if (!Number.isSafeInteger(vehicleTypeId) || vehicleTypeId <= 0) {
-        setSaveError('Choose a vehicle type for every new price row.')
+        setSaveError({ key: 'admin.services.prices.validation.selectType' })
         return
       }
       if (seenVehicleTypeIds.has(vehicleTypeId)) {
-        setSaveError('Each vehicle type can have only one price. Choose a different type.')
+        setSaveError({ key: 'admin.services.prices.validation.duplicateType' })
         return
       }
       if (vehicleType?.status !== 'ACTIVE') {
-        setSaveError('A selected vehicle type is no longer active. Refresh the list and try again.')
+        setSaveError({ key: 'admin.services.prices.validation.inactiveType' })
         return
       }
       if (!isValidServicePrice(row.price)) {
-        setSaveError(
-          `${typeName}: enter a non-negative price with up to 2 decimal places and no more than 8 digits before the decimal.`,
-        )
+        setSaveError({
+          key: typeName
+            ? 'admin.services.prices.validation.price'
+            : 'admin.services.prices.validation.priceWithoutType',
+          params: typeName ? { typeName } : undefined,
+        })
         return
       }
       seenVehicleTypeIds.add(vehicleTypeId)
@@ -177,7 +193,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
         },
       })
       setPrices(null)
-      setSaveMessage('Service prices saved.')
+      setSaveMessage({ key: 'admin.services.prices.saved' })
       refresh()
     } catch (requestError) {
       setSaveError(requestError.message)
@@ -191,29 +207,33 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
   return (
     <section className="admin-panel admin-edit-form">
       <div className="admin-panel-heading">
-        <div><h3>Prices · Service #{serviceId}</h3><p>Prices are stored per vehicle type. Saved prices can be updated; this API does not delete them.</p></div>
-        <button className="admin-inline-button" onClick={onClose} type="button">Close</button>
+        <div><h3>{t('admin.services.prices.title', { id: serviceId })}</h3><p>{t('admin.services.prices.description')}</p></div>
+        <button className="admin-inline-button" onClick={onClose} type="button">{t('admin.common.close')}</button>
       </div>
       <RequestState
-        error={loadError}
+        error={messageText(loadError, t)}
         loading={isLoading}
-        loadingMessage="Loading service prices and vehicle types…"
+        loadingMessage={t('admin.services.prices.loading')}
         onRetry={handleRetry}
       />
       {!isLoading && !loadError && (
         <form onSubmit={savePrices}>
           {inactivePrices.length > 0 && (
             <div className="admin-price-note" role="status">
-              <p>Prices for inactive or unavailable vehicle types are shown for reference and are not changed here.</p>
+              <p>{t('admin.services.prices.inactiveNote')}</p>
               <ul className="admin-price-inactive-list">
                 {inactivePrices.map((item) => {
                   const vehicleType = vehicleTypesById.get(Number(item.vehicle_type_id))
-                  const typeName = vehicleType?.type_name || item.type_name || `Vehicle type #${item.vehicle_type_id}`
-                  const status = vehicleType?.status === 'INACTIVE' ? 'Inactive' : 'Status unavailable'
+                  const typeName = vehicleType?.type_name || item.type_name || t('admin.services.prices.typeFallback', {
+                    id: item.vehicle_type_id,
+                  })
+                  const status = vehicleType?.status === 'INACTIVE'
+                    ? t('admin.status.inactive')
+                    : t('admin.services.prices.statusUnavailable')
                   return (
                     <li key={item.vehicle_type_id}>
                       <span>{typeName} · {status}</span>
-                      <strong>{formatMoney(item.price)}</strong>
+                      <strong>{formatMoney(item.price, language)}</strong>
                     </li>
                   )
                 })}
@@ -222,7 +242,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
           )}
           {priceRows.length === 0 && (
             <p className="admin-price-empty" role="status">
-              No active prices are set. Add an active vehicle type to set this service’s price.
+              {t('admin.services.prices.empty')}
             </p>
           )}
           <div className="admin-price-list">
@@ -230,7 +250,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
               <div className="admin-price-row" key={`${item.vehicle_type_id}-${index}`}>
                 {item.isNew ? (
                   <label>
-                    Vehicle type
+                    {t('admin.services.prices.vehicleType')}
                     <select
                       disabled={saving}
                       onChange={(event) => updatePriceRows(priceRows.map((price, row) => (
@@ -241,7 +261,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
                       required
                       value={item.vehicle_type_id}
                     >
-                      <option value="">Select a vehicle type</option>
+                      <option value="">{t('admin.services.prices.selectType')}</option>
                       {activeVehicleTypes.map((vehicleType) => {
                         const typeId = String(vehicleType.vehicle_type_id)
                         const alreadyAssigned = priceRows.some(
@@ -249,7 +269,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
                         )
                         return (
                           <option disabled={alreadyAssigned} key={typeId} value={typeId}>
-                            {vehicleType.type_name}{alreadyAssigned ? ' · already priced' : ''}
+                            {vehicleType.type_name}{alreadyAssigned ? ` · ${t('admin.services.prices.alreadyPriced')}` : ''}
                           </option>
                         )
                       })}
@@ -257,12 +277,12 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
                   </label>
                 ) : (
                   <div className="admin-price-type">
-                    <span>Vehicle type</span>
-                    <strong>{vehicleTypesById.get(Number(item.vehicle_type_id))?.type_name || 'Vehicle type unavailable'}</strong>
+                    <span>{t('admin.services.prices.vehicleType')}</span>
+                    <strong>{vehicleTypesById.get(Number(item.vehicle_type_id))?.type_name || t('admin.services.prices.typeUnavailable')}</strong>
                   </div>
                 )}
                 <label>
-                  Price (฿)
+                  {t('admin.services.prices.priceLabel')}
                   <input
                     disabled={saving}
                     inputMode="decimal"
@@ -276,32 +296,32 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
                 </label>
                 {item.isNew && (
                   <button
-                    aria-label="Remove unsaved price row"
+                    aria-label={t('admin.services.prices.removeRowLabel')}
                     className="admin-inline-button admin-action-danger"
                     disabled={saving}
                     onClick={() => {
                       updatePriceRows(priceRows.filter((_, row) => row !== index))
-                      setSaveMessage('Unsaved row removed. Existing saved prices are unchanged.')
+                      setSaveMessage({ key: 'admin.services.prices.rowRemoved' })
                     }}
                     type="button"
                   >
-                    Remove row
+                    {t('admin.services.prices.removeRow')}
                   </button>
                 )}
               </div>
             ))}
           </div>
           {hasUnselectedPrice && (
-            <p className="admin-price-hint">Choose a vehicle type for each new row before saving.</p>
+            <p className="admin-price-hint">{t('admin.services.prices.chooseTypeHint')}</p>
           )}
           {activeVehicleTypes.length === 0 && (
-            <p className="admin-price-hint">No active vehicle types are available for new prices.</p>
+            <p className="admin-price-hint">{t('admin.services.prices.noActiveTypes')}</p>
           )}
           {activeVehicleTypes.length > 0 && priceRows.length > 0 && !canAddVehicleType && (
-            <p className="admin-price-hint">Every active vehicle type already has a price.</p>
+            <p className="admin-price-hint">{t('admin.services.prices.allTypesPriced')}</p>
           )}
-          {saveError && <div className="admin-alert admin-alert-error" role="alert">{saveError}</div>}
-          {saveMessage && <div className="admin-alert admin-alert-success" role="status">{saveMessage}</div>}
+          {saveError && <div className="admin-alert admin-alert-error" role="alert">{messageText(saveError, t)}</div>}
+          {saveMessage && <div className="admin-alert admin-alert-success" role="status">{messageText(saveMessage, t)}</div>}
           <div className="admin-form-actions">
             <button
               className="admin-secondary-button"
@@ -312,14 +332,14 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
               ])}
               type="button"
             >
-              Add vehicle type
+              {t('admin.services.prices.addVehicleType')}
             </button>
             <button
               className="admin-primary-button"
               disabled={saving || priceRows.length === 0 || hasUnselectedPrice}
               type="submit"
             >
-              {saving ? 'Saving…' : 'Save prices'}
+              {saving ? t('admin.common.saving') : t('admin.services.prices.save')}
             </button>
           </div>
         </form>
@@ -329,6 +349,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
 }
 
 function ServicesPage() {
+  const { language, t } = useLanguage()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -376,7 +397,9 @@ function ServicesPage() {
         method: editing ? 'PATCH' : 'POST',
         body,
       })
-      setMessage(editing ? 'Service updated.' : 'Service created.')
+      setMessage({
+        key: editing ? 'admin.services.feedback.updated' : 'admin.services.feedback.created',
+      })
       setForm(initialForm)
       setEditing(null)
       setFormOpen(false)
@@ -390,8 +413,13 @@ function ServicesPage() {
 
   async function toggleStatus(service) {
     const nextStatus = service.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    const action = nextStatus === 'ACTIVE' ? 'activate' : 'deactivate'
-    if (!window.confirm(`Are you sure you want to ${action} ${service.service_name}?`)) return
+    const action = t(nextStatus === 'ACTIVE'
+      ? 'admin.services.action.activateVerb'
+      : 'admin.services.action.deactivateVerb')
+    if (!window.confirm(t('admin.services.confirm.status', {
+      action,
+      name: service.service_name,
+    }))) return
 
     setBusy(true)
     setActionError('')
@@ -401,7 +429,12 @@ function ServicesPage() {
         method: 'PATCH',
         body: { status: nextStatus },
       })
-      setMessage(`${service.service_name} is now ${nextStatus.toLowerCase()}.`)
+      setMessage({
+        key: nextStatus === 'ACTIVE'
+          ? 'admin.services.feedback.activated'
+          : 'admin.services.feedback.deactivated',
+        params: { name: service.service_name },
+      })
       refresh()
     } catch (requestError) {
       setActionError(requestError.message)
@@ -415,19 +448,19 @@ function ServicesPage() {
       <PageHeading
         action={(
           <div className="admin-heading-actions">
-            <button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">Refresh</button>
-            <button className="admin-primary-button" onClick={openCreateForm} type="button">+ Add service</button>
+            <button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">{t('admin.services.refresh')}</button>
+            <button className="admin-primary-button" onClick={openCreateForm} type="button">{t('admin.services.add')}</button>
           </div>
         )}
-        description="Add services, set how long they take, and set a price for each vehicle type."
-        eyebrow="CATALOG"
-        title="Services & pricing"
+        description={t('admin.services.description')}
+        eyebrow={t('admin.services.eyebrow')}
+        title={t('admin.services.title')}
       />
-      {!formOpen && message && <div className="admin-alert admin-alert-success" role="status">{message}</div>}
+      {!formOpen && message && <div className="admin-alert admin-alert-success" role="status">{messageText(message, t)}</div>}
       {!formOpen && actionError && <div className="admin-alert admin-alert-error" role="alert">{actionError}</div>}
       {formOpen && (
         <AdminModal
-          description="Enter the service details below."
+          description={t('admin.services.modal.description')}
           error={actionError}
           onClose={() => {
             if (busy) return
@@ -438,56 +471,60 @@ function ServicesPage() {
           }}
           onSubmit={submitService}
           open={formOpen}
-          submitLabel={editing ? 'Save changes' : 'Create service'}
+          submitLabel={t(editing ? 'admin.services.modal.save' : 'admin.services.modal.create')}
           submitting={busy}
-          title={editing ? `Edit service #${editing}` : 'Add a service'}
+          title={t(editing ? 'admin.services.modal.editTitle' : 'admin.services.modal.addTitle', {
+            id: editing,
+          })}
         >
           <div className="admin-form-grid">
-            <label>Service name<input autoFocus maxLength="100" onChange={(e) => setForm({ ...form, service_name: e.target.value })} required value={form.service_name} /></label>
-            <label>Duration (minutes)<input min="1" onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} required type="number" value={form.duration_minutes} /></label>
-            <label className="admin-form-wide">Description<textarea onChange={(e) => setForm({ ...form, description: e.target.value })} value={form.description} /></label>
+            <label>{t('admin.services.form.name')}<input autoFocus maxLength="100" onChange={(e) => setForm({ ...form, service_name: e.target.value })} required value={form.service_name} /></label>
+            <label>{t('admin.services.form.duration')}<input min="1" onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} required type="number" value={form.duration_minutes} /></label>
+            <label className="admin-form-wide">{t('admin.services.form.description')}<textarea onChange={(e) => setForm({ ...form, description: e.target.value })} value={form.description} /></label>
           </div>
         </AdminModal>
       )}
       <form className="admin-filter-bar" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedSearch(search.trim()) }}>
-        <input aria-label="Search services" maxLength="100" onChange={(event) => setSearch(event.target.value)} placeholder="Search services" value={search} />
-        <button className="admin-primary-button" type="submit">Search</button>
+        <input aria-label={t('admin.services.search.label')} maxLength="100" onChange={(event) => setSearch(event.target.value)} placeholder={t('admin.services.search.placeholder')} value={search} />
+        <button className="admin-primary-button" type="submit">{t('admin.services.search.submit')}</button>
       </form>
       <section className="admin-panel admin-data-panel">
         <RequestState
           empty={!rows.length}
-          emptyDescription="Try a different service name or clear the search."
-          emptyTitle="No services match"
+          emptyDescription={t('admin.services.state.emptyDescription')}
+          emptyTitle={t('admin.services.state.emptyTitle')}
           error={error}
           loading={loading}
-          loadingMessage="Loading services…"
+          loadingMessage={t('admin.services.state.loading')}
           onRetry={refresh}
         />
         {!loading && !error && !!rows.length && (
           <>
             <DataTable columns={[
-              { key: 'service_id', label: 'ID' },
-              { key: 'service_name', label: 'Service' },
-              { key: 'duration_minutes', label: 'Duration (min)' },
+              { key: 'service_id', label: t('admin.services.table.id') },
+              { key: 'service_name', label: t('admin.services.table.service') },
+              { key: 'duration_minutes', label: t('admin.services.table.duration') },
               {
                 key: 'price',
-                label: 'Price',
+                label: t('admin.services.table.price'),
                 render: (row) => {
                   if (!row.price_count) {
-                    return <button className="admin-inline-button admin-action-danger" onClick={() => setPricingServiceId(row.service_id)} type="button">Set prices</button>
+                    return <button className="admin-inline-button admin-action-danger" onClick={() => setPricingServiceId(row.service_id)} type="button">{t('admin.services.table.setPrices')}</button>
                   }
                   const range = Number(row.min_price) === Number(row.max_price)
-                    ? formatMoney(row.min_price)
-                    : `${formatMoney(row.min_price)} – ${formatMoney(row.max_price)}`
-                  return <span>{range} <small className="admin-muted">· {row.price_count} {row.price_count === 1 ? 'type' : 'types'}</small></span>
+                    ? formatMoney(row.min_price, language)
+                    : `${formatMoney(row.min_price, language)} – ${formatMoney(row.max_price, language)}`
+                  return <span>{range} <small className="admin-muted">· {t('admin.services.table.typeCount', {
+                    count: row.price_count,
+                  })}</small></span>
                 },
               },
-              { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-              { key: 'actions', label: 'Actions', render: (row) => (
+              { key: 'status', label: t('admin.services.table.status'), render: (row) => <StatusBadge value={row.status} /> },
+              { key: 'actions', label: t('admin.services.table.actions'), render: (row) => (
                 <div className="admin-row-actions">
-                  <button className="admin-inline-button" disabled={busy} onClick={() => { startEdit(row); setActionError(''); setFormOpen(true) }} type="button">Edit</button>
-                  <button className="admin-inline-button" onClick={() => setPricingServiceId(row.service_id)} type="button">Prices</button>
-                  <button className={`admin-inline-button ${row.status === 'ACTIVE' ? 'admin-action-danger' : 'admin-action-success'}`} disabled={busy} onClick={() => toggleStatus(row)} type="button">{row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</button>
+                  <button className="admin-inline-button" disabled={busy} onClick={() => { startEdit(row); setActionError(''); setFormOpen(true) }} type="button">{t('admin.services.table.edit')}</button>
+                  <button className="admin-inline-button" onClick={() => setPricingServiceId(row.service_id)} type="button">{t('admin.services.table.prices')}</button>
+                  <button className={`admin-inline-button ${row.status === 'ACTIVE' ? 'admin-action-danger' : 'admin-action-success'}`} disabled={busy} onClick={() => toggleStatus(row)} type="button">{t(row.status === 'ACTIVE' ? 'admin.services.action.deactivate' : 'admin.services.action.activate')}</button>
                 </div>
               ) },
             ]} rows={rows} />

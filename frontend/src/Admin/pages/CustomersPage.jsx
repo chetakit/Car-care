@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import AdminModal from '../components/AdminModal.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
@@ -18,14 +19,19 @@ function isValidUserId(value) {
   return /^[1-9]\d*$/.test(id) && Number.isSafeInteger(Number(id))
 }
 
-function vehicleLabel(vehicle) {
+function messageText(message, t) {
+  return message?.key ? t(message.key, message.params) : message
+}
+
+function vehicleLabel(vehicle, t) {
   return [
     [vehicle.brand_name, vehicle.model_name].filter(Boolean).join(' '),
     vehicle.license_plate,
-  ].filter(Boolean).join(' · ') || 'Vehicle details unavailable'
+  ].filter(Boolean).join(' · ') || t('admin.members.vehicle.detailsUnavailable')
 }
 
 function CustomersPage({ user, role = 'CUSTOMER' }) {
+  const { language, t } = useLanguage()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -59,8 +65,8 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
   const [creating, setCreating] = useState(false)
   const requestId = useRef(0)
   const api = useApi()
-  const memberType = role === 'STAFF' ? 'Staff' : 'Customer'
-  const memberCountLabel = role === 'STAFF' ? 'staff' : 'customers'
+  const memberType = t(role === 'STAFF' ? 'admin.members.staff' : 'admin.members.customer')
+  const memberTypes = t(role === 'STAFF' ? 'admin.members.staffPlural' : 'admin.members.customers')
 
   const params = new URLSearchParams({
     page: String(page),
@@ -102,9 +108,13 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
     const name =
       selectedRoleUser.full_name ||
       selectedRoleUser.email ||
-      `User #${selectedRoleUser.user_id}`
+      `#${selectedRoleUser.user_id}`
     if (!window.confirm(
-      `Change ${name}'s role from ${selectedRoleUser.role} to ${newRole}?`,
+      t('admin.members.confirm.roleChange', {
+        name,
+        oldRole: selectedRoleUser.role,
+        newRole,
+      }),
     )) return
 
     setRoleChanging(true)
@@ -115,7 +125,10 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
         method: 'PATCH',
         body: { role: newRole },
       })
-      setRoleChangeMessage(`${name}'s role is now ${newRole}.`)
+      setRoleChangeMessage({
+        key: 'admin.members.feedback.roleChanged',
+        params: { name, role: newRole },
+      })
       setSelectedRoleUser(null)
       refresh()
     } catch (requestError) {
@@ -137,11 +150,14 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
     if (user?.role !== 'ADMIN' || creating) return
     const phone = createForm.phone.trim()
     if (phone && !/^\d{10}$/.test(phone)) {
-      setCreateError('Phone must be exactly 10 digits, or leave it empty.')
+      setCreateError({ key: 'admin.staff.validation.phone' })
       return
     }
     if (createForm.password.length < MIN_PASSWORD_LENGTH) {
-      setCreateError(`The temporary password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
+      setCreateError({
+        key: 'admin.staff.validation.passwordLength',
+        params: { length: MIN_PASSWORD_LENGTH },
+      })
       return
     }
     setCreating(true)
@@ -160,7 +176,15 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
       const created = response.data
       setCreateOpen(false)
       setCreateForm(BLANK_MEMBER)
-      setRoleChangeMessage(`${created?.full_name ?? 'The account'} was created as ${created?.role ?? createForm.role}. Share the temporary password with them privately.`)
+      setRoleChangeMessage({
+        key: created?.full_name
+          ? 'admin.staff.feedback.created'
+          : 'admin.staff.feedback.createdWithoutName',
+        params: {
+          name: created?.full_name ?? '',
+          role: created?.role ?? createForm.role,
+        },
+      })
       refresh()
     } catch (requestError) {
       setCreateError(requestError.message)
@@ -176,10 +200,10 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
       statusChangingId !== null
     ) return
     const nextStatus = row.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    const name = row.full_name || row.email || `User #${row.user_id}`
+    const name = row.full_name || row.email || `#${row.user_id}`
     const question = nextStatus === 'INACTIVE'
-      ? `Suspend ${name}? They will be signed out and cannot sign in until the account is activated again. Their bookings and payments are kept.`
-      : `Activate ${name}? They will be able to sign in again.`
+      ? t('admin.members.confirm.suspend', { name })
+      : t('admin.members.confirm.activate', { name })
     if (!window.confirm(question)) return
 
     setStatusChangingId(row.user_id)
@@ -190,7 +214,12 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
         method: 'PATCH',
         body: { status: nextStatus },
       })
-      setRoleChangeMessage(nextStatus === 'INACTIVE' ? `${name} is suspended.` : `${name} is active again.`)
+      setRoleChangeMessage({
+        key: nextStatus === 'INACTIVE'
+          ? 'admin.members.feedback.suspended'
+          : 'admin.members.feedback.activeAgain',
+        params: { name },
+      })
       refresh()
     } catch (requestError) {
       setRoleChangeError(requestError.message)
@@ -239,7 +268,9 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
         } else {
           paymentsByBooking[matchingBookings[index].booking_id] = {
             payment: null,
-            error: result.reason instanceof Error ? result.reason.message : 'Payment could not be loaded.',
+            error: result.reason instanceof Error
+              ? result.reason.message
+              : { key: 'admin.members.bookings.paymentLoadError' },
           }
         }
       })
@@ -368,89 +399,92 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
   return (
     <div className="admin-customers-page">
       <PageHeading
-        description={`Search and review ${memberType.toLowerCase()} accounts and their related records.`}
-        eyebrow="PEOPLE"
+        description={t('admin.members.description', { member: memberTypes })}
+        eyebrow={t('admin.members.eyebrow')}
         title={memberType}
         action={(
           <div className="admin-heading-actions">
-            <button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">Refresh</button>
+            <button className="admin-secondary-button admin-refresh-button" disabled={loading} onClick={refresh} type="button">{t('admin.members.refresh')}</button>
             {role === 'STAFF' && user?.role === 'ADMIN' && (
-              <button className="admin-primary-button" onClick={openCreate} type="button">+ Add staff</button>
+              <button className="admin-primary-button" onClick={openCreate} type="button">{t('admin.staff.add')}</button>
             )}
           </div>
         )}
       />
       {createOpen && (
         <AdminModal
-          description="Create a Staff or Admin account. They sign in with this email and the temporary password you set."
-          error={createError}
+          description={t('admin.staff.modal.description')}
+          error={messageText(createError, t)}
           onClose={() => { if (!creating) setCreateOpen(false) }}
           onSubmit={createMember}
           open
-          submitLabel="Create account"
+          submitLabel={t('admin.staff.modal.submit')}
           submitting={creating}
-          title="Add a staff account"
+          title={t('admin.staff.modal.title')}
         >
           <div className="admin-form-grid">
-            <label className="admin-form-wide">Full name<input autoComplete="off" autoFocus maxLength="100" onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })} required value={createForm.full_name} /></label>
-            <label>Email<input autoComplete="off" maxLength="150" onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} required type="email" value={createForm.email} /></label>
-            <label>Phone (optional)<input autoComplete="off" inputMode="numeric" maxLength="10" onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} placeholder="10 digits" value={createForm.phone} /></label>
-            <label>Temporary password<input autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required type="password" value={createForm.password} /></label>
-            <label>Role<select onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })} value={createForm.role}><option value="STAFF">Staff</option><option value="ADMIN">Admin</option></select></label>
+            <label className="admin-form-wide">{t('admin.staff.form.fullName')}<input autoComplete="off" autoFocus maxLength="100" onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })} required value={createForm.full_name} /></label>
+            <label>{t('admin.staff.form.email')}<input autoComplete="off" maxLength="150" onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} required type="email" value={createForm.email} /></label>
+            <label>{t('admin.staff.form.phoneOptional')}<input autoComplete="off" inputMode="numeric" maxLength="10" onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} placeholder={t('admin.staff.form.phonePlaceholder')} value={createForm.phone} /></label>
+            <label>{t('admin.staff.form.temporaryPassword')}<input autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required type="password" value={createForm.password} /></label>
+            <label>{t('admin.staff.form.role')}<select onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })} value={createForm.role}><option value="STAFF">{t('admin.staff.form.staffRole')}</option><option value="ADMIN">{t('admin.staff.form.adminRole')}</option></select></label>
           </div>
         </AdminModal>
       )}
       <form className="admin-filter-bar admin-customer-filters" onSubmit={applyFilters}>
         <input
-          aria-label={`Search ${memberCountLabel}`}
+          aria-label={t('admin.members.search.label', { member: memberTypes })}
           maxLength="100"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search name, email or phone"
+          placeholder={t('admin.members.search.placeholder')}
           value={search}
         />
         <select
-          aria-label="Account status"
+          aria-label={t('admin.members.status.label')}
           onChange={(event) => setStatus(event.target.value)}
           value={status}
         >
-          <option value="">All account statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
+          <option value="">{t('admin.members.status.all')}</option>
+          <option value="ACTIVE">{t('admin.status.active')}</option>
+          <option value="INACTIVE">{t('admin.status.inactive')}</option>
         </select>
-        <button className="admin-primary-button" disabled={loading} type="submit">Search</button>
+        <button className="admin-primary-button" disabled={loading} type="submit">{t('admin.members.search.submit')}</button>
       </form>
 
       <section className="admin-panel admin-data-panel admin-customers-panel">
         <div className="admin-panel-heading">
           <div>
-            <h3>{memberType} accounts</h3>
-            <p>{data?.pagination?.total ?? 0} {memberCountLabel} · ordered by name (A–Z)</p>
+            <h3>{t('admin.members.accountsTitle', { member: memberTypes })}</h3>
+            <p>{t('admin.members.accountsSummary', {
+              count: data?.pagination?.total ?? 0,
+              member: memberTypes,
+            })}</p>
           </div>
         </div>
         {roleChangeError && !selectedRoleUser && <div className="admin-alert admin-alert-error" role="alert">{roleChangeError}</div>}
-        {roleChangeMessage && <div className="admin-alert admin-alert-success" role="status">{roleChangeMessage}</div>}
+        {roleChangeMessage && <div className="admin-alert admin-alert-success" role="status">{messageText(roleChangeMessage, t)}</div>}
         <RequestState
           empty={!rows.length}
-          emptyDescription="Try a different name, email, phone number, or account status."
-          emptyTitle={`No ${memberType.toLowerCase()} accounts match`}
+          emptyDescription={t('admin.members.state.emptyDescription')}
+          emptyTitle={t('admin.members.state.emptyTitle', { member: memberTypes })}
           error={error}
           loading={loading}
-          loadingMessage={`Loading ${memberCountLabel} accounts…`}
+          loadingMessage={t('admin.members.state.loading', { member: memberTypes })}
           onRetry={refresh}
         />
         {!loading && !error && rows.length > 0 && (
           <>
             <DataTable
               columns={[
-                { key: 'user_id', label: 'User ID', render: (row) => `#${row.user_id}` },
-                { key: 'full_name', label: 'Full name', wrap: true },
-                { key: 'email', label: 'Email' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'created_at', label: 'Registered', render: (row) => formatDate(row.created_at) },
-                { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+                { key: 'user_id', label: t('admin.members.table.userId'), render: (row) => `#${row.user_id}` },
+                { key: 'full_name', label: t('admin.members.table.fullName'), wrap: true },
+                { key: 'email', label: t('admin.members.table.email') },
+                { key: 'phone', label: t('admin.members.table.phone') },
+                { key: 'created_at', label: t('admin.members.table.registered'), render: (row) => formatDate(row.created_at, language) },
+                { key: 'status', label: t('admin.members.table.status'), render: (row) => <StatusBadge value={row.status} /> },
                 {
                   key: 'actions',
-                  label: 'Actions',
+                  label: t('admin.members.table.actions'),
                   render: (row) => (
                     <div className="admin-row-actions">
                       <button
@@ -459,28 +493,39 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
                         onClick={() => openDetails(row)}
                         type="button"
                       >
-                        View details
+                        {t('admin.members.action.viewDetails')}
                       </button>
                       {user?.role === 'ADMIN' && (
                         <button
-                          aria-label={`Change role for ${row.full_name || row.email || `user ${row.user_id}`}`}
+                          aria-label={t('admin.members.action.changeRoleLabel', {
+                            name: row.full_name || row.email || `#${row.user_id}`,
+                          })}
                           className="admin-inline-button"
                           disabled={roleChanging || !isValidUserId(row.user_id) || Number(row.user_id) === Number(user?.user_id)}
                           onClick={() => openRoleChange(row)}
                           type="button"
                         >
-                          Change Role
+                          {t('admin.members.action.changeRole')}
                         </button>
                       )}
                       {user?.role === 'ADMIN' && (
                         <button
-                          aria-label={`${row.status === 'ACTIVE' ? 'Suspend' : 'Activate'} ${row.full_name || row.email || `user ${row.user_id}`}`}
+                          aria-label={t(
+                            row.status === 'ACTIVE'
+                              ? 'admin.members.action.suspendLabel'
+                              : 'admin.members.action.activateLabel',
+                            { name: row.full_name || row.email || `#${row.user_id}` },
+                          )}
                           className={`admin-inline-button ${row.status === 'ACTIVE' ? 'admin-action-danger' : 'admin-action-success'}`}
                           disabled={statusChangingId !== null || !isValidUserId(row.user_id) || Number(row.user_id) === Number(user?.user_id)}
                           onClick={() => toggleStatus(row)}
                           type="button"
                         >
-                          {statusChangingId === row.user_id ? 'Saving…' : row.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                          {statusChangingId === row.user_id
+                            ? t('admin.common.saving')
+                            : t(row.status === 'ACTIVE'
+                              ? 'admin.members.action.suspend'
+                              : 'admin.members.action.activate')}
                         </button>
                       )}
                     </div>
@@ -497,62 +542,64 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
 
       {selectedCustomer && (
         <AdminModal
-          description={`Member account and related records for ${displayedCustomer?.full_name || `#${selectedCustomer.user_id}`}.`}
+          description={t('admin.members.details.description', {
+            name: displayedCustomer?.full_name || `#${selectedCustomer.user_id}`,
+          })}
           error={customerError}
           onClose={closeDetails}
           onSubmit={handleModalSubmit}
           open
-          submitLabel="Close"
+          submitLabel={t('admin.common.close')}
           submitting={false}
           viewOnly
-          title={`Member #${selectedCustomer.user_id}`}
+          title={t('admin.members.details.title', { id: selectedCustomer.user_id })}
         >
           <div className="admin-customer-detail">
-            <nav aria-label="Member record sections" className="admin-customer-section-nav">
-              <a href="#admin-customer-information">Account</a>
-              <a href="#admin-customer-vehicles">Vehicles</a>
-              <a href="#admin-customer-bookings">Bookings</a>
-              <a href="#admin-customer-wallet">Wallet</a>
-              <a href="#admin-customer-transactions">Transactions</a>
+            <nav aria-label={t('admin.members.details.navigation')} className="admin-customer-section-nav">
+              <a href="#admin-customer-information">{t('admin.members.details.account')}</a>
+              <a href="#admin-customer-vehicles">{t('admin.members.details.vehicles')}</a>
+              <a href="#admin-customer-bookings">{t('admin.members.details.bookings')}</a>
+              <a href="#admin-customer-wallet">{t('admin.members.details.wallet')}</a>
+              <a href="#admin-customer-transactions">{t('admin.members.details.transactions')}</a>
             </nav>
 
             <section className="admin-customer-detail-section" id="admin-customer-information">
-              <h3>Member information</h3>
-              <RequestState loading={customerLoading} loadingMessage="Loading member information…" />
+              <h3>{t('admin.members.details.information')}</h3>
+              <RequestState loading={customerLoading} loadingMessage={t('admin.members.details.loadingInformation')} />
               {!customerLoading && displayedCustomer && (
                 <dl className="admin-customer-detail-grid">
-                  <div><dt>Full name</dt><dd>{displayedCustomer.full_name || '—'}</dd></div>
-                  <div><dt>Account status</dt><dd><StatusBadge value={displayedCustomer.status} /></dd></div>
-                  <div><dt>Role</dt><dd>{displayedCustomer.role}</dd></div>
-                  <div><dt>Email</dt><dd>{displayedCustomer.email || '—'}</dd></div>
-                  <div><dt>Phone</dt><dd>{displayedCustomer.phone || '—'}</dd></div>
-                  <div><dt>Registered</dt><dd>{formatDateTime(displayedCustomer.created_at)}</dd></div>
+                  <div><dt>{t('admin.members.details.fullName')}</dt><dd>{displayedCustomer.full_name || '—'}</dd></div>
+                  <div><dt>{t('admin.members.details.accountStatus')}</dt><dd><StatusBadge value={displayedCustomer.status} /></dd></div>
+                  <div><dt>{t('admin.members.details.role')}</dt><dd>{displayedCustomer.role}</dd></div>
+                  <div><dt>{t('admin.members.details.email')}</dt><dd>{displayedCustomer.email || '—'}</dd></div>
+                  <div><dt>{t('admin.members.details.phone')}</dt><dd>{displayedCustomer.phone || '—'}</dd></div>
+                  <div><dt>{t('admin.members.details.registered')}</dt><dd>{formatDateTime(displayedCustomer.created_at, language)}</dd></div>
                 </dl>
               )}
             </section>
 
             <section className="admin-customer-detail-section" id="admin-customer-vehicles">
-              <h3>Vehicles in loaded bookings</h3>
+              <h3>{t('admin.members.vehicles.title')}</h3>
               <p className="admin-customer-section-note">
-                This is a partial list from the currently loaded Booking search page, not a complete vehicle list. The Admin API has no member-specific vehicle-list endpoint.
+                {t('admin.members.vehicles.note')}
               </p>
               {bookingsError && (
-                <p className="admin-customer-section-note">Vehicle information is unavailable because booking history could not be loaded.</p>
+                <p className="admin-customer-section-note">{t('admin.members.vehicles.bookingError')}</p>
               )}
               <RequestState
                 empty={!uniqueVehicles.size && !bookingsError}
-                emptyDescription="No vehicles were returned in the currently loaded booking results."
-                emptyTitle="No vehicle details on this page"
+                emptyDescription={t('admin.members.vehicles.emptyDescription')}
+                emptyTitle={t('admin.members.vehicles.emptyTitle')}
                 loading={bookingsLoading}
-                loadingMessage="Loading vehicles from booking records…"
+                loadingMessage={t('admin.members.vehicles.loading')}
               />
               {!bookingsLoading && !bookingsError && uniqueVehicles.size > 0 && (
                 <div className="admin-customer-record-list">
                   {[...uniqueVehicles.values()].map((vehicle) => (
                     <div className="admin-customer-record" key={vehicle.vehicle_id}>
                       <div>
-                        <strong>{vehicleLabel(vehicle)}</strong>
-                        <small>{[vehicle.type_name, vehicle.production_year].filter(Boolean).join(' · ') || 'Vehicle details as returned by Booking API'}</small>
+                        <strong>{vehicleLabel(vehicle, t)}</strong>
+                        <small>{[vehicle.type_name, vehicle.production_year].filter(Boolean).join(' · ') || t('admin.members.vehicles.apiDetails')}</small>
                       </div>
                       <span>#{vehicle.vehicle_id}</span>
                     </div>
@@ -562,17 +609,17 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
             </section>
 
             <section className="admin-customer-detail-section" id="admin-customer-bookings">
-              <h3>Booking history</h3>
+              <h3>{t('admin.members.bookings.title')}</h3>
               <p className="admin-customer-section-note">
-                Results come from the current page of the Admin booking search; pagination may include other matching members and is not a complete member-only history.
+                {t('admin.members.bookings.note')}
               </p>
               <RequestState
                 empty={!bookingRows.length}
-                emptyDescription="No matching booking records were returned on this search page."
-                emptyTitle="No bookings on this page"
+                emptyDescription={t('admin.members.bookings.emptyDescription')}
+                emptyTitle={t('admin.members.bookings.emptyTitle')}
                 error={bookingsError}
                 loading={bookingsLoading}
-                loadingMessage="Loading booking history…"
+                loadingMessage={t('admin.members.bookings.loading')}
               />
               {!bookingsLoading && !bookingsError && bookingRows.length > 0 && (
                 <>
@@ -582,27 +629,29 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
                       return (
                         <article className="admin-customer-booking" key={booking.booking_id}>
                           <div className="admin-customer-booking-heading">
-                            <strong>Booking #{booking.booking_id}</strong>
+                            <strong>{t('admin.members.bookings.id', { id: booking.booking_id })}</strong>
                             <StatusBadge value={booking.booking_status} />
                           </div>
                           <dl className="admin-customer-booking-grid">
-                            <div><dt>Vehicle</dt><dd>{vehicleLabel(booking)}</dd></div>
-                            <div><dt>Date</dt><dd>{formatDate(booking.booking_date)} · {String(booking.start_time ?? '').slice(0, 5) || '—'}</dd></div>
-                            <div><dt>Amount</dt><dd>{formatMoney(booking.final_amount)}</dd></div>
+                            <div><dt>{t('admin.members.bookings.vehicle')}</dt><dd>{vehicleLabel(booking, t)}</dd></div>
+                            <div><dt>{t('admin.members.bookings.date')}</dt><dd>{formatDate(booking.booking_date, language)} · {String(booking.start_time ?? '').slice(0, 5) || '—'}</dd></div>
+                            <div><dt>{t('admin.members.bookings.amount')}</dt><dd>{formatMoney(booking.final_amount, language)}</dd></div>
                             <div>
-                              <dt>Payment</dt>
+                              <dt>{t('admin.members.bookings.payment')}</dt>
                               <dd>
                                 {paymentInfo ? paymentInfo.error
-                                  ? <span className="admin-customer-unavailable">Unavailable: {paymentInfo.error}</span>
+                                  ? <span className="admin-customer-unavailable">{t('admin.members.bookings.unavailable')}: {messageText(paymentInfo.error, t)}</span>
                                   : paymentInfo.payment
                                     ? <><StatusBadge value={paymentInfo.payment.payment_status} /> <span>{paymentInfo.payment.payment_method}</span></>
-                                    : <span>Not available</span>
-                                  : 'Loading…'}
+                                    : <span>{t('admin.members.bookings.notAvailable')}</span>
+                                  : t('admin.members.bookings.paymentLoading')}
                               </dd>
                             </div>
                           </dl>
                           {paymentInfo?.payment?.paid_at && (
-                            <p className="admin-customer-payment-date">Paid {formatDateTime(paymentInfo.payment.paid_at)}</p>
+                            <p className="admin-customer-payment-date">{t('admin.members.bookings.paidAt', {
+                              date: formatDateTime(paymentInfo.payment.paid_at, language),
+                            })}</p>
                           )}
                         </article>
                       )
@@ -614,32 +663,32 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
             </section>
 
             <section className="admin-customer-detail-section" id="admin-customer-wallet">
-              <h3>Wallet balance</h3>
+              <h3>{t('admin.members.wallet.title')}</h3>
               <RequestState
                 empty={!wallet && !walletError}
-                emptyDescription="No wallet record was returned for this member."
-                emptyTitle="Wallet balance unavailable"
+                emptyDescription={t('admin.members.wallet.emptyDescription')}
+                emptyTitle={t('admin.members.wallet.emptyTitle')}
                 error={walletError}
                 loading={walletLoading}
-                loadingMessage="Loading wallet balance…"
+                loadingMessage={t('admin.members.wallet.loading')}
               />
               {!walletLoading && !walletError && wallet && (
                 <div className="admin-customer-wallet">
-                  <span>Available balance</span>
-                  <strong>{formatMoney(wallet.balance)}</strong>
+                  <span>{t('admin.members.wallet.availableBalance')}</span>
+                  <strong>{formatMoney(wallet.balance, language)}</strong>
                 </div>
               )}
             </section>
 
             <section className="admin-customer-detail-section" id="admin-customer-transactions">
-              <h3>Wallet transaction history</h3>
+              <h3>{t('admin.members.transactions.title')}</h3>
               <RequestState
                 empty={!transactions.length}
-                emptyDescription="No wallet transactions were returned for this member."
-                emptyTitle="No wallet transactions"
+                emptyDescription={t('admin.members.transactions.emptyDescription')}
+                emptyTitle={t('admin.members.transactions.emptyTitle')}
                 error={transactionsError}
                 loading={transactionsLoading}
-                loadingMessage="Loading wallet transactions…"
+                loadingMessage={t('admin.members.transactions.loading')}
               />
               {!transactionsLoading && !transactionsError && transactions.length > 0 && (
                 <>
@@ -648,9 +697,9 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
                       <div className="admin-customer-transaction" key={transaction.wallet_transaction_id}>
                         <div>
                           <strong><StatusBadge value={transaction.transaction_type} /></strong>
-                          <small>{transaction.description || '—'} · {formatDateTime(transaction.created_at)}</small>
+                          <small>{transaction.description || '—'} · {formatDateTime(transaction.created_at, language)}</small>
                         </div>
-                        <span>{formatMoney(transaction.amount)}</span>
+                        <span>{formatMoney(transaction.amount, language)}</span>
                       </div>
                     ))}
                   </div>
@@ -664,26 +713,29 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
 
       {selectedRoleUser && (
         <AdminModal
-          description={`Choose a new role for ${selectedRoleUser.full_name || selectedRoleUser.email || `User #${selectedRoleUser.user_id}`}. Their current role is ${selectedRoleUser.role}.`}
+          description={t('admin.members.role.description', {
+            name: selectedRoleUser.full_name || selectedRoleUser.email || `#${selectedRoleUser.user_id}`,
+            role: selectedRoleUser.role,
+          })}
           error={roleChangeError}
           onClose={() => {
             if (!roleChanging) setSelectedRoleUser(null)
           }}
           onSubmit={changeRole}
           open
-          submitLabel="Save role"
+          submitLabel={t('admin.members.role.save')}
           submitting={roleChanging}
-          title="Change Role"
+          title={t('admin.members.role.title')}
         >
           <label className="admin-form-field">
-            <span>New role</span>
+            <span>{t('admin.members.role.newRole')}</span>
             <select
               onChange={(event) => setNewRole(event.target.value)}
               value={newRole}
             >
               {ROLE_OPTIONS.map((value) => (
                 <option disabled={value === selectedRoleUser.role} key={value} value={value}>
-                  {value}
+                  {t(`admin.members.role.option.${value.toLowerCase()}`)}
                 </option>
               ))}
             </select>

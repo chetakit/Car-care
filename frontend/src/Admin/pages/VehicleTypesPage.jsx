@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import AdminModal from '../components/AdminModal.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
@@ -8,7 +9,12 @@ import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
 
 const blankForm = { type_name: '', description: '' }
 
+function messageText(message, t) {
+  return message?.key ? t(message.key, message.params) : message
+}
+
 function VehicleTypesPage({ onNavigate }) {
+  const { language, t } = useLanguage()
   const [filters, setFilters] = useState({ search: '', status: '' })
   const [applied, setApplied] = useState({})
   const [page, setPage] = useState(1)
@@ -44,7 +50,7 @@ function VehicleTypesPage({ onNavigate }) {
     const typeName = form.type_name.trim()
     const description = form.description.trim()
     if (!typeName) {
-      setActionError('Enter a vehicle type name.')
+      setActionError({ key: 'admin.vehicleTypes.validation.nameRequired' })
       return
     }
     setBusy(true)
@@ -54,7 +60,13 @@ function VehicleTypesPage({ onNavigate }) {
         method: editing ? 'PATCH' : 'POST',
         body: { type_name: typeName, description: description || null },
       })
-      setMessage(editing ? `Vehicle type “${typeName}” updated.` : `Vehicle type “${typeName}” added. Set its prices in Services & pricing.`)
+      setMessage({
+        key: editing
+          ? 'admin.vehicleTypes.feedback.updated'
+          : 'admin.vehicleTypes.feedback.created',
+        params: { name: typeName },
+        showPricingLink: !editing,
+      })
       setFormOpen(false)
       setEditing(null)
       setForm(blankForm)
@@ -68,9 +80,9 @@ function VehicleTypesPage({ onNavigate }) {
 
   async function toggleStatus(row) {
     const nextStatus = row.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    const question = nextStatus === 'INACTIVE'
-      ? `Deactivate “${row.type_name}”? Customers will no longer get prices for this type, but existing vehicles and bookings are kept.`
-      : `Activate “${row.type_name}” again?`
+    const question = t(nextStatus === 'INACTIVE'
+      ? 'admin.vehicleTypes.confirm.deactivate'
+      : 'admin.vehicleTypes.confirm.activate', { name: row.type_name })
     if (!window.confirm(question)) return
     setBusy(true)
     setActionError('')
@@ -80,7 +92,12 @@ function VehicleTypesPage({ onNavigate }) {
         method: 'PATCH',
         body: { status: nextStatus },
       })
-      setMessage(`“${row.type_name}” is now ${nextStatus === 'ACTIVE' ? 'active' : 'inactive'}.`)
+      setMessage({
+        key: nextStatus === 'ACTIVE'
+          ? 'admin.vehicleTypes.feedback.activated'
+          : 'admin.vehicleTypes.feedback.deactivated',
+        params: { name: row.type_name },
+      })
       refresh()
     } catch (requestError) {
       setActionError(requestError.message)
@@ -94,86 +111,96 @@ function VehicleTypesPage({ onNavigate }) {
       <PageHeading
         action={(
           <div className="admin-heading-actions">
-            <button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">Refresh</button>
-            <button className="admin-primary-button" onClick={() => openForm()} type="button">+ Add vehicle type</button>
+            <button className="admin-secondary-button admin-refresh-button" onClick={refresh} type="button">{t('admin.vehicleTypes.refresh')}</button>
+            <button className="admin-primary-button" onClick={() => openForm()} type="button">{t('admin.vehicleTypes.add')}</button>
           </div>
         )}
-        description="Vehicle types group cars for pricing, for example Sedan, SUV, or Pickup. Each service has one price per active type."
-        eyebrow="CATALOG"
-        title="Vehicle types"
+        description={t('admin.vehicleTypes.description')}
+        eyebrow={t('admin.vehicleTypes.eyebrow')}
+        title={t('admin.vehicleTypes.title')}
       />
       {formOpen && (
         <AdminModal
-          description={editing ? 'Rename or describe this vehicle type. Prices and vehicles stay linked.' : 'Add a vehicle type, then set its price for each service.'}
-          error={actionError}
+          description={t(editing
+            ? 'admin.vehicleTypes.modal.editDescription'
+            : 'admin.vehicleTypes.modal.addDescription')}
+          error={messageText(actionError, t)}
           onClose={closeForm}
           onSubmit={submit}
           open
-          submitLabel={editing ? 'Save changes' : 'Add vehicle type'}
+          submitLabel={t(editing
+            ? 'admin.vehicleTypes.modal.save'
+            : 'admin.vehicleTypes.modal.add')}
           submitting={busy}
-          title={editing ? `Edit ${editing.type_name}` : 'Add a vehicle type'}
+          title={t(editing
+            ? 'admin.vehicleTypes.modal.editTitle'
+            : 'admin.vehicleTypes.modal.addTitle', {
+            name: editing?.type_name ?? '',
+          })}
         >
           <div className="admin-form-grid">
             <label className="admin-form-wide">
-              Name
-              <input autoFocus maxLength="50" onChange={(e) => setForm({ ...form, type_name: e.target.value })} placeholder="e.g. Van" required value={form.type_name} />
+              {t('admin.vehicleTypes.form.name')}
+              <input autoFocus maxLength="50" onChange={(e) => setForm({ ...form, type_name: e.target.value })} placeholder={t('admin.vehicleTypes.form.namePlaceholder')} required value={form.type_name} />
             </label>
             <label className="admin-form-wide">
-              Description (optional)
-              <textarea maxLength="255" onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="e.g. 10–12 seat passenger vans" value={form.description} />
+              {t('admin.vehicleTypes.form.descriptionOptional')}
+              <textarea maxLength="255" onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder={t('admin.vehicleTypes.form.descriptionPlaceholder')} value={form.description} />
             </label>
           </div>
         </AdminModal>
       )}
       {!formOpen && (message || actionError) && (
         <div className={`admin-alert ${actionError ? 'admin-alert-error' : 'admin-alert-success'}`} role={actionError ? 'alert' : 'status'}>
-          {actionError || message}
-          {!actionError && message.includes('Services & pricing') && (
-            <> <button className="admin-inline-button" onClick={() => onNavigate?.('services')} type="button">Go to Services &amp; pricing</button></>
+          {messageText(actionError || message, t)}
+          {!actionError && message?.showPricingLink && (
+            <> <button className="admin-inline-button" onClick={() => onNavigate?.('services')} type="button">{t('admin.vehicleTypes.goToServices')}</button></>
           )}
         </div>
       )}
       <form className="admin-filter-bar" onSubmit={(event) => { event.preventDefault(); setPage(1); setApplied(Object.fromEntries(Object.entries(filters).filter(([, value]) => value.trim()))) }}>
-        <input aria-label="Search vehicle types" maxLength="100" onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="Search vehicle type" value={filters.search} />
-        <select aria-label="Vehicle type status filter" onChange={(e) => setFilters({ ...filters, status: e.target.value })} value={filters.status}>
-          <option value="">All statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
+        <input aria-label={t('admin.vehicleTypes.search.label')} maxLength="100" onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder={t('admin.vehicleTypes.search.placeholder')} value={filters.search} />
+        <select aria-label={t('admin.vehicleTypes.status.label')} onChange={(e) => setFilters({ ...filters, status: e.target.value })} value={filters.status}>
+          <option value="">{t('admin.vehicleTypes.status.all')}</option>
+          <option value="ACTIVE">{t('admin.status.active')}</option>
+          <option value="INACTIVE">{t('admin.status.inactive')}</option>
         </select>
-        <button className="admin-primary-button" type="submit">Apply</button>
+        <button className="admin-primary-button" type="submit">{t('admin.vehicleTypes.search.submit')}</button>
       </form>
       <section className="admin-panel admin-data-panel">
         <RequestState
           empty={!rows.length}
-          emptyDescription="Add a vehicle type, or try a different search or status."
-          emptyTitle="No vehicle types"
+          emptyDescription={t('admin.vehicleTypes.state.emptyDescription')}
+          emptyTitle={t('admin.vehicleTypes.state.emptyTitle')}
           error={error}
           loading={loading}
-          loadingMessage="Loading vehicle types…"
+          loadingMessage={t('admin.vehicleTypes.state.loading')}
           onRetry={refresh}
         />
         {!loading && !error && !!rows.length && (
           <>
             <DataTable
               columns={[
-                { key: 'vehicle_type_id', label: 'ID' },
-                { key: 'type_name', label: 'Name', render: (row) => <strong>{row.type_name}</strong> },
-                { key: 'description', label: 'Description', render: (row) => row.description || '—', wrap: true },
-                { key: 'updated_at', label: 'Updated', render: (row) => formatDateTime(row.updated_at) },
-                { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+                { key: 'vehicle_type_id', label: t('admin.vehicleTypes.table.id') },
+                { key: 'type_name', label: t('admin.vehicleTypes.table.name'), render: (row) => <strong>{row.type_name}</strong> },
+                { key: 'description', label: t('admin.vehicleTypes.table.description'), render: (row) => row.description || '—', wrap: true },
+                { key: 'updated_at', label: t('admin.vehicleTypes.table.updated'), render: (row) => formatDateTime(row.updated_at, language) },
+                { key: 'status', label: t('admin.vehicleTypes.table.status'), render: (row) => <StatusBadge value={row.status} /> },
                 {
                   key: 'actions',
-                  label: 'Actions',
+                  label: t('admin.vehicleTypes.table.actions'),
                   render: (row) => (
                     <div className="admin-row-actions">
-                      <button className="admin-inline-button" disabled={busy} onClick={() => openForm(row)} type="button">Edit</button>
+                      <button className="admin-inline-button" disabled={busy} onClick={() => openForm(row)} type="button">{t('admin.vehicleTypes.table.edit')}</button>
                       <button
                         className={`admin-inline-button ${row.status === 'ACTIVE' ? 'admin-action-danger' : 'admin-action-success'}`}
                         disabled={busy}
                         onClick={() => toggleStatus(row)}
                         type="button"
                       >
-                        {row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                        {t(row.status === 'ACTIVE'
+                          ? 'admin.vehicleTypes.action.deactivate'
+                          : 'admin.vehicleTypes.action.activate')}
                       </button>
                     </div>
                   ),
