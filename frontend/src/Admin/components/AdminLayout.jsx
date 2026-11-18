@@ -1,3 +1,4 @@
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import AdminHeader from './AdminHeader.jsx'
 import AdminSidebar from './AdminSidebar.jsx'
 
@@ -13,11 +14,12 @@ function AdminLayout({
   user,
   onLogout,
 }) {
+  const { t } = useLanguage()
   return (
     <div className="admin-shell">
       {sidebarOpen && (
         <button
-          aria-label="Close navigation"
+          aria-label={t('admin.header.closeNavigation')}
           className="admin-sidebar-backdrop"
           onClick={onCloseSidebar}
           type="button"

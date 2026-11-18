@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
 function AdminModal({
   open,
@@ -13,6 +14,7 @@ function AdminModal({
   // View-only dialogs show a single close button instead of Cancel + Save.
   viewOnly = false,
 }) {
+  const { t } = useLanguage()
   const dialogRef = useRef(null)
   const titleId = useId()
   const descriptionId = useId()
@@ -53,7 +55,7 @@ function AdminModal({
             {description && <p id={descriptionId}>{description}</p>}
           </div>
           <button
-            aria-label="Close dialog"
+            aria-label={t('admin.modal.close')}
             className="admin-modal-close"
             disabled={submitting}
             onClick={onClose}
@@ -70,7 +72,7 @@ function AdminModal({
           <footer className="admin-modal-footer">
             {viewOnly ? (
               <button className="admin-primary-button" form={formId} type="submit">
-                {submitLabel || 'Close'}
+                {submitLabel === 'Close' ? t('admin.common.close') : submitLabel || t('admin.common.close')}
               </button>
             ) : (
               <>
@@ -80,10 +82,10 @@ function AdminModal({
                   onClick={onClose}
                   type="button"
                 >
-                  Cancel
+                  {t('admin.common.cancel')}
                 </button>
                 <button className="admin-primary-button" disabled={submitting} form={formId} type="submit">
-                  {submitting ? 'Saving…' : submitLabel}
+                  {submitting ? t('admin.common.saving') : submitLabel}
                 </button>
               </>
             )}

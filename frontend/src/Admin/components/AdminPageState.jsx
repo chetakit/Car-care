@@ -1,4 +1,5 @@
 import formatStatusLabel from '../utils/formatStatusLabel.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
 export function PageHeading({ eyebrow, title, description, action }) {
   return (
@@ -18,15 +19,16 @@ export function RequestState({
   error,
   empty,
   onRetry,
-  loadingMessage = 'Loading data from the backend…',
-  emptyTitle = 'No records found',
-  emptyDescription = 'Try changing the search or filters.',
+  loadingMessage,
+  emptyTitle,
+  emptyDescription,
 }) {
+  const { t } = useLanguage()
   if (loading) {
     return (
       <div aria-live="polite" className="admin-request-state">
         <span aria-hidden="true" className="admin-spinner" />
-        <span>{loadingMessage}</span>
+        <span>{loadingMessage ?? t('admin.state.loading')}</span>
       </div>
     )
   }
@@ -36,19 +38,25 @@ export function RequestState({
         <span>{error}</span>
         {onRetry && (
           <button className="admin-inline-button" onClick={onRetry} type="button">
-            Try again
+            {t('admin.common.retry')}
           </button>
         )}
       </div>
     )
   }
   if (empty) {
-    return <div className="admin-request-state"><strong>{emptyTitle}</strong><span>{emptyDescription}</span></div>
+    return (
+      <div className="admin-request-state">
+        <strong>{emptyTitle ?? t('admin.state.emptyTitle')}</strong>
+        <span>{emptyDescription ?? t('admin.state.emptyDescription')}</span>
+      </div>
+    )
   }
   return null
 }
 
 export function Pagination({ pagination, onPageChange }) {
+  const { t } = useLanguage()
   if (!pagination || pagination.totalPages <= 1) return null
 
   // Changing page brings the top of the table back into view instead of
@@ -60,9 +68,13 @@ export function Pagination({ pagination, onPageChange }) {
   }
 
   return (
-    <div aria-label="Pagination" className="admin-pagination">
+    <div aria-label={t('admin.pagination.label')} className="admin-pagination">
       <span>
-        Page {pagination.page} of {pagination.totalPages} · {pagination.total} records
+        {t('admin.pagination.summary', {
+          page: pagination.page,
+          totalPages: pagination.totalPages,
+          total: pagination.total,
+        })}
       </span>
       <div>
         <button
@@ -70,14 +82,14 @@ export function Pagination({ pagination, onPageChange }) {
           onClick={(event) => goTo(event, pagination.page - 1)}
           type="button"
         >
-          Previous
+          {t('admin.pagination.previous')}
         </button>
         <button
           disabled={pagination.page >= pagination.totalPages}
           onClick={(event) => goTo(event, pagination.page + 1)}
           type="button"
         >
-          Next
+          {t('admin.pagination.next')}
         </button>
       </div>
     </div>
@@ -85,10 +97,11 @@ export function Pagination({ pagination, onPageChange }) {
 }
 
 export function DataTable({ columns, rows, rowKey }) {
+  const { t } = useLanguage()
   return (
     <div
       aria-keyshortcuts="ArrowLeft ArrowRight"
-      aria-label="Data table; use the left and right arrow keys to view all columns"
+      aria-label={t('admin.table.ariaLabel')}
       className="admin-table-scroll-region admin-table-wrap"
       role="region"
       tabIndex={0}
@@ -102,7 +115,7 @@ export function DataTable({ columns, rows, rowKey }) {
         })
       }}
     >
-      <p className="admin-table-scroll-hint">Scroll horizontally to view all columns</p>
+      <p className="admin-table-scroll-hint">{t('admin.table.scrollHint')}</p>
       <table className="admin-table">
         <thead>
           <tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr>
@@ -124,15 +137,17 @@ export function DataTable({ columns, rows, rowKey }) {
 }
 
 export function StatusBadge({ value }) {
+  const { language } = useLanguage()
   const tone = String(value ?? '').toLowerCase().replaceAll('_', '-')
-  return <span className={`admin-status-badge status-${tone}`}>{formatStatusLabel(value)}</span>
+  return <span className={`admin-status-badge status-${tone}`}>{formatStatusLabel(value, language)}</span>
 }
 
 export function PaymentStatusBadge({ payment }) {
+  const { t } = useLanguage()
   return (
     <>
       <StatusBadge value={payment.payment_status} />
-      {payment.payment_method === 'SIMULATED' && <span className="admin-payment-method-note">Online</span>}
+      {payment.payment_method === 'SIMULATED' && <span className="admin-payment-method-note">{t('admin.payment.online')}</span>}
     </>
   )
 }

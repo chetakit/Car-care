@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, createApiClient } from '../Admin/api/client.js'
-import formatMoney from '../Admin/utils/formatMoney.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import {
   formatCustomerBookingStatus,
   formatCustomerDate,
+  formatCustomerMoney,
   formatCustomerPaymentStatus,
   formatCustomerTime,
 } from './customerFormatters.js'
@@ -25,10 +26,26 @@ function cents(value) {
   return whole * 100n + fraction
 }
 
+const PAYMENT_ERROR_KEYS = {
+  'The bookings response is incomplete.': 'customer.payment.bookingsResponseIncomplete',
+  'The payment response is incomplete.': 'customer.payment.paymentResponseIncomplete',
+  'The wallet response is incomplete.': 'customer.payment.walletResponseIncomplete',
+}
+const EMPTY_ERROR = { message: '', key: '' }
+
 function getErrorMessage(error) {
-  if (error instanceof ApiError) return error.message
-  if (error instanceof Error) return error.message
-  return 'Something went wrong. Please try again.'
+  if (error instanceof ApiError) return { message: error.message, key: '' }
+  if (error instanceof Error) {
+    const key = PAYMENT_ERROR_KEYS[error.message]
+    return key
+      ? { message: '', key }
+      : { message: error.message, key: '' }
+  }
+  return { message: '', key: 'customer.common.unexpectedError' }
+}
+
+function renderErrorMessage(error, t) {
+  return error.key ? t(error.key) : error.message
 }
 
 async function findBookingInHistory(api, bookingId, signal) {
@@ -60,13 +77,12 @@ async function findBookingInHistory(api, bookingId, signal) {
   return null
 }
 
-function PaymentStatus({ payment }) {
+function PaymentStatus({ payment, language, t }) {
   const status = String(payment?.payment_status || 'NOT PAID').toUpperCase()
   const statusClass = status.toLowerCase().replace(/ /g, '-')
-  const statusLabel = formatCustomerPaymentStatus(status)
-  const demoStatus = statusLabel.replace(/^Payment /, '')
+  const statusLabel = formatCustomerPaymentStatus(status, language)
   const label = payment?.payment_method === 'SIMULATED'
-    ? `Demo · ${demoStatus.charAt(0).toUpperCase()}${demoStatus.slice(1)}`
+    ? t('customer.payment.demoStatus', { status: statusLabel })
     : statusLabel
   return (
     <span className={`payment-status payment-status-${statusClass}`}>
@@ -117,6 +133,7 @@ function formatCountdown(seconds) {
 
 function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
   const { token, handleUnauthorized } = useAuth()
+  const { language, t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -128,17 +145,17 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
   const [bookingState, setBookingState] = useState(
     hasInitialBooking ? 'ready' : validId ? 'loading' : 'unavailable',
   )
-  const [bookingError, setBookingError] = useState('')
+  const [bookingError, setBookingError] = useState(EMPTY_ERROR)
   const [bookingReload, setBookingReload] = useState(0)
   const [payment, setPayment] = useState(null)
   const [paymentState, setPaymentState] = useState(validId ? 'loading' : 'idle')
-  const [paymentError, setPaymentError] = useState('')
+  const [paymentError, setPaymentError] = useState(EMPTY_ERROR)
   const [walletBalance, setWalletBalance] = useState(null)
   const [walletState, setWalletState] = useState(validId ? 'loading' : 'idle')
-  const [walletError, setWalletError] = useState('')
+  const [walletError, setWalletError] = useState(EMPTY_ERROR)
   const [infoReload, setInfoReload] = useState(0)
   const [action, setAction] = useState('')
-  const [actionError, setActionError] = useState('')
+  const [actionError, setActionError] = useState(EMPTY_ERROR)
   const [actionNotice, setActionNotice] = useState('')
   const actionLock = useRef(false)
 
@@ -176,14 +193,14 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
           throw new Error('The payment response is incomplete.')
         }
         setPayment(result)
-        setPaymentError('')
+        setPaymentError(EMPTY_ERROR)
         setPaymentState('ready')
       })
       .catch((error) => {
         if (error.name === 'AbortError') return
         if (error instanceof ApiError && error.status === 404) {
           setPayment(null)
-          setPaymentError('')
+          setPaymentError(EMPTY_ERROR)
           setPaymentState('ready')
           return
         }
@@ -198,7 +215,7 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
           throw new Error('The wallet response is incomplete.')
         }
         setWalletBalance(balance)
-        setWalletError('')
+        setWalletError(EMPTY_ERROR)
         setWalletState('ready')
       })
       .catch((error) => {
@@ -214,14 +231,14 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
   function refreshPaymentInfo() {
     setPaymentState('loading')
     setWalletState('loading')
-    setPaymentError('')
-    setWalletError('')
+    setPaymentError(EMPTY_ERROR)
+    setWalletError(EMPTY_ERROR)
     setInfoReload((current) => current + 1)
   }
 
   function retryBooking() {
     setBookingState('loading')
-    setBookingError('')
+    setBookingError(EMPTY_ERROR)
     setBookingReload((current) => current + 1)
   }
 
@@ -229,7 +246,7 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
     if (actionLock.current) return
     actionLock.current = true
     setAction(actionType)
-    setActionError('')
+    setActionError(EMPTY_ERROR)
     setActionNotice('')
 
     try {
@@ -261,10 +278,16 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
       }
       setActionNotice(
         actionType === 'simulate'
-          ? `Demo payment marked ${paymentStatus === 'PAID' ? 'paid' : 'failed'}.`
+          ? t('customer.payment.demoMarked', {
+              result: t(
+                paymentStatus === 'PAID'
+                  ? 'customer.payment.demoPaid'
+                  : 'customer.payment.demoFailed',
+              ),
+            })
           : actionType === 'wallet'
-            ? 'Wallet payment completed.'
-            : 'Demo payment created. Choose a result below.',
+            ? t('customer.payment.walletCompleted')
+            : t('customer.payment.demoCreated'),
       )
       refreshPaymentInfo()
     } catch (error) {
@@ -317,52 +340,53 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
     .filter(Boolean)
     .join(' ')
   const services = Array.isArray(booking?.services) ? booking.services : []
+  const hasActionError = Boolean(actionError.key || actionError.message)
 
   return (
     <div className="customer-home customer-payment">
       <CustomerHeader onLogout={onLogout} user={user} />
       <main className="payment-main">
         <div className="customer-container">
-          <nav aria-label="Breadcrumb" className="payment-breadcrumb">
-            <a href="/customer">Home</a>
+          <nav aria-label={t('customer.profile.breadcrumbLabel')} className="payment-breadcrumb">
+            <a href="/customer">{t('customer.common.home')}</a>
             <span aria-hidden="true">/</span>
-            <a href="/customer/bookings">My Bookings</a>
+            <a href="/customer/bookings">{t('customer.common.myBookings')}</a>
             <span aria-hidden="true">/</span>
-            <span aria-current="page">Payment</span>
+            <span aria-current="page">{t('customer.payment.breadcrumb')}</span>
           </nav>
 
           <header className="payment-heading">
             <div>
-              <span className="customer-eyebrow">PAYMENT OPTIONS</span>
-              <h1>Complete your payment</h1>
-              <p>Review your booking and choose an available payment option.</p>
+              <span className="customer-eyebrow">{t('customer.payment.optionsEyebrow')}</span>
+              <h1>{t('customer.payment.title')}</h1>
+              <p>{t('customer.payment.description')}</p>
             </div>
             <a className="payment-back-link" href="/customer/bookings">
-              <span aria-hidden="true">←</span> My Bookings
+              <span aria-hidden="true">←</span> {t('customer.payment.backToBookings')}
             </a>
           </header>
 
           {bookingState === 'loading' && (
             <div aria-live="polite" className="payment-state">
               <span className="customer-loader" />
-              Loading booking details…
+              {t('customer.payment.loadingBooking')}
             </div>
           )}
 
           {bookingState === 'error' && (
             <section className="payment-state payment-state-error" role="alert">
-              <h2>We couldn’t load this booking.</h2>
-              <p>{bookingError}</p>
-              <button onClick={retryBooking} type="button">Try again</button>
+              <h2>{t('customer.payment.loadBookingError')}</h2>
+              <p>{renderErrorMessage(bookingError, t)}</p>
+              <button onClick={retryBooking} type="button">{t('customer.common.retry')}</button>
             </section>
           )}
 
           {bookingState === 'unavailable' && (
             <section className="payment-state payment-state-error">
-              <h2>Booking unavailable</h2>
-              <p>This booking could not be found in your booking history.</p>
+              <h2>{t('customer.payment.unavailable')}</h2>
+              <p>{t('customer.payment.notInHistory')}</p>
               <a className="payment-primary-link" href="/customer/bookings">
-                Return to My Bookings
+                {t('customer.payment.returnBookings')}
               </a>
             </section>
           )}
@@ -371,14 +395,14 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
             <div className={`payment-countdown${holdExpired ? ' is-expired' : secondsLeft < 180 ? ' is-urgent' : ''}`} role="status">
               {holdExpired ? (
                 <>
-                  <strong>Payment time is up</strong>
-                  <span>This slot has been released. Please book again.</span>
-                  <a href="/customer/booking">Book again</a>
+                  <strong>{t('customer.payment.timeUp')}</strong>
+                  <span>{t('customer.payment.slotReleased')}</span>
+                  <a href="/customer/booking">{t('customer.payment.bookAgain')}</a>
                 </>
               ) : (
                 <>
                   <strong>{formatCountdown(secondsLeft)}</strong>
-                  <span>left to pay. Your slot is held until then.</span>
+                  <span>{t('customer.payment.timeLeft')}</span>
                 </>
               )}
             </div>
@@ -389,55 +413,59 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
               <section aria-labelledby="payment-booking-title" className="payment-booking-card">
                 <div className="payment-card-heading">
                   <div>
-                    <span className="payment-overline">BOOKING SUMMARY</span>
-                    <h2 id="payment-booking-title">Booking #{booking.booking_id}</h2>
+                    <span className="payment-overline">{t('customer.payment.bookingSummary')}</span>
+                    <h2 id="payment-booking-title">
+                      {t('customer.payment.bookingId', { bookingId: booking.booking_id })}
+                    </h2>
                   </div>
-                  <PaymentStatus payment={payment} />
+                  <PaymentStatus language={language} payment={payment} t={t} />
                 </div>
 
                 <dl className="payment-booking-details">
                   <div>
-                    <dt>Vehicle</dt>
-                    <dd>{vehicleName || 'Vehicle details unavailable'}</dd>
+                    <dt>{t('customer.payment.vehicle')}</dt>
+                    <dd>{vehicleName || t('customer.payment.vehicleDetailsUnavailable')}</dd>
                     {booking.vehicle?.license_plate && (
                       <span>{booking.vehicle.license_plate}</span>
                     )}
                   </div>
                   <div>
-                    <dt>Appointment</dt>
-                    <dd>{formatCustomerDate(booking.booking_date)}</dd>
+                    <dt>{t('customer.payment.appointment')}</dt>
+                    <dd>{formatCustomerDate(booking.booking_date, language)}</dd>
                     <span>
-                      {formatCustomerTime(booking.start_time)} – {formatCustomerTime(booking.end_time)}
+                      {formatCustomerTime(booking.start_time, language)} – {formatCustomerTime(booking.end_time, language)}
                     </span>
                   </div>
                 </dl>
 
                 <div className="payment-services">
-                  <h3>Booked services</h3>
+                  <h3>{t('customer.payment.bookedServices')}</h3>
                   {services.length > 0 ? (
                     <ul>
                       {services.map((service, index) => (
                         <li key={service.booking_service_id || `${service.service_name}-${index}`}>
-                          <span>{service.service_name || 'Service'}</span>
+                          <span>{service.service_name || t('customer.common.service')}</span>
                           {service.unit_price !== undefined && (
-                            <strong>{formatMoney(service.unit_price)}</strong>
+                            <strong>{formatCustomerMoney(service.unit_price, language)}</strong>
                           )}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p>Service details are not available.</p>
+                    <p>{t('customer.payment.serviceDetailsUnavailable')}</p>
                   )}
                 </div>
 
                 <div className="payment-total">
-                  <span>Total amount</span>
-                  <strong>{formatMoney(amount)}</strong>
+                  <span>{t('customer.payment.totalAmount')}</span>
+                  <strong>{formatCustomerMoney(amount, language)}</strong>
                 </div>
 
                 {bookingAllowsPayment === false && (
                   <p className="payment-inline-note">
-                    This booking is not eligible for payment because it is {formatCustomerBookingStatus(booking.booking_status)}.
+                    {t('customer.payment.ineligible', {
+                      status: formatCustomerBookingStatus(booking.booking_status, language),
+                    })}
                   </p>
                 )}
               </section>
@@ -445,42 +473,42 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
               <section aria-labelledby="payment-options-title" className="payment-options-card">
                 <div className="payment-card-heading payment-options-heading">
                   <div>
-                    <span className="payment-overline">PAYMENT METHOD</span>
-                    <h2 id="payment-options-title">Choose how to pay</h2>
+                    <span className="payment-overline">{t('customer.payment.methodEyebrow')}</span>
+                    <h2 id="payment-options-title">{t('customer.payment.chooseMethod')}</h2>
                   </div>
                 </div>
 
                 <div className="payment-demo-notice">
                   <span className="payment-demo-icon"><PaymentPageIcon type="demo" /></span>
                   <div>
-                    <strong>DEMO ONLY</strong>
-                    <p>Simulated payment is for demonstration. No real payment is processed.</p>
+                    <strong>{t('customer.payment.demoOnly')}</strong>
+                    <p>{t('customer.payment.demoNotice')}</p>
                   </div>
                 </div>
 
                 {paymentState === 'loading' && (
                   <div aria-live="polite" className="payment-inline-state">
                     <span className="customer-loader" />
-                    Checking payment status…
+                    {t('customer.payment.checkingStatus')}
                   </div>
                 )}
                 {paymentState === 'error' && (
                   <div className="payment-inline-error" role="alert">
-                    <span>{paymentError}</span>
-                    <button onClick={refreshPaymentInfo} type="button">Retry</button>
+                    <span>{renderErrorMessage(paymentError, t)}</span>
+                    <button onClick={refreshPaymentInfo} type="button">{t('customer.payment.retry')}</button>
                   </div>
                 )}
                 {paymentState === 'ready' && payment?.payment_status === 'PAID' && (
                   <div className="payment-success" role="status">
-                    <strong>Payment complete</strong>
-                    <span>Your payment has been recorded.</span>
+                    <strong>{t('customer.payment.complete')}</strong>
+                    <span>{t('customer.payment.recorded')}</span>
                   </div>
                 )}
                 {paymentState === 'ready' && payment?.payment_status === 'FAILED' && (
                   <div className="payment-inline-note">
                     {retryableFailure
-                      ? 'This payment attempt failed. You can try again below before the 15-minute hold ends.'
-                      : 'This payment attempt failed.'}
+                      ? t('customer.payment.retryFailed')
+                      : t('customer.payment.failed')}
                   </div>
                 )}
                 {paymentState === 'ready' &&
@@ -488,7 +516,7 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                   !canSimulate &&
                   !walletPaymentCompatible && (
                     <div className="payment-inline-note">
-                      This pending payment cannot be completed using the available methods on this page.
+                      {t('customer.payment.pendingUnavailable')}
                     </div>
                   )}
 
@@ -496,8 +524,8 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                   <div className="payment-method-heading">
                     <span className="payment-method-icon"><PaymentPageIcon type="demo" /></span>
                     <div>
-                      <h3>Simulated payment</h3>
-                      <p>Mark this demo transaction as paid or failed.</p>
+                      <h3>{t('customer.payment.simulated')}</h3>
+                      <p>{t('customer.payment.simulateInstructions')}</p>
                     </div>
                   </div>
                   {canCreateDemo && (
@@ -507,7 +535,9 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                       onClick={() => submitPaymentAction('create-simulated')}
                       type="button"
                     >
-                      {action === 'create-simulated' ? 'Creating…' : 'Create demo payment'}
+                      {action === 'create-simulated'
+                        ? t('customer.payment.creating')
+                        : t('customer.payment.createDemo')}
                     </button>
                   )}
                   {canSimulate && (
@@ -518,7 +548,9 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                         onClick={() => submitPaymentAction('simulate', 'PAID')}
                         type="button"
                       >
-                        {action === 'simulate' ? 'Processing…' : 'Simulate successful payment'}
+                        {action === 'simulate'
+                          ? t('customer.payment.processing')
+                          : t('customer.payment.simulateSuccess')}
                       </button>
                       <button
                         className="payment-secondary-button"
@@ -526,17 +558,17 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                         onClick={() => submitPaymentAction('simulate', 'FAILED')}
                         type="button"
                       >
-                        Simulate failed payment
+                        {t('customer.payment.simulateFailure')}
                       </button>
                     </div>
                   )}
                   {paymentState === 'ready' && !canCreateDemo && !canSimulate && (
                     <p className="payment-method-unavailable">
                       {payment?.payment_status === 'PAID'
-                        ? 'This booking has already been paid.'
+                        ? t('customer.payment.alreadyPaid')
                         : payment?.payment_status === 'FAILED'
-                          ? 'No further demo payment action is available.'
-                          : 'This option is not available for the current booking or payment state.'}
+                          ? t('customer.payment.noDemoAction')
+                          : t('customer.payment.optionUnavailable')}
                     </p>
                   )}
                 </div>
@@ -545,26 +577,26 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                   <div className="payment-method-heading">
                     <span className="payment-method-icon"><PaymentPageIcon type="wallet" /></span>
                     <div>
-                      <h3>Car Care Wallet</h3>
-                      <p>Pay directly from your available wallet balance.</p>
+                      <h3>{t('customer.payment.wallet')}</h3>
+                      <p>{t('customer.payment.walletDescription')}</p>
                     </div>
                   </div>
 
                   <div className="payment-wallet-balance">
-                    <span>Wallet balance</span>
-                    {walletState === 'loading' && <span>Loading…</span>}
-                    {walletState === 'ready' && <strong>{formatMoney(walletBalance)}</strong>}
-                    {walletState === 'error' && <strong>Unavailable</strong>}
+                    <span>{t('customer.payment.walletBalance')}</span>
+                    {walletState === 'loading' && <span>{t('customer.common.loading')}</span>}
+                    {walletState === 'ready' && <strong>{formatCustomerMoney(walletBalance, language)}</strong>}
+                    {walletState === 'error' && <strong>{t('customer.payment.walletUnavailable')}</strong>}
                   </div>
                   {walletState === 'error' && (
                     <div className="payment-inline-error" role="alert">
-                      <span>{walletError}</span>
-                      <button onClick={refreshPaymentInfo} type="button">Retry</button>
+                      <span>{renderErrorMessage(walletError, t)}</span>
+                      <button onClick={refreshPaymentInfo} type="button">{t('customer.payment.retry')}</button>
                     </div>
                   )}
                   {insufficientWallet && (
                     <p className="payment-inline-note">
-                      Your wallet balance is less than the booking total.
+                      {t('customer.payment.insufficientWallet')}
                     </p>
                   )}
                   {walletPaymentCompatible && bookingAllowsPayment && (
@@ -575,23 +607,23 @@ function CustomerPaymentPage({ user, onLogout, bookingId, initialBooking }) {
                       type="button"
                     >
                       {action === 'wallet'
-                        ? 'Processing wallet payment…'
-                        : 'Pay with wallet'}
+                        ? t('customer.payment.processingWallet')
+                        : t('customer.payment.payWithWallet')}
                     </button>
                   )}
                   {paymentState === 'ready' && !walletPaymentCompatible && (
                     <p className="payment-method-unavailable">
-                      Wallet payment is unavailable for the current payment state.
+                      {t('customer.payment.walletMethodUnavailable')}
                     </p>
                   )}
                 </div>
 
-                {(actionError || actionNotice) && (
+                {(hasActionError || actionNotice) && (
                   <div
-                    className={actionError ? 'payment-action-feedback is-error' : 'payment-action-feedback'}
-                    role={actionError ? 'alert' : 'status'}
+                    className={hasActionError ? 'payment-action-feedback is-error' : 'payment-action-feedback'}
+                    role={hasActionError ? 'alert' : 'status'}
                   >
-                    {actionError || actionNotice}
+                    {hasActionError ? renderErrorMessage(actionError, t) : actionNotice}
                   </div>
                 )}
               </section>

@@ -1,13 +1,13 @@
-// Labels that read better than the raw enum value.
-const LABELS = {
-  PENDING_PAYMENT: 'Awaiting payment',
-  NO_SHOW: 'No-show',
-  REFUND_PENDING: 'Refund pending',
-  REFUND_FAILED: 'Refund failed',
-}
+import messages from '../../i18n/messages.js'
+import { getAdminLanguage } from './formatDate.js'
 
-export default function formatStatusLabel(value) {
+// Labels that read better than the raw enum value.
+export default function formatStatusLabel(value, language) {
   if (!value) return '—'
-  return LABELS[value] ??
+  const resolvedLanguage = getAdminLanguage(language)
+  const statusKey = `admin.status.${String(value).toLowerCase().split('_').map((part, index) => (
+    index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)
+  )).join('')}`
+  return messages[resolvedLanguage][statusKey] ??
     String(value).toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
 }

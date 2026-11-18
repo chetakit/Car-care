@@ -1,13 +1,15 @@
 import AdminIcon from './AdminIcon.jsx'
 import AdminAccountMenu from './AdminAccountMenu.jsx'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import LanguageToggle from '../../i18n/LanguageToggle.jsx'
 
 function AdminHeader({ pageTitle, user, onMenuClick, onLogout }) {
+  const { t } = useLanguage()
   return (
     <header className="admin-header">
       <div className="admin-header-leading">
         <button
-          aria-label="Toggle navigation"
+          aria-label={t('admin.header.toggleNavigation')}
           className="admin-icon-button admin-menu-button"
           onClick={onMenuClick}
           type="button"
@@ -15,14 +17,14 @@ function AdminHeader({ pageTitle, user, onMenuClick, onLogout }) {
           <AdminIcon name="menu" />
         </button>
         <div>
-          <nav aria-label="Breadcrumb" className="admin-breadcrumb">
+          <nav aria-label={t('admin.header.breadcrumbLabel')} className="admin-breadcrumb">
             <ol>
-              <li>Workspace</li>
-              <li>Admin</li>
-              <li aria-current="page">{pageTitle}</li>
+              <li>{t('admin.header.workspace')}</li>
+              <li>{t('admin.header.admin')}</li>
+              <li aria-current="page">{t(pageTitle)}</li>
             </ol>
           </nav>
-          <h1 className="admin-page-title">{pageTitle}</h1>
+          <h1 className="admin-page-title">{t(pageTitle)}</h1>
         </div>
       </div>
 

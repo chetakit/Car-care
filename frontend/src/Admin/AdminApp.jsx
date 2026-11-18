@@ -14,24 +14,24 @@ import WalletPage from './pages/WalletPage.jsx'
 import './styles/admin.css'
 
 const navigationItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
-  { id: 'bookings', label: 'Bookings', icon: 'calendar' },
-  { id: 'schedules', label: 'Queue capacity', icon: 'calendar' },
+  { id: 'dashboard', label: 'admin.navigation.dashboard', icon: 'grid' },
+  { id: 'bookings', label: 'admin.navigation.bookings', icon: 'calendar' },
+  { id: 'schedules', label: 'admin.navigation.queueCapacity', icon: 'calendar' },
   {
     id: 'members',
-    label: 'Members',
+    label: 'admin.navigation.members',
     icon: 'users',
     children: [
-      { id: 'staff', label: 'Staff' },
-      { id: 'customers', label: 'Customer' },
+      { id: 'staff', label: 'admin.navigation.staff' },
+      { id: 'customers', label: 'admin.navigation.customer' },
     ],
   },
-  { id: 'services', label: 'Services & pricing', icon: 'tool' },
-  { id: 'vehicle-types', label: 'Vehicle types', icon: 'car' },
-  { id: 'coupons', label: 'Coupons', icon: 'tag' },
-  { id: 'payments', label: 'Payments', icon: 'credit-card' },
-  { id: 'wallet', label: 'Wallet', icon: 'wallet' },
-  { id: 'reports', label: 'Reports', icon: 'chart' },
+  { id: 'services', label: 'admin.navigation.services', icon: 'tool' },
+  { id: 'vehicle-types', label: 'admin.navigation.vehicleTypes', icon: 'car' },
+  { id: 'coupons', label: 'admin.navigation.coupons', icon: 'tag' },
+  { id: 'payments', label: 'admin.navigation.payments', icon: 'credit-card' },
+  { id: 'wallet', label: 'admin.navigation.wallet', icon: 'wallet' },
+  { id: 'reports', label: 'admin.navigation.reports', icon: 'chart' },
 ]
 
 const pages = {
@@ -109,7 +109,7 @@ function AdminContent({ user, onLogout }) {
       onLogout={() => void onLogout()}
       onMenuClick={() => setSidebarOpen((open) => !open)}
       onNavigate={handleNavigate}
-      pageTitle={activeItem?.label ?? 'Dashboard'}
+      pageTitle={activeItem?.label ?? 'admin.navigation.dashboard'}
       sidebarOpen={sidebarOpen}
       user={user}
     >

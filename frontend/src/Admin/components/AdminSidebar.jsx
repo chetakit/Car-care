@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import AdminIcon from './AdminIcon.jsx'
 
 function AdminSidebar({
@@ -7,11 +8,12 @@ function AdminSidebar({
   onNavigate,
 }) {
   const [membersOpen, setMembersOpen] = useState(true)
+  const { t } = useLanguage()
 
   return (
     <aside className="admin-sidebar">
       <a
-        aria-label="Car Care Admin home"
+        aria-label={t('admin.shell.homeLabel')}
         className="admin-brand"
         href="/"
       >
@@ -23,12 +25,12 @@ function AdminSidebar({
         </span>
         <span className="admin-brand-copy">
           <strong>Car Care</strong>
-          <small>ADMINISTRATION</small>
+          <small>{t('admin.shell.brandSubtitle')}</small>
         </span>
       </a>
 
-      <div className="admin-sidebar-label">WORKSPACE</div>
-      <nav aria-label="Admin navigation" className="admin-navigation">
+      <div className="admin-sidebar-label">{t('admin.shell.workspace')}</div>
+      <nav aria-label={t('admin.header.navigation')} className="admin-navigation">
         {navigationItems.map((item) => {
           if (item.children) {
             const isActive = item.children.some((child) => child.id === activePage)
@@ -42,7 +44,7 @@ function AdminSidebar({
                   type="button"
                 >
                   <AdminIcon name={item.icon} />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                   <AdminIcon
                     className="admin-nav-chevron"
                     name="chevron"
@@ -65,7 +67,7 @@ function AdminSidebar({
                         onNavigate(child.id)
                       }}
                     >
-                      <span>{child.label}</span>
+                      <span>{t(child.label)}</span>
                       {activePage === child.id && (
                         <AdminIcon className="admin-nav-chevron" name="chevron" size={16} />
                       )}
@@ -88,7 +90,7 @@ function AdminSidebar({
               }}
             >
               <AdminIcon name={item.icon} />
-              <span>{item.label}</span>
+              <span>{t(item.label)}</span>
               {activePage === item.id && (
                 <AdminIcon className="admin-nav-chevron" name="chevron" size={16} />
               )}
@@ -100,8 +102,8 @@ function AdminSidebar({
       <div className="admin-sidebar-footer">
         <span className="admin-sidebar-status" />
         <span>
-          <strong>Admin workspace</strong>
-          <small>Management portal</small>
+          <strong>{t('admin.shell.footerTitle')}</strong>
+          <small>{t('admin.shell.footerDescription')}</small>
         </span>
       </div>
     </aside>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
 function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const accountRef = useRef(null)
   const triggerRef = useRef(null)
@@ -55,7 +57,7 @@ function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
           {isWorkspace ? (
             <>
               <strong>{displayName}</strong>
-              <small>{user?.role || 'Admin account'}</small>
+              <small>{user?.role || t('admin.account.fallbackRole')}</small>
             </>
           ) : (
             displayName
@@ -75,8 +77,12 @@ function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
         hidden={!open}
         id={menuId}
       >
-        <a href="/" onClick={closeMenu}>Home</a>
-        <a href="/admin/dashboard" onClick={closeMenu}>Admin Manage</a>
+        <a href="/" onClick={closeMenu}>
+          {isWorkspace ? t('customer.common.home') : 'Home'}
+        </a>
+        <a href="/admin/dashboard" onClick={closeMenu}>
+          {isWorkspace ? t('admin.account.manage') : 'Admin Manage'}
+        </a>
         <button
           onClick={() => {
             closeMenu()
@@ -84,7 +90,7 @@ function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
           }}
           type="button"
         >
-          Logout
+          {isWorkspace ? t('customer.header.signOut') : 'Logout'}
         </button>
       </div>
     </div>

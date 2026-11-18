@@ -1,9 +1,11 @@
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import './customer.css'
 import './dashboard.css'
 
 function CustomerNotFoundPage({ user, onLogout }) {
+  const { t } = useLanguage()
   return (
     <div className="customer-home customer-dashboard">
       <CustomerHeader onLogout={onLogout} user={user} />
@@ -11,12 +13,12 @@ function CustomerNotFoundPage({ user, onLogout }) {
         <div className="customer-container">
           <header className="dashboard-heading">
             <div>
-              <span className="customer-eyebrow">CUSTOMER WORKSPACE</span>
-              <h1 id="customer-not-found-title">Page not found</h1>
-              <p>This Customer page doesn’t exist or may have moved.</p>
+              <span className="customer-eyebrow">{t('customer.notFound.eyebrow')}</span>
+              <h1 id="customer-not-found-title">{t('customer.notFound.title')}</h1>
+              <p>{t('customer.notFound.description')}</p>
             </div>
             <a className="customer-button customer-button-primary" href="/customer">
-              Return to dashboard
+              {t('customer.notFound.return')}
             </a>
           </header>
         </div>

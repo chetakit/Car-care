@@ -6,6 +6,7 @@ import usePagedRows from '../hooks/usePagedRows.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDate } from '../utils/formatDate.js'
 import { ADMIN_PAGE_SIZE } from '../utils/pageSize.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
 function getToday() {
   const date = new Date()
@@ -31,6 +32,7 @@ function formatTime(value) {
 }
 
 function SchedulesPage() {
+  const { language, t } = useLanguage()
   const [filters, setFilters] = useState(() => {
     const from = getToday()
     return { from, to: addDays(from, 29) }
@@ -53,7 +55,7 @@ function SchedulesPage() {
   function applyFilters(event) {
     event.preventDefault()
     if (filters.to < filters.from) {
-      setFilterError('The “To” date must be the same as or later than the “From” date.')
+      setFilterError('admin.schedules.filters.dateRangeError')
       return
     }
     setFilterError('')
@@ -79,7 +81,7 @@ function SchedulesPage() {
     event.preventDefault()
     const capacity = Number(capacityInput)
     if (!Number.isSafeInteger(capacity) || capacity <= 0) {
-      setSaveError('Capacity must be a positive whole number.')
+      setSaveError({ translationKey: 'admin.schedules.validation.capacity' })
       return
     }
 
@@ -91,12 +93,12 @@ function SchedulesPage() {
         method: 'PATCH',
         body: { capacity },
       })
-      setMessage('Schedule capacity updated.')
+      setMessage('admin.schedules.capacityUpdated')
       setEditingSchedule(null)
       setCapacityInput('')
       refresh()
     } catch (requestError) {
-      setSaveError(requestError.message)
+      setSaveError({ message: requestError.message })
     } finally {
       setSaving(false)
     }
@@ -112,19 +114,19 @@ function SchedulesPage() {
             onClick={refresh}
             type="button"
           >
-            Refresh
+            {t('admin.schedules.refresh')}
           </button>
         )}
-        description="Review scheduled time slots and set the maximum number of vehicles each can accept."
-        eyebrow="OPERATIONS"
-        title="Queue capacity"
+        description={t('admin.schedules.description')}
+        eyebrow={t('admin.schedules.eyebrow')}
+        title={t('admin.schedules.title')}
       />
-      {message && <div className="admin-alert admin-alert-success" role="status">{message}</div>}
+      {message && <div className="admin-alert admin-alert-success" role="status">{t(message)}</div>}
       <form className="admin-filter-bar" onSubmit={applyFilters}>
         <label>
-          From
+          {t('admin.schedules.filters.from')}
           <input
-            aria-label="From date"
+            aria-label={t('admin.schedules.filters.fromLabel')}
             onChange={(event) => {
               setFilters({ ...filters, from: event.target.value })
               setFilterError('')
@@ -135,9 +137,9 @@ function SchedulesPage() {
           />
         </label>
         <label>
-          To
+          {t('admin.schedules.filters.to')}
           <input
-            aria-label="To date"
+            aria-label={t('admin.schedules.filters.toLabel')}
             onChange={(event) => {
               setFilters({ ...filters, to: event.target.value })
               setFilterError('')
@@ -147,35 +149,35 @@ function SchedulesPage() {
             value={filters.to}
           />
         </label>
-        <button className="admin-primary-button" type="submit">Show schedules</button>
+        <button className="admin-primary-button" type="submit">{t('admin.schedules.filters.submit')}</button>
       </form>
-      {filterError && <div className="admin-alert admin-alert-error" role="alert">{filterError}</div>}
+      {filterError && <div className="admin-alert admin-alert-error" role="alert">{t(filterError)}</div>}
       <section className="admin-panel admin-data-panel">
         <RequestState
           empty={!rows.length}
-          emptyDescription="Choose another date range to view scheduled slots."
-          emptyTitle="No schedules found"
+          emptyDescription={t('admin.schedules.state.emptyDescription')}
+          emptyTitle={t('admin.schedules.state.emptyTitle')}
           error={error}
           loading={loading}
-          loadingMessage="Loading scheduled slots…"
+          loadingMessage={t('admin.schedules.state.loading')}
           onRetry={refresh}
         />
         {!loading && !error && rows.length > 0 && (
           <DataTable
             columns={[
-              { key: 'schedule_date', label: 'Date', render: (row) => formatDate(row.schedule_date) },
+              { key: 'schedule_date', label: t('admin.schedules.table.date'), render: (row) => formatDate(row.schedule_date, language) },
               {
                 key: 'time',
-                label: 'Time',
+                label: t('admin.schedules.table.time'),
                 render: (row) => `${formatTime(row.start_time)}–${formatTime(row.end_time)}`,
               },
-              { key: 'booked_count', label: 'Booked' },
-              { key: 'capacity', label: 'Maximum vehicles' },
-              { key: 'remaining_capacity', label: 'Remaining' },
-              { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+              { key: 'booked_count', label: t('admin.schedules.table.booked') },
+              { key: 'capacity', label: t('admin.schedules.table.maximumVehicles') },
+              { key: 'remaining_capacity', label: t('admin.schedules.table.remaining') },
+              { key: 'status', label: t('admin.schedules.table.status'), render: (row) => <StatusBadge value={row.status} /> },
               {
                 key: 'actions',
-                label: 'Actions',
+                label: t('admin.schedules.table.actions'),
                 render: (row) => (
                   <button
                     className="admin-inline-button"
@@ -183,7 +185,7 @@ function SchedulesPage() {
                     onClick={() => openCapacityEditor(row)}
                     type="button"
                   >
-                    Edit capacity
+                    {t('admin.schedules.editCapacity')}
                   </button>
                 ),
               },
@@ -196,17 +198,20 @@ function SchedulesPage() {
       </section>
       {editingSchedule && (
         <AdminModal
-          description="Capacity cannot be set below the number of bookings that have not been cancelled."
-          error={saveError}
+          description={t('admin.schedules.modal.description')}
+          error={saveError?.translationKey ? t(saveError.translationKey) : saveError?.message ?? ''}
           onClose={closeCapacityEditor}
           onSubmit={saveCapacity}
           open={Boolean(editingSchedule)}
-          submitLabel="Save capacity"
+          submitLabel={t('admin.schedules.modal.save')}
           submitting={saving}
-          title={`Edit capacity · ${formatDate(editingSchedule.schedule_date)} ${formatTime(editingSchedule.start_time)}`}
+          title={t('admin.schedules.modal.title', {
+            date: formatDate(editingSchedule.schedule_date, language),
+            time: formatTime(editingSchedule.start_time),
+          })}
         >
           <label>
-            Maximum vehicles
+            {t('admin.schedules.modal.maximumVehicles')}
             <input
               autoFocus
               min="1"
@@ -217,7 +222,7 @@ function SchedulesPage() {
             />
           </label>
           <p className="admin-muted">
-            Current bookings: {editingSchedule.booked_count}
+            {t('admin.schedules.modal.currentBookings', { count: editingSchedule.booked_count })}
           </p>
         </AdminModal>
       )}

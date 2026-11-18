@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createApiClient } from '../Admin/api/client.js'
-import formatMoney from '../Admin/utils/formatMoney.js'
+import { ApiError, createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
-import { formatCustomerTimestamp } from './customerFormatters.js'
+import { formatCustomerMoney, formatCustomerTimestamp } from './customerFormatters.js'
 import './customer.css'
 import './customer-wallet.css'
 
 const PAGE_SIZE = 10
+const WALLET_ERROR_KEYS = {
+  'The wallet balance response is incomplete.': 'customer.wallet.balanceResponseIncomplete',
+  'The wallet history response is incomplete.': 'customer.wallet.historyResponseIncomplete',
+}
 
 function isMoney(value) {
   return /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(String(value ?? ''))
 }
 
-function displayMoney(value) {
-  return isMoney(value) ? formatMoney(value) : '—'
+function displayMoney(value, language) {
+  return isMoney(value) ? formatCustomerMoney(value, language) : '—'
+}
+
+function getWalletError(error) {
+  if (error instanceof ApiError) return { message: error.message, key: '' }
+  if (error instanceof Error) {
+    return {
+      message: WALLET_ERROR_KEYS[error.message] ? '' : error.message,
+      key: WALLET_ERROR_KEYS[error.message] || '',
+    }
+  }
+  return { message: '', key: 'customer.common.unexpectedError' }
 }
 
 function validateBalance(data) {
@@ -39,10 +54,14 @@ function validateHistory(data) {
 }
 
 function useWalletResource(api, path, validate) {
-  const [result, setResult] = useState({ status: 'loading', data: null, error: '' })
+  const [result, setResult] = useState({
+    status: 'loading',
+    data: null,
+    error: { message: '', key: '' },
+  })
   const [reload, setReload] = useState(0)
   const refresh = useCallback(() => {
-    setResult({ status: 'loading', data: null, error: '' })
+    setResult({ status: 'loading', data: null, error: { message: '', key: '' } })
     setReload((value) => value + 1)
   }, [])
 
@@ -50,14 +69,18 @@ function useWalletResource(api, path, validate) {
     const controller = new AbortController()
     api(path, { signal: controller.signal })
       .then((response) => {
-        setResult({ status: 'ready', data: validate(response?.data), error: '' })
+        setResult({
+          status: 'ready',
+          data: validate(response?.data),
+          error: { message: '', key: '' },
+        })
       })
       .catch((error) => {
         if (error.name !== 'AbortError') {
           setResult({
             status: 'error',
             data: null,
-            error: error instanceof Error ? error.message : 'Please try again.',
+            error: getWalletError(error),
           })
         }
       })
@@ -67,77 +90,94 @@ function useWalletResource(api, path, validate) {
   return { ...result, refresh }
 }
 
-function WalletState({ resource, loadingText }) {
+function WalletState({ resource, loadingText, t }) {
   if (resource.status === 'loading') {
     return <p aria-live="polite" className="wallet-state">{loadingText}</p>
   }
   if (resource.status === 'error') {
     return (
       <div className="wallet-state wallet-state-error" role="alert">
-        <p>{resource.error}</p>
-        <button onClick={resource.refresh} type="button">Try again</button>
+        <p>{resource.error.key ? t(resource.error.key) : resource.error.message}</p>
+        <button onClick={resource.refresh} type="button">{t('customer.common.retry')}</button>
       </div>
     )
   }
   return null
 }
 
-function Pagination({ label, pagination, onPageChange }) {
+function Pagination({ label, pagination, onPageChange, t }) {
   if (pagination.totalPages <= 1 && pagination.page <= 1) return null
   return (
-    <nav aria-label={`${label} pages`} className="wallet-pagination">
+    <nav aria-label={t('customer.wallet.paginationLabel', { label })} className="wallet-pagination">
       <button disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)} type="button">
-        Previous
+        {t('customer.bookings.previous')}
       </button>
-      <span>
-        Page {pagination.page}
-        {pagination.page <= pagination.totalPages && ` of ${pagination.totalPages}`}
-      </span>
+      <span>{t('customer.bookings.pageOf', {
+        page: pagination.page,
+        totalPages: pagination.totalPages,
+      })}</span>
       <button disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)} type="button">
-        Next
+        {t('customer.bookings.next')}
       </button>
     </nav>
   )
 }
 
-function TransactionItem({ transaction }) {
+function TransactionItem({ transaction, language, t }) {
   const type = String(transaction.transaction_type ?? '').toUpperCase()
-  const amount = displayMoney(transaction.amount)
+  const amount = displayMoney(transaction.amount, language)
   const prefix = amount === '—' ? '' : type === 'CREDIT' ? '+' : type === 'DEBIT' ? '−' : ''
   return (
     <li className="wallet-history-item">
       <div className="wallet-item-copy">
         <span className={`wallet-type${type === 'CREDIT' ? ' wallet-type-credit' : ''}`}>
-          {type === 'CREDIT' ? 'Credit' : type === 'DEBIT' ? 'Debit' : 'Transaction'}
+          {type === 'CREDIT'
+            ? t('customer.wallet.credit')
+            : type === 'DEBIT'
+              ? t('customer.wallet.debit')
+              : t('customer.wallet.transaction')}
         </span>
-        <strong>{transaction.description || 'No description provided'}</strong>
-        <span>{formatCustomerTimestamp(transaction.created_at)}</span>
-        {transaction.booking_id != null && <span>Booking #{transaction.booking_id}</span>}
-        {transaction.refund_id != null && <span>Refund #{transaction.refund_id}</span>}
+        <strong>{transaction.description || t('customer.wallet.noDescription')}</strong>
+        <span>{formatCustomerTimestamp(transaction.created_at, language)}</span>
+        {transaction.booking_id != null && (
+          <span>{t('customer.wallet.bookingId', { bookingId: transaction.booking_id })}</span>
+        )}
+        {transaction.refund_id != null && (
+          <span>{t('customer.wallet.refundId', { refundId: transaction.refund_id })}</span>
+        )}
       </div>
       <strong className="wallet-item-amount">{prefix}{amount}</strong>
     </li>
   )
 }
 
-function RefundItem({ refund }) {
+function RefundItem({ refund, language, t }) {
   const status = String(refund.refund_status ?? '').replace(/_/g, ' ')
   return (
     <li className="wallet-history-item">
       <div className="wallet-item-copy">
-        <span className="wallet-type">Refund #{refund.refund_id}</span>
-        <strong>{status || 'Status unavailable'}</strong>
-        <span>{formatCustomerTimestamp(refund.processed_at || refund.created_at)}</span>
-        {refund.booking_id != null && <span>Booking #{refund.booking_id}</span>}
-        {refund.cancellation_fee != null && <span>Cancellation fee: {displayMoney(refund.cancellation_fee)}</span>}
+        <span className="wallet-type">
+          {t('customer.wallet.refundId', { refundId: refund.refund_id })}
+        </span>
+        <strong>{status || t('customer.wallet.refundStatusUnavailable')}</strong>
+        <span>{formatCustomerTimestamp(refund.processed_at || refund.created_at, language)}</span>
+        {refund.booking_id != null && (
+          <span>{t('customer.wallet.bookingId', { bookingId: refund.booking_id })}</span>
+        )}
+        {refund.cancellation_fee != null && (
+          <span>{t('customer.wallet.cancellationFee', {
+            amount: displayMoney(refund.cancellation_fee, language),
+          })}</span>
+        )}
       </div>
-      <strong className="wallet-item-amount">{displayMoney(refund.refund_amount)}</strong>
+      <strong className="wallet-item-amount">{displayMoney(refund.refund_amount, language)}</strong>
     </li>
   )
 }
 
 function CustomerWalletPage({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
+  const { language, t } = useLanguage()
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
     [handleUnauthorized, token],
@@ -191,47 +231,75 @@ function CustomerWalletPage({ user, onLogout }) {
       <CustomerHeader onLogout={onLogout} user={user} />
       <main className="wallet-main">
         <div className="customer-container">
-          <nav aria-label="Breadcrumb" className="wallet-breadcrumb">
-            <a href="/customer">My Account</a>
+          <nav aria-label={t('customer.profile.breadcrumbLabel')} className="wallet-breadcrumb">
+            <a href="/customer">{t('customer.wallet.breadcrumb')}</a>
             <span aria-hidden="true">/</span>
-            <span aria-current="page">My Wallet</span>
+            <span aria-current="page">{t('customer.wallet.title')}</span>
           </nav>
           <header className="wallet-heading">
             <div>
-              <span className="customer-eyebrow">YOUR CAR CARE</span>
-              <h1>My Wallet</h1>
-              <p>Keep track of your wallet balance, payments and refunds.</p>
+              <span className="customer-eyebrow">{t('customer.dashboard.eyebrow')}</span>
+              <h1>{t('customer.wallet.title')}</h1>
+              <p>{t('customer.wallet.description')}</p>
             </div>
-            <button className="wallet-refresh" onClick={refreshAll} type="button">Refresh wallet</button>
+            <button className="wallet-refresh" onClick={refreshAll} type="button">
+              {t('customer.wallet.refresh')}
+            </button>
           </header>
 
           <section aria-labelledby="wallet-balance-heading" className="wallet-balance">
             <div>
-              <span id="wallet-balance-heading">Available balance</span>
-              {balance.status === 'ready' && <strong>{displayMoney(balance.data.balance)}</strong>}
-              <WalletState resource={balance} loadingText="Loading balance…" />
+              <span id="wallet-balance-heading">{t('customer.wallet.availableBalance')}</span>
+              {balance.status === 'ready' && (
+                <strong>{displayMoney(balance.data.balance, language)}</strong>
+              )}
+              <WalletState resource={balance} loadingText={t('customer.wallet.loadingBalance')} t={t} />
             </div>
-            <a href="/customer/bookings">View my bookings <span aria-hidden="true">→</span></a>
+            <a href="/customer/bookings">
+              {t('customer.wallet.viewBookings')} <span aria-hidden="true">→</span>
+            </a>
           </section>
 
           <div className="wallet-sections">
             <section aria-labelledby="wallet-transactions-heading" className="wallet-panel">
               <header className="wallet-panel-heading">
                 <div>
-                  <span className="customer-eyebrow">WALLET ACTIVITY</span>
-                  <h2 id="wallet-transactions-heading">Transactions</h2>
+                  <span className="customer-eyebrow">{t('customer.wallet.activity')}</span>
+                  <h2 id="wallet-transactions-heading">{t('customer.wallet.transactions')}</h2>
                 </div>
-                <span>Newest first</span>
+                <span>{t('customer.wallet.newestFirst')}</span>
               </header>
-              <WalletState resource={transactions} loadingText="Loading transactions…" />
+              <WalletState
+                resource={transactions}
+                loadingText={t('customer.wallet.loadingTransactions')}
+                t={t}
+              />
               {transactions.status === 'ready' && (
                 <>
                   {transactions.data.items.length ? (
                     <ul className="wallet-history-list">
-                      {transactions.data.items.map((item) => <TransactionItem key={item.wallet_transaction_id} transaction={item} />)}
+                      {transactions.data.items.map((item) => (
+                        <TransactionItem
+                          key={item.wallet_transaction_id}
+                          language={language}
+                          t={t}
+                          transaction={item}
+                        />
+                      ))}
                     </ul>
-                  ) : <p className="wallet-empty">{transactions.data.pagination.page > 1 ? 'No transactions on this page.' : 'No wallet transactions yet.'}</p>}
-                  <Pagination label="Transactions" pagination={transactions.data.pagination} onPageChange={changeTransactionPage} />
+                  ) : (
+                    <p className="wallet-empty">
+                      {transactions.data.pagination.page > 1
+                        ? t('customer.wallet.noTransactionsOnPage')
+                        : t('customer.wallet.noTransactions')}
+                    </p>
+                  )}
+                  <Pagination
+                    label={t('customer.wallet.transactions')}
+                    pagination={transactions.data.pagination}
+                    onPageChange={changeTransactionPage}
+                    t={t}
+                  />
                 </>
               )}
             </section>
@@ -239,20 +307,38 @@ function CustomerWalletPage({ user, onLogout }) {
             <section aria-labelledby="wallet-refunds-heading" className="wallet-panel">
               <header className="wallet-panel-heading">
                 <div>
-                  <span className="customer-eyebrow">YOUR REFUNDS</span>
-                  <h2 id="wallet-refunds-heading">Refund history</h2>
+                  <span className="customer-eyebrow">{t('customer.wallet.refundsEyebrow')}</span>
+                  <h2 id="wallet-refunds-heading">{t('customer.wallet.refundHistory')}</h2>
                 </div>
-                <span>Newest first</span>
+                <span>{t('customer.wallet.newestFirst')}</span>
               </header>
-              <WalletState resource={refunds} loadingText="Loading refunds…" />
+              <WalletState resource={refunds} loadingText={t('customer.wallet.loadingRefunds')} t={t} />
               {refunds.status === 'ready' && (
                 <>
                   {refunds.data.items.length ? (
                     <ul className="wallet-history-list">
-                      {refunds.data.items.map((item) => <RefundItem key={item.refund_id} refund={item} />)}
+                      {refunds.data.items.map((item) => (
+                        <RefundItem
+                          key={item.refund_id}
+                          language={language}
+                          refund={item}
+                          t={t}
+                        />
+                      ))}
                     </ul>
-                  ) : <p className="wallet-empty">{refunds.data.pagination.page > 1 ? 'No refunds on this page.' : 'No refunds yet.'}</p>}
-                  <Pagination label="Refunds" pagination={refunds.data.pagination} onPageChange={changeRefundPage} />
+                  ) : (
+                    <p className="wallet-empty">
+                      {refunds.data.pagination.page > 1
+                        ? t('customer.wallet.noRefundsOnPage')
+                        : t('customer.wallet.noRefunds')}
+                    </p>
+                  )}
+                  <Pagination
+                    label={t('customer.wallet.refundHistory')}
+                    pagination={refunds.data.pagination}
+                    onPageChange={changeRefundPage}
+                    t={t}
+                  />
                 </>
               )}
             </section>
