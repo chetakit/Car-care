@@ -155,32 +155,34 @@ async function list({ page, limit, offset, search, status, includePrices = false
     [...values, limit, offset],
   );
 
-  // Price range across active vehicle types, so the list shows prices without
-  // opening each service.
+  // One fixed price per active vehicle type (size), cheapest first, so the
+  // list shows each size's price without opening the service.
   const priceById = new Map();
   if (includePrices && rows.length > 0) {
     const ids = rows.map((row) => row.service_id);
     const [priceRows] = await pool.execute(
-      `SELECT sp.service_id, MIN(sp.price) AS min_price, MAX(sp.price) AS max_price,
-        COUNT(*) AS price_count
+      `SELECT sp.service_id, sp.vehicle_type_id, vt.type_name, sp.price
       FROM service_prices sp
       INNER JOIN vehicle_types vt ON vt.vehicle_type_id = sp.vehicle_type_id
       WHERE vt.status = 'ACTIVE' AND sp.service_id IN (${ids.map(() => "?").join(", ")})
-      GROUP BY sp.service_id`,
+      ORDER BY sp.service_id ASC, sp.price ASC, vt.vehicle_type_id ASC`,
       ids,
     );
-    priceRows.forEach((row) => priceById.set(Number(row.service_id), row));
+    priceRows.forEach((row) => {
+      const id = Number(row.service_id);
+      if (!priceById.has(id)) priceById.set(id, []);
+      priceById.get(id).push({
+        vehicle_type_id: Number(row.vehicle_type_id),
+        type_name: row.type_name,
+        price: Number(row.price),
+      });
+    });
   }
 
   return {
     items: !includePrices ? rows : rows.map((row) => {
-      const price = priceById.get(Number(row.service_id));
-      return {
-        ...row,
-        min_price: price ? price.min_price : null,
-        max_price: price ? price.max_price : null,
-        price_count: price ? Number(price.price_count) : 0,
-      };
+      const prices = priceById.get(Number(row.service_id)) ?? [];
+      return { ...row, prices, price_count: prices.length };
     }),
     pagination: {
       page,

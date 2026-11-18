@@ -2340,3 +2340,256 @@
 .admin-status-badge.status-confirmed { border: 1px solid #b9d0f0; color: #1f4f8f; background: #edf4fd; }
 .admin-status-badge.status-completed { color: #fff; background: #2f8a57; }
 .admin-status-badge.status-in-service { color: #5b3fa3; background: #f1ecfb; }
+
+/* Services: price status + price list (services × vehicle sizes) */
+.admin-price-set,
+.admin-price-partial {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.admin-price-set {
+  color: var(--admin-muted);
+}
+
+.admin-price-partial {
+  color: var(--car-care-accent-dark);
+  font-weight: 600;
+}
+
+.admin-price-board {
+  margin-top: 16px;
+}
+
+.admin-price-board-table th,
+.admin-price-board-table td {
+  white-space: nowrap;
+}
+
+.admin-price-board-table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-price-board-table thead th:not(:first-child) {
+  text-align: right;
+}
+
+.admin-price-board-table tbody th {
+  padding: 12px;
+  border-bottom: 1px solid #f0f2f3;
+  background: transparent;
+  color: var(--admin-ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+}
+
+.admin-price-board-table tr.is-inactive {
+  color: var(--admin-muted);
+}
+
+.admin-price-board-table tr.is-inactive th {
+  color: var(--admin-muted);
+  font-weight: 500;
+}
+
+/* Price popup: one row per vehicle size */
+.admin-price-editor-meta {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px 8px;
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.admin-price-editor {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  list-style: none;
+}
+
+.admin-price-editor li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 8px 8px 14px;
+  transition: background-color 140ms ease;
+}
+
+.admin-price-editor li + li {
+  border-top: 1px solid #f0f0ee;
+}
+
+.admin-price-editor li:focus-within {
+  background: #fafaf9;
+}
+
+/* Changed but not saved yet: a thin accent bar on the left edge. */
+.admin-price-editor li::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--car-care-accent);
+  content: '';
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.admin-price-editor li.is-dirty::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.admin-price-editor label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--admin-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-price-editor label small {
+  color: var(--car-care-accent-dark);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.admin-price-input {
+  position: relative;
+  width: 148px;
+  flex: 0 0 148px;
+}
+
+.admin-price-input input {
+  width: 100%;
+  height: 38px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  color: var(--admin-ink);
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.admin-price-input input:hover:not(:disabled) {
+  border-color: #c9c9c5;
+}
+
+.admin-price-input input:focus {
+  border-color: var(--car-care-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--car-care-accent-rgb) / 14%);
+}
+
+.admin-price-input span {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  color: var(--admin-muted);
+  font-size: 13px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.admin-modal .admin-price-hint {
+  margin: 12px 2px 0;
+}
+
+/* Popups open with a short fade and rise instead of appearing at once. */
+.admin-modal[open] .admin-modal-card {
+  animation: admin-modal-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.admin-modal[open]::backdrop {
+  animation: admin-backdrop-in 200ms ease-out;
+}
+
+@keyframes admin-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes admin-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-modal[open] .admin-modal-card,
+  .admin-modal[open]::backdrop { animation: none; }
+  .admin-price-editor li::before { transition: none; }
+}
+
+@media (max-width: 480px) {
+  .admin-price-input { width: 120px; flex-basis: 120px; }
+}
+
+/* Fields inside popups: same look as the price inputs. */
+.admin-modal-body .admin-form-grid label {
+  color: var(--admin-ink);
+  font-size: 13px;
+}
+
+.admin-modal-body input:not([type='checkbox']):not([type='radio']),
+.admin-modal-body select,
+.admin-modal-body textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  color: var(--admin-ink);
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.admin-modal-body textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.admin-modal-body input:hover:not(:disabled):not(:focus),
+.admin-modal-body select:hover:not(:disabled):not(:focus),
+.admin-modal-body textarea:hover:not(:disabled):not(:focus) {
+  border-color: #c9c9c5;
+}
+
+.admin-modal-body input:focus,
+.admin-modal-body select:focus,
+.admin-modal-body textarea:focus {
+  border-color: var(--car-care-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--car-care-accent-rgb) / 14%);
+}
+
+/* Keep room for the ฿ suffix (beats the general popup field padding). */
+.admin-modal-body .admin-price-input input:not([type='checkbox']):not([type='radio']) {
+  min-height: 38px;
+  padding: 0 30px 0 12px;
+  text-align: right;
+}
