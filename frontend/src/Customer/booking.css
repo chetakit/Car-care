@@ -1458,4 +1458,18 @@
 .booking-coupon-applied span { display: grid; gap: 2px; }
 .booking-coupon-applied small { color: #65736f; font-size: 12px; }
 .booking-coupon-error { margin: 8px 0 0; color: #a33a32; font-size: 12px; }
+
+/* Coupon picker: one dropdown + "check" button instead of a long list. */
+.booking-coupon-picker { display: grid; gap: 8px; }
+.booking-coupon-label { color: #65736f; font-size: 12px; font-weight: 600; }
+.booking-coupon-row { display: flex; gap: 8px; }
+.booking-coupon-row select { flex: 1; min-width: 0; min-height: 40px; padding: 0 36px 0 12px; border: 1px solid #d8e2df; border-radius: 8px; color: var(--customer-ink); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2365736f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; font: inherit; font-size: 13px; appearance: none; cursor: pointer; transition: border-color 140ms ease, box-shadow 140ms ease; }
+.booking-coupon-row select:hover:not(:disabled) { border-color: #b9c9c4; }
+.booking-coupon-row select:focus-visible { outline: none; border-color: var(--customer-teal-dark); box-shadow: 0 0 0 3px rgb(0 0 0 / 6%); }
+.booking-coupon-row select:disabled { opacity: 0.6; cursor: not-allowed; }
+.booking-coupon-row button { flex: none; padding: 0 16px; min-height: 40px; border: 1px solid var(--customer-teal-dark); border-radius: 8px; color: #fff; background: var(--customer-teal-dark); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 140ms ease; }
+.booking-coupon-row button:disabled { opacity: 0.45; cursor: not-allowed; }
+.booking-coupon-detail { display: grid; gap: 2px; margin: 0; padding: 8px 12px; border-radius: 8px; background: #f3f7f6; }
+.booking-coupon-detail span { color: var(--customer-ink); font-size: 12px; }
+.booking-coupon-detail small { color: #65736f; font-size: 12px; }
 .booking-summary-breakdown { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 12px 18px 0; color: #65736f; font-size: 12px; }

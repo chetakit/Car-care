@@ -1,6 +1,7 @@
 const pool = require("../../shared/config/db");
 const { HOLDS_SLOT_SQL } = require("../../shared/services/bookingPaymentHold");
 const coupons = require("../../shared/services/couponPricing");
+const { SHOP_NOW_SQL } = require("../../shared/services/shopTime");
 const { OVERLAPPING_BOOKINGS_SQL, planFromSlot } = require("../../shared/services/slotPlanner");
 
 class BookingNotFoundError extends Error {}
@@ -132,11 +133,7 @@ async function create(
     const [scheduleRows] = await connection.execute(
       `SELECT schedule_id, schedule_date, start_time, end_time, capacity, status,
         CASE
-          WHEN schedule_date < CURRENT_DATE()
-            OR (
-              schedule_date = CURRENT_DATE()
-              AND start_time <= CURRENT_TIME()
-            )
+          WHEN TIMESTAMP(schedule_date, start_time) <= ${SHOP_NOW_SQL}
           THEN 1
           ELSE 0
         END AS has_started

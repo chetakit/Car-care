@@ -94,10 +94,9 @@ test("Customer can retrieve available schedules with remaining capacity", async 
   pool.execute = async (sql, values) => {
     assert.match(sql, /s\.schedule_date BETWEEN \? AND \?/);
     assert.match(sql, /s\.status,/);
-    assert.match(sql, /s\.schedule_date < CURRENT_DATE\(\)/);
     assert.match(
       sql,
-      /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time <= CURRENT_TIME\(\)/,
+      /TIMESTAMP\(s\.schedule_date, s\.start_time\) <= \(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\)/,
     );
     assert.match(sql, /b\.booking_status <> 'CANCELLED'/);
     // Counts bookings that overlap each slot in time, so multi-slot bookings are included.
@@ -156,7 +155,8 @@ test("Past dates and elapsed same-day slots are returned as unavailable using da
 
   assert.match(
     query,
-    /s\.schedule_date = CURRENT_DATE\(\)\s+AND s\.start_time <= CURRENT_TIME\(\)/,
+    // Schedules are in Thai time; the database clock is UTC.
+    /TIMESTAMP\(s\.schedule_date, s\.start_time\) <= \(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\)/,
   );
 });
 

@@ -76,6 +76,28 @@ function amountToCents(value) {
   return match ? BigInt(match[1]) * 100n + BigInt((match[2] ?? '').padEnd(2, '0')) : null
 }
 
+function couponDiscountLabel(coupon) {
+  return coupon.discount_type === 'PERCENT'
+    ? `${Number(coupon.discount_value)}%`
+    : formatCents(amountToCents(coupon.discount_value) ?? 0n)
+}
+
+// Turns the server's coupon rule message into a reason the customer can read.
+function couponReasonText(error, t) {
+  const message = error instanceof ApiError ? String(error.message) : ''
+  const minimum = /minimum order of THB (\d+(?:\.\d{1,2})?)/i.exec(message)
+  if (minimum) {
+    return t('customer.booking.couponReason.minimum', {
+      amount: formatCents(amountToCents(minimum[1]) ?? 0n),
+    })
+  }
+  if (/not active yet/i.test(message)) return t('customer.booking.couponReason.notStarted')
+  if (/expired/i.test(message)) return t('customer.booking.couponReason.expired')
+  if (/usage limit/i.test(message)) return t('customer.booking.couponReason.limit')
+  if (/not valid/i.test(message)) return t('customer.booking.couponReason.invalid')
+  return t('customer.booking.couponCheckError')
+}
+
 function vehicleLabel(vehicle, t) {
   return [vehicle.brand_name, vehicle.model_name].filter(Boolean).join(' ') ||
     t('customer.booking.vehicle')
@@ -168,6 +190,7 @@ function CustomerBookingPage({ user, onLogout }) {
   const [availableCoupons, setAvailableCoupons] = useState([])
   const [couponsState, setCouponsState] = useState('idle')
   const [couponReload, setCouponReload] = useState(0)
+  const [selectedCouponCode, setSelectedCouponCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [bookingResult, setBookingResult] = useState(null)
   const submissionInProgress = useRef(false)
@@ -423,9 +446,9 @@ function CustomerBookingPage({ user, onLogout }) {
         discountCents,
         finalCents,
       })
-    } catch {
+    } catch (error) {
       setAppliedCoupon(null)
-      setCouponError(t('customer.booking.couponCheckError'))
+      setCouponError(couponReasonText(error, t))
     } finally {
       setCouponChecking(false)
     }
@@ -1273,43 +1296,69 @@ function CustomerBookingPage({ user, onLogout }) {
                             {t('customer.booking.noCoupons')}
                           </p>
                         )}
-                        {couponsState === 'ready' && availableCoupons.length > 0 && (
-                          <div className="booking-coupon-options">
-                            {availableCoupons.map((coupon) => {
-                              const discountLabel = coupon.discount_type === 'PERCENT'
-                                ? `${coupon.discount_value}%`
-                                : formatCents(amountToCents(coupon.discount_value) ?? 0n)
-                              const minimumCents = amountToCents(coupon.min_order_amount)
-                              return (
-                                <article className="booking-coupon-option" key={coupon.coupon_id}>
-                                  <div>
-                                    <strong>{discountLabel}</strong>
-                                    <span>{coupon.description || coupon.coupon_code}</span>
-                                    {minimumCents !== null && minimumCents > 0n && (
-                                      <small>
-                                        {t('customer.booking.couponMinimum', {
-                                          amount: formatCents(minimumCents),
-                                        })}
-                                      </small>
-                                    )}
-                                  </div>
-                                  <button
-                                    disabled={couponChecking || submitting}
-                                    onClick={() => {
-                                      setCouponError('')
-                                      void applyCoupon(coupon.coupon_code)
-                                    }}
-                                    type="button"
-                                  >
-                                    {couponChecking
-                                      ? t('customer.booking.checkingCoupon')
-                                      : t('customer.booking.useCoupon')}
-                                  </button>
-                                </article>
-                              )
-                            })}
-                          </div>
-                        )}
+                        {couponsState === 'ready' && availableCoupons.length > 0 && (() => {
+                          const chosen = availableCoupons.find(
+                            (coupon) => coupon.coupon_code === selectedCouponCode,
+                          )
+                          const minimumCents = chosen ? amountToCents(chosen.min_order_amount) : null
+                          const maxCents = chosen?.discount_type === 'PERCENT'
+                            ? amountToCents(chosen.max_discount)
+                            : null
+                          return (
+                            <div className="booking-coupon-picker">
+                              <label className="booking-coupon-label" htmlFor="booking-coupon-select">
+                                {t('customer.booking.couponSelectLabel', { count: availableCoupons.length })}
+                              </label>
+                              <div className="booking-coupon-row">
+                                <select
+                                  disabled={couponChecking || submitting}
+                                  id="booking-coupon-select"
+                                  onChange={(event) => {
+                                    setSelectedCouponCode(event.target.value)
+                                    setCouponError('')
+                                  }}
+                                  value={selectedCouponCode}
+                                >
+                                  <option value="">{t('customer.booking.couponSelectPlaceholder')}</option>
+                                  {availableCoupons.map((coupon) => (
+                                    <option key={coupon.coupon_id} value={coupon.coupon_code}>
+                                      {coupon.coupon_code} · {t('customer.booking.couponOff', {
+                                        amount: couponDiscountLabel(coupon),
+                                      })}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  disabled={!chosen || couponChecking || submitting}
+                                  onClick={() => {
+                                    setCouponError('')
+                                    void applyCoupon(chosen.coupon_code)
+                                  }}
+                                  type="button"
+                                >
+                                  {couponChecking
+                                    ? t('customer.booking.checkingCoupon')
+                                    : t('customer.booking.checkCoupon')}
+                                </button>
+                              </div>
+                              {chosen && (
+                                <p className="booking-coupon-detail">
+                                  {chosen.description && <span>{chosen.description}</span>}
+                                  <small>
+                                    {[
+                                      minimumCents !== null && minimumCents > 0n
+                                        ? t('customer.booking.couponMinimum', { amount: formatCents(minimumCents) })
+                                        : t('customer.booking.couponNoMinimum'),
+                                      maxCents !== null
+                                        ? t('customer.booking.couponMax', { amount: formatCents(maxCents) })
+                                        : null,
+                                    ].filter(Boolean).join(' · ')}
+                                  </small>
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </>
                     )}
                     {couponError && <p className="booking-coupon-error" role="alert">{couponError}</p>}

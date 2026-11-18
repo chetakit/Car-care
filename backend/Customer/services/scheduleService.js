@@ -1,5 +1,6 @@
 const pool = require("../../shared/config/db");
 const { OVERLAPPING_BOOKINGS_SQL, planFromSlot } = require("../../shared/services/slotPlanner");
+const { SHOP_NOW_SQL } = require("../../shared/services/shopTime");
 
 // Lists every schedule so customers can see occupied and elapsed times as
 // disabled options. With duration_minutes, selectable starts must have enough
@@ -15,11 +16,7 @@ async function listAvailability({ from, to, duration_minutes: durationMinutes })
       s.status,
       ${OVERLAPPING_BOOKINGS_SQL("s")} AS booked_count,
       CASE
-        WHEN s.schedule_date < CURRENT_DATE()
-          OR (
-            s.schedule_date = CURRENT_DATE()
-            AND s.start_time <= CURRENT_TIME()
-          )
+        WHEN TIMESTAMP(s.schedule_date, s.start_time) <= ${SHOP_NOW_SQL}
         THEN 1
         ELSE 0
       END AS has_started

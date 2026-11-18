@@ -359,8 +359,11 @@ test("Booking rejects past dates and elapsed same-day schedules using database t
       assert.equal(response.statusCode, 400);
       assert.equal(response.payload.message, message);
       assert.equal(database.state.queries.length, 1);
-      assert.match(database.state.queries[0].sql, /schedule_date < CURRENT_DATE\(\)/);
-      assert.match(database.state.queries[0].sql, /start_time <= CURRENT_TIME\(\)/);
+      // Schedules are in Thai time; the database clock is UTC.
+      assert.match(
+        database.state.queries[0].sql,
+        /TIMESTAMP\(schedule_date, start_time\) <= \(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\)/,
+      );
       assert.equal(database.state.bookingInsert, null);
       assert.equal(database.state.rolledBack, true);
     });

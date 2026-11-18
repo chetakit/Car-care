@@ -80,8 +80,9 @@ test("Customers can list only currently usable coupons", async () => {
   }];
   pool.execute = async (sql) => {
     assert.match(sql, /status = 'ACTIVE'/);
-    assert.match(sql, /NOW\(\) >= start_date/);
-    assert.match(sql, /NOW\(\) <= end_date/);
+    // Coupon dates are entered in Thai time; the database clock is UTC.
+    assert.match(sql, /\(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\) >= start_date/);
+    assert.match(sql, /\(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\) <= end_date/);
     assert.match(sql, /used_count < usage_limit/);
     return [coupons];
   };

@@ -1,6 +1,8 @@
 // Coupon rules shared by the customer preview endpoint and booking creation.
 // Amounts are handled in integer cents (BigInt) to avoid rounding drift.
 
+const { SHOP_NOW_SQL } = require("./shopTime");
+
 class CouponError extends Error {}
 
 const MAX_CODE_LENGTH = 50;
@@ -23,8 +25,8 @@ function centsToDecimal(cents) {
 
 const COUPON_COLUMNS = `coupon_id, coupon_code, description, discount_type, discount_value,
   max_discount, min_order_amount, usage_limit, used_count, status,
-  (NOW() >= start_date AND NOW() <= end_date) AS is_live,
-  (NOW() < start_date) AS not_started`;
+  (${SHOP_NOW_SQL} >= start_date AND ${SHOP_NOW_SQL} <= end_date) AS is_live,
+  (${SHOP_NOW_SQL} < start_date) AS not_started`;
 
 async function findCoupon(executor, code, { lock = false } = {}) {
   const [rows] = await executor.execute(

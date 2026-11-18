@@ -8,6 +8,7 @@ const {
   requireCustomer,
 } = require("../../Auth/middleware/authMiddleware");
 const coupons = require("../../shared/services/couponPricing");
+const { SHOP_NOW_SQL } = require("../../shared/services/shopTime");
 
 const router = express.Router();
 
@@ -18,8 +19,8 @@ router.get("/available", authenticateToken, requireCustomer, async (req, res) =>
         max_discount, min_order_amount
       FROM coupons
       WHERE status = 'ACTIVE'
-        AND NOW() >= start_date
-        AND NOW() <= end_date
+        AND ${SHOP_NOW_SQL} >= start_date
+        AND ${SHOP_NOW_SQL} <= end_date
         AND (usage_limit IS NULL OR used_count < usage_limit)
       ORDER BY coupon_code ASC, coupon_id ASC`,
     );
