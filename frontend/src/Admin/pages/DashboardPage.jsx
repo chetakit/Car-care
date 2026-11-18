@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import AdminIcon from '../components/AdminIcon.jsx'
 import { DataTable, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
+import { StatusDonut, TrendBarChart } from '../components/DashboardCharts.jsx'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDate } from '../utils/formatDate.js'
-import formatStatusLabel from '../utils/formatStatusLabel.js'
 import formatMoney from '../utils/formatMoney.js'
 import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
@@ -18,32 +18,38 @@ const BOOKING_STATUS_ORDER = [
 ]
 const BOOKING_STATUSES = new Set(BOOKING_STATUS_ORDER)
 
-const metrics = [
-  { key: 'todayBookings', label: 'admin.dashboard.metric.todayBookings', icon: 'calendar' },
-  { key: 'totalCustomers', label: 'admin.dashboard.metric.customers', icon: 'users' },
-  { key: 'totalVehicles', label: 'admin.dashboard.metric.vehicles', icon: 'tool' },
-]
+const TREND_RANGES = [7, 14, 30]
+const TREND_DAYS = 30
 
-const revenuePeriods = [
-  {
-    key: 'today',
-    title: 'admin.dashboard.revenue.today',
-    gross: 'todayGrossRevenue',
-    refunds: 'todayRefunds',
-    net: 'todayRevenue',
-  },
-  {
-    key: 'monthly',
-    title: 'admin.dashboard.revenue.month',
-    gross: 'monthlyGrossRevenue',
-    refunds: 'monthlyRefunds',
-    net: 'monthlyRevenue',
-  },
-]
+function toLocale(language) {
+  return language === 'TH' ? 'th-TH' : 'en-GB'
+}
+
+function toDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+// The last TREND_DAYS calendar days, oldest first, ending today.
+function lastDays(locale) {
+  const today = new Date()
+  return Array.from({ length: TREND_DAYS }, (_, index) => {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (TREND_DAYS - 1 - index))
+    return {
+      key: toDateKey(date),
+      label: date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }),
+      shortLabel: date.toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+    }
+  })
+}
+
+function formatCompactMoney(value, locale) {
+  if (value >= 1000) return `฿${(value / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}k`
+  return `฿${value.toLocaleString(locale)}`
+}
 
 function formatCount(value, language) {
   return typeof value === 'number' && Number.isFinite(value)
-    ? value.toLocaleString(language === 'TH' ? 'th-TH' : 'en-GB')
+    ? value.toLocaleString(toLocale(language))
     : '—'
 }
 
@@ -67,8 +73,41 @@ function formatTimeRange(startTime, endTime) {
 
 function DashboardPage({ onNavigate }) {
   const { language, t } = useLanguage()
-  const { data, loading, error, refresh } = useRemoteData('/api/admin/dashboard/summary')
+  const locale = toLocale(language)
+  const { data, loading, error, refresh: refreshSummary } = useRemoteData('/api/admin/dashboard/summary')
   const summary = data ?? {}
+  // Fixed once per visit so the report queries stay stable; labels follow the language.
+  const [dayKeys] = useState(() => lastDays('en-GB').map((day) => day.key))
+  const days = useMemo(
+    () => lastDays(locale).filter((day) => dayKeys.includes(day.key)),
+    [dayKeys, locale],
+  )
+  const trendQuery = `date_from=${dayKeys[0]}&date_to=${dayKeys[dayKeys.length - 1]}&group_by=day`
+  const revenueTrend = useRemoteData(`/api/admin/reports/revenue?${trendQuery}`)
+  const bookingTrend = useRemoteData(`/api/admin/reports/bookings?${trendQuery}`)
+  const [trendMetric, setTrendMetric] = useState('revenue')
+  const [trendRange, setTrendRange] = useState(14)
+  const isRevenue = trendMetric === 'revenue'
+
+  const trendPoints = useMemo(() => {
+    const rows = isRevenue
+      ? revenueTrend.data?.revenueByPeriod ?? []
+      : bookingTrend.data?.bookingCountsByPeriod ?? []
+    const values = new Map(rows.map((row) => [
+      String(row.period).slice(0, 10),
+      Number(isRevenue ? row.revenue : row.count) || 0,
+    ]))
+    return days.slice(-trendRange).map((day) => ({ ...day, value: values.get(day.key) ?? 0 }))
+  }, [bookingTrend.data, days, isRevenue, revenueTrend.data, trendRange])
+  const trendTotal = trendPoints.reduce((sum, point) => sum + point.value, 0)
+  const trendLoading = revenueTrend.loading || bookingTrend.loading
+  const trendError = revenueTrend.error || bookingTrend.error
+
+  function refresh() {
+    refreshSummary()
+    revenueTrend.refresh()
+    bookingTrend.refresh()
+  }
   const statusRows = useMemo(
     () => (Array.isArray(summary.bookingStatusSummary)
       ? summary.bookingStatusSummary.filter((row) => (
@@ -100,47 +139,108 @@ function DashboardPage({ onNavigate }) {
       <RequestState error={error} loading={loading} onRetry={refresh} />
       {!loading && !error && (
         <>
-          <section aria-label={t('admin.dashboard.summaryLabel')} className="admin-metrics">
-            {metrics.map((metric, index) => (
-              <article className="admin-metric-card" key={metric.key}>
-                <div className="admin-metric-heading">
-                  <span>{t(metric.label)}</span>
-                  <span className={`admin-metric-icon metric-icon-${index + 1}`}>
-                    <AdminIcon name={metric.icon} size={16} />
-                  </span>
-                </div>
-                <strong className="admin-metric-value">
-                  {formatCount(summary[metric.key], language)}
-                </strong>
-              </article>
-            ))}
+          <section aria-label={t('admin.dashboard.summaryLabel')} className="admin-metrics admin-metrics-4">
+            <article className="admin-metric-card">
+              <div className="admin-metric-heading">
+                <span>{t('admin.dashboard.metric.todayBookings')}</span>
+                <span className="admin-metric-icon metric-icon-1"><AdminIcon name="calendar" size={16} /></span>
+              </div>
+              <strong className="admin-metric-value">{formatCount(summary.todayBookings, language)}</strong>
+              <span className="admin-metric-detail">{t('admin.dashboard.metric.todayDetail')}</span>
+            </article>
+            <article className="admin-metric-card">
+              <div className="admin-metric-heading">
+                <span>{t('admin.dashboard.metric.monthNet')}</span>
+                <span className="admin-metric-icon metric-icon-3"><AdminIcon name="wallet" size={16} /></span>
+              </div>
+              <strong className="admin-metric-value">{formatSummaryMoney(summary.monthlyRevenue, language)}</strong>
+              <span className="admin-metric-detail">
+                {t('admin.dashboard.metric.monthDetail', {
+                  paid: formatSummaryMoney(summary.monthlyGrossRevenue, language),
+                  refunded: formatSummaryMoney(summary.monthlyRefunds, language),
+                })}
+              </span>
+            </article>
+            <article className="admin-metric-card">
+              <div className="admin-metric-heading">
+                <span>{t('admin.dashboard.metric.customers')}</span>
+                <span className="admin-metric-icon metric-icon-2"><AdminIcon name="users" size={16} /></span>
+              </div>
+              <strong className="admin-metric-value">{formatCount(summary.totalCustomers, language)}</strong>
+              <span className="admin-metric-detail">{t('admin.dashboard.metric.customersDetail')}</span>
+            </article>
+            <article className="admin-metric-card">
+              <div className="admin-metric-heading">
+                <span>{t('admin.dashboard.metric.vehicles')}</span>
+                <span className="admin-metric-icon metric-icon-4"><AdminIcon name="car" size={16} /></span>
+              </div>
+              <strong className="admin-metric-value">{formatCount(summary.totalVehicles, language)}</strong>
+              <span className="admin-metric-detail">{t('admin.dashboard.metric.vehiclesDetail')}</span>
+            </article>
           </section>
-          <section aria-label={t('admin.dashboard.revenue.summaryLabel')} className="admin-revenue-grid">
-            {revenuePeriods.map((period) => (
-              <article className="admin-panel admin-revenue-panel" key={period.key}>
-                <div className="admin-panel-heading">
-                  <div>
-                    <h3>{t(period.title)}</h3>
-                    <p>{t('admin.dashboard.revenue.basis')}</p>
+
+          <section className="admin-dashboard-charts">
+            <article className="admin-panel admin-trend-panel">
+              <div className="admin-panel-heading">
+                <div>
+                  <h3>{t(isRevenue ? 'admin.dashboard.trend.revenueTitle' : 'admin.dashboard.trend.bookingsTitle', { days: trendRange })}</h3>
+                  <p>
+                    {isRevenue
+                      ? t('admin.dashboard.trend.revenueBasis', { total: formatMoney(trendTotal, language) })
+                      : t('admin.dashboard.trend.bookingsBasis', { total: trendTotal.toLocaleString(locale) })}
+                  </p>
+                </div>
+                <div className="admin-chart-controls">
+                  <div aria-label={t('admin.dashboard.trend.dataLabel')} className="admin-segmented" role="group">
+                    <button aria-pressed={isRevenue} onClick={() => setTrendMetric('revenue')} type="button">{t('admin.dashboard.trend.revenue')}</button>
+                    <button aria-pressed={!isRevenue} onClick={() => setTrendMetric('bookings')} type="button">{t('admin.dashboard.trend.bookings')}</button>
+                  </div>
+                  <div aria-label={t('admin.dashboard.trend.periodLabel')} className="admin-segmented" role="group">
+                    {TREND_RANGES.map((range) => (
+                      <button aria-pressed={trendRange === range} key={range} onClick={() => setTrendRange(range)} type="button">
+                        {t('admin.dashboard.trend.days', { days: range })}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <dl className="admin-revenue-breakdown">
-                  <div>
-                    <dt>{t('admin.dashboard.revenue.gross')}</dt>
-                    <dd>{formatSummaryMoney(summary[period.gross], language)}</dd>
-                  </div>
-                  <div>
-                    <dt>{t('admin.dashboard.revenue.refunds')}</dt>
-                    <dd>{formatSummaryMoney(summary[period.refunds], language)}</dd>
-                  </div>
-                  <div className="is-net-revenue">
-                    <dt>{t('admin.dashboard.revenue.net')}</dt>
-                    <dd>{formatSummaryMoney(summary[period.net], language)}</dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
+              </div>
+              <RequestState error={trendError} loading={trendLoading} loadingMessage={t('admin.dashboard.trend.loading')} onRetry={refresh} />
+              {!trendLoading && !trendError && (
+                <TrendBarChart
+                  formatAxis={isRevenue ? (value) => formatCompactMoney(value, locale) : (value) => value.toLocaleString(locale)}
+                  formatValue={isRevenue
+                    ? (value) => formatMoney(value, language)
+                    : (value) => t(value === 1 ? 'admin.dashboard.trend.bookingValueOne' : 'admin.dashboard.trend.bookingValue', { count: value })}
+                  label={t(isRevenue ? 'admin.dashboard.trend.revenueChartLabel' : 'admin.dashboard.trend.bookingsChartLabel', { days: trendRange })}
+                  points={trendPoints}
+                />
+              )}
+            </article>
+            <article className="admin-panel admin-status-panel">
+              <div className="admin-panel-heading">
+                <div>
+                  <h3>{t('admin.dashboard.status.title')}</h3>
+                  <p>{t('admin.dashboard.status.allDescription')}</p>
+                </div>
+              </div>
+              <RequestState
+                empty={!statusRows.length}
+                emptyDescription={hasStatusSummary
+                  ? t('admin.dashboard.status.emptyDescription')
+                  : t('admin.dashboard.status.unavailableDescription')}
+                emptyTitle={hasStatusSummary
+                  ? t('admin.dashboard.status.emptyTitle')
+                  : t('admin.dashboard.status.unavailableTitle')}
+              />
+              {!!statusRows.length && (
+                <StatusDonut
+                  onSelect={(status) => onNavigate('bookings', { booking_status: status })}
+                  rows={statusRows}
+                />
+              )}
+            </article>
           </section>
+
           <section className="admin-dashboard-grid">
             <article className="admin-panel admin-bookings-panel">
               <div className="admin-panel-heading">
@@ -192,43 +292,24 @@ function DashboardPage({ onNavigate }) {
                 ]} rows={recentBookings} />
               )}
             </article>
-            <article className="admin-panel admin-status-panel">
+            <article className="admin-panel admin-today-panel">
               <div className="admin-panel-heading">
-                <div>
-                  <h3>{t('admin.dashboard.status.title')}</h3>
-                  <p>{t('admin.dashboard.status.description')}</p>
-                </div>
+                <div><h3>{t('admin.dashboard.today.title')}</h3><p>{t('admin.dashboard.revenue.basis')}</p></div>
               </div>
-              <RequestState
-                empty={!statusRows.length}
-                emptyDescription={hasStatusSummary
-                  ? t('admin.dashboard.status.emptyDescription')
-                  : t('admin.dashboard.status.unavailableDescription')}
-                emptyTitle={hasStatusSummary
-                  ? t('admin.dashboard.status.emptyTitle')
-                  : t('admin.dashboard.status.unavailableTitle')}
-              />
-              {!!statusRows.length && (
-                <DataTable columns={[
-                  {
-                    key: 'booking_status',
-                    label: t('admin.dashboard.status.status'),
-                    render: (row) => (
-                      <button
-                        aria-label={t('admin.dashboard.status.viewBookings', {
-                          status: formatStatusLabel(row.booking_status, language),
-                        })}
-                        className="admin-booking-link"
-                        onClick={() => onNavigate('bookings', { booking_status: row.booking_status })}
-                        type="button"
-                      >
-                        <StatusBadge value={row.booking_status} />
-                      </button>
-                    ),
-                  },
-                  { key: 'count', label: t('admin.dashboard.status.bookings'), render: (row) => formatCount(row.count, language) },
-                ]} rows={statusRows} />
-              )}
+              <dl className="admin-revenue-breakdown">
+                <div>
+                  <dt>{t('admin.dashboard.today.paid')}</dt>
+                  <dd>{formatSummaryMoney(summary.todayGrossRevenue, language)}</dd>
+                </div>
+                <div>
+                  <dt>{t('admin.dashboard.today.refunded')}</dt>
+                  <dd>{formatSummaryMoney(summary.todayRefunds, language)}</dd>
+                </div>
+                <div className="is-net-revenue">
+                  <dt>{t('admin.dashboard.today.net')}</dt>
+                  <dd>{formatSummaryMoney(summary.todayRevenue, language)}</dd>
+                </div>
+              </dl>
               <div className="admin-dashboard-payment-note">
                 <p>{t('admin.dashboard.paymentNote')}</p>
                 <button className="admin-inline-button" onClick={() => onNavigate('payments')} type="button">

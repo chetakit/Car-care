@@ -2195,3 +2195,148 @@
 .admin-status-bars-track span {
   background: #3b4142;
 }
+
+/* ── Dashboard charts ─────────────────────────────────────────────────────── */
+.admin-metrics-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-metrics-4 .admin-metric-card { min-height: 0; }
+.admin-metrics-4 .admin-metric-detail { color: var(--admin-muted); font-size: 11px; }
+
+.admin-dashboard-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.85fr);
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.admin-trend-panel,
+.admin-status-panel,
+.admin-today-panel { min-height: 0; padding: 18px; }
+
+.admin-trend-panel .admin-panel-heading { flex-wrap: wrap; align-items: flex-start; }
+
+.admin-chart-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.admin-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: #f5f5f3;
+}
+
+.admin-shell .admin-segmented button {
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--admin-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-shell .admin-segmented button[aria-pressed='true'] {
+  color: #fff;
+  background: #141718;
+}
+
+.admin-chart { position: relative; margin-top: 12px; }
+.admin-chart svg { display: block; overflow: visible; }
+.admin-chart-grid { stroke: #ecebe8; stroke-width: 1; }
+.admin-chart-baseline { stroke: #cfcfcb; stroke-width: 1; }
+.admin-chart-axis { fill: var(--admin-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.admin-chart-bar { fill: var(--admin-accent); transition: opacity 120ms ease; }
+.admin-chart-bar.is-dimmed { opacity: 0.35; }
+.admin-chart-hit { fill: transparent; cursor: default; }
+
+.admin-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  min-width: 120px;
+  padding: 7px 10px;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  color: #f2f2f0;
+  background: #141718;
+  box-shadow: 0 8px 20px rgb(20 23 24 / 18%);
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-chart-tooltip span { color: #b9bdbc; font-size: 11px; }
+.admin-chart-tooltip strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.admin-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.admin-donut { display: grid; justify-items: center; gap: 16px; margin-top: 12px; }
+.admin-donut-figure { position: relative; width: 168px; height: 168px; }
+.admin-donut-track { fill: none; stroke: #f0f0ee; }
+.admin-donut-segment { fill: none; transition: opacity 120ms ease; }
+.admin-donut-segment.is-dimmed { opacity: 0.3; }
+.admin-donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.admin-donut-center strong { font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.admin-donut-center span { color: var(--admin-muted); font-size: 11px; }
+
+.admin-donut-legend { display: grid; width: 100%; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.admin-shell .admin-donut-legend button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 10px minmax(0, 1fr) auto 38px;
+  align-items: center;
+  gap: 9px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--admin-ink);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.admin-shell .admin-donut-legend button:hover,
+.admin-shell .admin-donut-legend button:focus-visible { background: #f3f3f1; }
+.admin-donut-legend li.is-empty { opacity: 0.5; }
+.admin-donut-swatch { width: 10px; height: 10px; border-radius: 3px; }
+.admin-donut-legend strong { font-variant-numeric: tabular-nums; }
+.admin-donut-legend small { color: var(--admin-muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+.admin-today-panel .admin-dashboard-payment-note { margin-top: 14px; }
+
+@media (max-width: 1100px) {
+  .admin-metrics-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-dashboard-charts { grid-template-columns: 1fr; }
+  .admin-donut { grid-template-columns: 168px minmax(0, 1fr); align-items: center; justify-items: stretch; }
+}
+
+@media (max-width: 560px) {
+  .admin-donut { grid-template-columns: 1fr; justify-items: center; }
+}
+
+/* ── Status badges: Confirmed (booked) and Completed (done) must not blur ──
+   Completed is the finished state, so it gets a solid fill; Confirmed stays a
+   pale blue chip with a border. In service moves to purple so it no longer
+   matches Checked in. */
+.admin-status-badge.status-confirmed { border: 1px solid #b9d0f0; color: #1f4f8f; background: #edf4fd; }
+.admin-status-badge.status-completed { color: #fff; background: #2f8a57; }
+.admin-status-badge.status-in-service { color: #5b3fa3; background: #f1ecfb; }
