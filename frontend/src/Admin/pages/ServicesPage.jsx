@@ -213,7 +213,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
                   return (
                     <li key={item.vehicle_type_id}>
                       <span>{typeName} · {status}</span>
-                      <strong>THB {item.price}</strong>
+                      <strong>{formatMoney(item.price)}</strong>
                     </li>
                   )
                 })}
@@ -262,7 +262,7 @@ function ServicePricesPanel({ serviceId, api, onClose }) {
                   </div>
                 )}
                 <label>
-                  Price (THB)
+                  Price (฿)
                   <input
                     disabled={saving}
                     inputMode="decimal"

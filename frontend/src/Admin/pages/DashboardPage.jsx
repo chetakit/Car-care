@@ -43,8 +43,8 @@ function lastDays(locale) {
 }
 
 function formatCompactMoney(value, locale) {
-  if (value >= 1000) return `฿${(value / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}k`
-  return `฿${value.toLocaleString(locale)}`
+  if (value >= 1000) return `${(value / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}k ฿`
+  return `${value.toLocaleString(locale)} ฿`
 }
 
 function formatCount(value, language) {
