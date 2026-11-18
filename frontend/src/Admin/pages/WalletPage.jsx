@@ -8,9 +8,18 @@ import formatStatusLabel from '../utils/formatStatusLabel.js'
 import formatMoney from '../utils/formatMoney.js'
 
 const MATCH_LIMIT = 8
+const ROLE_LABEL_KEYS = {
+  ADMIN: 'admin.members.role.option.admin',
+  CUSTOMER: 'admin.members.role.option.customer',
+  STAFF: 'admin.members.role.option.staff',
+}
 
 function messageText(message, t) {
   return message?.key ? t(message.key, message.params) : message
+}
+
+function roleLabel(value, t) {
+  return ROLE_LABEL_KEYS[value] ? t(ROLE_LABEL_KEYS[value]) : value || ''
 }
 
 function isValidUserId(value) {
@@ -119,7 +128,7 @@ function WalletPage() {
                     <button onClick={() => selectMember(member)} type="button">
                       <strong>{member.full_name || '—'}</strong>
                       <span>{[member.email, member.phone].filter(Boolean).join(' · ')}</span>
-                      <small>#{member.user_id}{member.role !== 'CUSTOMER' ? ` · ${member.role.toLowerCase()}` : ''}{member.status !== 'ACTIVE' ? ` · ${t('admin.status.inactive')}` : ''}</small>
+                      <small>#{member.user_id}{member.role !== 'CUSTOMER' ? ` · ${roleLabel(member.role, t)}` : ''}{member.status !== 'ACTIVE' ? ` · ${t('admin.status.inactive')}` : ''}</small>
                     </button>
                   </li>
                 ))}

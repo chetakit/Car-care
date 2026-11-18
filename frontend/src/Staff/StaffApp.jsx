@@ -11,6 +11,7 @@ import StaffBookingDetailPage from './pages/StaffBookingDetailPage.jsx'
 import StaffHistoryPage from './pages/StaffHistoryPage.jsx'
 import StaffQueuePage from './pages/StaffQueuePage.jsx'
 import { StaffLink } from './components/StaffUi.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import LanguageToggle from '../i18n/LanguageToggle.jsx'
 import './styles/staff.css'
 
@@ -29,6 +30,7 @@ function readLocation() {
 }
 
 export default function StaffApp({ user, onLogout }) {
+  const { t } = useLanguage()
   const [location, setLocation] = useState(readLocation)
 
   useEffect(() => {
@@ -65,22 +67,22 @@ export default function StaffApp({ user, onLogout }) {
           </span>
           <div>
             <strong>Car Care</strong>
-            <small>Staff &amp; Service</small>
+            <small>{t('staff.shell.tagline')}</small>
           </div>
         </div>
         <nav>
           <StaffLink className={!isHistory ? 'active' : ''} navigate={navigate} to="/staff">
-            คิวงาน
+            {t('staff.nav.queue')}
           </StaffLink>
           <StaffLink className={isHistory ? 'active' : ''} navigate={navigate} to="/staff/history">
-            ประวัติการให้บริการ
+            {t('staff.nav.history')}
           </StaffLink>
           <LanguageToggle />
         </nav>
         <div className="staff-user">
           <span className="staff-avatar">{user?.full_name?.[0] ?? 'S'}</span>
           <span className="staff-user-name">{user?.full_name}</span>
-          <button className="staff-link-btn" onClick={onLogout} type="button">ออกจากระบบ</button>
+          <button className="staff-link-btn" onClick={onLogout} type="button">{t('staff.nav.signOut')}</button>
         </div>
       </header>
       <main className="staff-container">{page}</main>

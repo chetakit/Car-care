@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
+const ROLE_LABEL_KEYS = {
+  ADMIN: 'admin.members.role.option.admin',
+  CUSTOMER: 'admin.members.role.option.customer',
+  STAFF: 'admin.members.role.option.staff',
+}
+
 function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const accountRef = useRef(null)
   const triggerRef = useRef(null)
   const isWorkspace = variant === 'workspace'
-  const displayName = user?.full_name?.trim() || user?.email || 'Administrator'
+  const displayName = user?.full_name?.trim() || user?.email || t('admin.account.fallbackName')
+  const roleLabel = ROLE_LABEL_KEYS[user?.role]
+    ? t(ROLE_LABEL_KEYS[user.role])
+    : user?.role || t('admin.account.fallbackRole')
   const initials = displayName.slice(0, 1).toUpperCase()
   const menuId = isWorkspace ? 'admin-user-dropdown' : 'customer-account-menu'
 
@@ -57,7 +66,7 @@ function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
           {isWorkspace ? (
             <>
               <strong>{displayName}</strong>
-              <small>{user?.role || t('admin.account.fallbackRole')}</small>
+              <small>{roleLabel}</small>
             </>
           ) : (
             displayName
@@ -78,10 +87,10 @@ function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
         id={menuId}
       >
         <a href="/" onClick={closeMenu}>
-          {isWorkspace ? t('customer.common.home') : 'Home'}
+          {t('customer.common.home')}
         </a>
         <a href="/admin/dashboard" onClick={closeMenu}>
-          {isWorkspace ? t('admin.account.manage') : 'Admin Manage'}
+          {t('admin.account.manage')}
         </a>
         <button
           onClick={() => {
@@ -90,7 +99,7 @@ function AdminAccountMenu({ user, onLogout, variant = 'workspace' }) {
           }}
           type="button"
         >
-          {isWorkspace ? t('customer.header.signOut') : 'Logout'}
+          {t('customer.header.signOut')}
         </button>
       </div>
     </div>

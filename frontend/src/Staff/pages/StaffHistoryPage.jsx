@@ -4,11 +4,13 @@ import useApi from '../../Admin/hooks/useApi.js'
 import { listStaffBookings } from '../api/staffBookingApi.js'
 import { LoadState, StaffLink, StatusBadge } from '../components/StaffUi.jsx'
 import useStaffRequest from '../hooks/useStaffRequest.js'
-import { STATUS_LABEL, formatMoney, formatShortDate, plateText } from '../utils/staffFormat.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
+import { STATUS_KEYS, formatMoney, formatShortDate, plateText } from '../utils/staffFormat.js'
 
 const PAGE_SIZE = 20
 
 export default function StaffHistoryPage({ navigate }) {
+  const { language, t } = useLanguage()
   const api = useApi()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -50,35 +52,36 @@ export default function StaffHistoryPage({ navigate }) {
     <>
       <div className="staff-page-head">
         <div>
-          <span className="staff-eyebrow">Staff · Service History</span>
-          <h1>ประวัติการให้บริการ</h1>
-          <p className="staff-muted">ค้นหาตามลูกค้า ทะเบียนรถ ช่วงวันที่ หรือสถานะ</p>
+          <span className="staff-eyebrow">{t('staff.history.eyebrow')}</span>
+          <h1>{t('staff.history.title')}</h1>
+          <p className="staff-muted">{t('staff.history.description')}</p>
         </div>
       </div>
 
       <div className="staff-filters">
         <input
           className="staff-search"
+          aria-label={t('staff.history.search')}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="ชื่อ / เบอร์ / ทะเบียน / เลขที่จอง"
+          placeholder={t('staff.history.searchPlaceholder')}
           value={search}
         />
-        <select onChange={resetPage(setStatus)} value={status}>
-          <option value="">ทุกสถานะ</option>
-          {Object.entries(STATUS_LABEL).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+        <select aria-label={t('staff.history.statusFilter')} onChange={resetPage(setStatus)} value={status}>
+          <option value="">{t('staff.history.allStatuses')}</option>
+          {STATUS_KEYS.map((value) => (
+            <option key={value} value={value}>{t(`staff.status.${value}`)}</option>
           ))}
         </select>
-        <label className="staff-inline">ตั้งแต่ <input onChange={resetPage(setFrom)} type="date" value={from} /></label>
-        <label className="staff-inline">ถึง <input onChange={resetPage(setTo)} type="date" value={to} /></label>
+        <label className="staff-inline">{t('staff.history.from')} <input onChange={resetPage(setFrom)} type="date" value={from} /></label>
+        <label className="staff-inline">{t('staff.history.to')} <input onChange={resetPage(setTo)} type="date" value={to} /></label>
       </div>
 
       {rangeInvalid ? (
-        <div className="staff-alert">วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด</div>
+        <div className="staff-alert">{t('staff.history.invalidDateRange')}</div>
       ) : (
         <LoadState
           empty={!loading && !error && rows.length === 0}
-          emptyText="ไม่พบข้อมูล"
+          emptyText={t('staff.history.empty')}
           error={error}
           loading={loading && !data}
           onRetry={reload}
@@ -90,15 +93,15 @@ export default function StaffHistoryPage({ navigate }) {
           <table className="staff-table">
             <thead>
               <tr>
-                <th>วันที่</th><th>เลขที่</th><th>ลูกค้า</th><th>รถ</th>
-                <th>บริการ</th><th className="r">ยอด</th><th>สถานะ</th>
+                <th>{t('staff.history.table.date')}</th><th>{t('staff.history.table.booking')}</th><th>{t('staff.history.table.customer')}</th><th>{t('staff.history.table.vehicle')}</th>
+                <th>{t('staff.history.table.services')}</th><th className="r">{t('staff.history.table.amount')}</th><th>{t('staff.history.table.status')}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((b) => (
                 <tr key={b.booking_id}>
                   <td className="nowrap">
-                    {formatShortDate(b.booking_date)}<br />
+                    {formatShortDate(b.booking_date, language)}<br />
                     <span className="staff-muted staff-small">{b.start_time}</span>
                   </td>
                   <td>
@@ -110,7 +113,7 @@ export default function StaffHistoryPage({ navigate }) {
                     <span className="staff-muted staff-small">{[b.brand_name, b.model_name].filter(Boolean).join(' ')}</span>
                   </td>
                   <td className="staff-small">{b.service_names.join(', ')}</td>
-                  <td className="r nowrap">{formatMoney(b.final_amount)}</td>
+                  <td className="r nowrap">{formatMoney(b.final_amount, language)}</td>
                   <td><StatusBadge status={b.booking_status} /></td>
                 </tr>
               ))}
@@ -121,16 +124,16 @@ export default function StaffHistoryPage({ navigate }) {
 
       {pagination && pagination.totalPages > 1 && (
         <div className="staff-pagination">
-          <span className="staff-muted">หน้า {pagination.page} / {pagination.totalPages} · {pagination.total} รายการ</span>
+          <span className="staff-muted">{t('staff.history.pagination', { page: pagination.page, totalPages: pagination.totalPages, total: pagination.total })}</span>
           <div>
-            <button className="staff-btn" disabled={page <= 1} onClick={() => setPage(page - 1)} type="button">ก่อนหน้า</button>
+            <button className="staff-btn" disabled={page <= 1} onClick={() => setPage(page - 1)} type="button">{t('staff.history.previous')}</button>
             <button
               className="staff-btn"
               disabled={page >= pagination.totalPages}
               onClick={() => setPage(page + 1)}
               type="button"
             >
-              ถัดไป
+              {t('staff.history.next')}
             </button>
           </div>
         </div>

@@ -8,8 +8,9 @@ import useApi from '../../Admin/hooks/useApi.js'
 import { listStaffBookings } from '../api/staffBookingApi.js'
 import useStaffRequest from '../hooks/useStaffRequest.js'
 import { toDateKey, todayKey } from '../utils/staffFormat.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 
-const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const PAGE_LIMIT = 200 // ค่าสูงสุดที่ backend ยอม
 const MAX_PAGES = 10 // กันวนไม่จบ (2,000 การจอง/เดือน)
 
@@ -65,6 +66,7 @@ function buildDays(monthKey) {
 }
 
 export default function StaffCalendar({ value, onChange, refreshKey = 0 }) {
+  const { language, t } = useLanguage()
   const api = useApi()
   const [month, setMonth] = useState(value.slice(0, 7))
   const { data: counts } = useStaffRequest(`cal-${month}-${refreshKey}`, (signal) =>
@@ -72,23 +74,26 @@ export default function StaffCalendar({ value, onChange, refreshKey = 0 }) {
   )
 
   const today = todayKey()
-  const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
+  const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString(
+    language === 'TH' ? 'th-TH' : 'en-US',
+    { month: 'long', year: 'numeric' },
+  )
   const monthTotal = Object.entries(counts ?? {})
     .filter(([key]) => key.startsWith(month))
     .reduce((sum, [, c]) => sum + c.total, 0)
 
   return (
-    <section aria-label="ปฏิทินการจอง" className="staff-calendar">
+    <section aria-label={t('staff.calendar.ariaLabel')} className="staff-calendar">
       <div className="staff-cal-head">
         <strong>{monthLabel}</strong>
         <div className="staff-cal-nav">
-          <button aria-label="เดือนก่อน" onClick={() => setMonth(shiftMonth(month, -1))} type="button">‹</button>
-          <button aria-label="เดือนถัดไป" onClick={() => setMonth(shiftMonth(month, 1))} type="button">›</button>
+          <button aria-label={t('staff.calendar.previousMonth')} onClick={() => setMonth(shiftMonth(month, -1))} type="button">‹</button>
+          <button aria-label={t('staff.calendar.nextMonth')} onClick={() => setMonth(shiftMonth(month, 1))} type="button">›</button>
         </div>
       </div>
 
       <div className="staff-cal-grid">
-        {WEEKDAYS.map((d) => <div className="staff-cal-dow" key={d}>{d}</div>)}
+        {WEEKDAY_KEYS.map((day) => <div className="staff-cal-dow" key={day}>{t(`staff.calendar.weekday.${day}`)}</div>)}
         {buildDays(month).map(({ key, day, inMonth }) => {
           const c = counts?.[key]
           const classes = [
@@ -100,11 +105,13 @@ export default function StaffCalendar({ value, onChange, refreshKey = 0 }) {
           ].filter(Boolean).join(' ')
           return (
             <button
-              aria-label={`${key}${c ? ` มี ${c.total} การจอง` : ''}`}
+              aria-label={c
+                ? t('staff.calendar.dayWithBookings', { date: key, count: c.total })
+                : t('staff.calendar.day', { date: key })}
               className={classes}
               key={key}
               onClick={() => onChange(key)}
-              title={c ? `${c.total} การจอง` : ''}
+              title={c ? t('staff.calendar.bookingCount', { count: c.total }) : ''}
               type="button"
             >
               {c && <span className="staff-cal-count">{c.total}</span>}
@@ -120,12 +127,14 @@ export default function StaffCalendar({ value, onChange, refreshKey = 0 }) {
       </div>
 
       <div className="staff-cal-legend">
-        <span><i className="staff-cal-dot waiting" /> รอรับรถ</span>
-        <span><i className="staff-cal-dot working" /> อยู่ในร้าน</span>
-        <span><i className="staff-cal-dot done" /> จบงานแล้ว</span>
+        <span><i className="staff-cal-dot waiting" /> {t('staff.calendar.legend.waiting')}</span>
+        <span><i className="staff-cal-dot working" /> {t('staff.calendar.legend.working')}</span>
+        <span><i className="staff-cal-dot done" /> {t('staff.calendar.legend.done')}</span>
       </div>
       <div className="staff-cal-month-total">
-        {counts ? `เดือนนี้มีการจองทั้งหมด ${monthTotal} รายการ` : 'กำลังโหลดปฏิทิน…'}
+        {counts
+          ? t('staff.calendar.monthTotal', { count: monthTotal })
+          : t('staff.calendar.loading')}
       </div>
     </section>
   )

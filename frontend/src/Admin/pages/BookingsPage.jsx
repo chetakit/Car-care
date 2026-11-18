@@ -12,6 +12,12 @@ import { useLanguage } from '../../i18n/LanguageContext.jsx'
 const REFUNDS_PAGE_SIZE = 100
 const MAX_BOOKING_ID = 2147483647
 const BOOKING_STATUSES = ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
+const PAYMENT_METHOD_LABEL_KEYS = {
+  BANK_TRANSFER: 'admin.payments.method.bankTransfer',
+  CASH: 'admin.payments.method.cash',
+  SIMULATED: 'admin.payments.method.simulated',
+  WALLET: 'admin.payments.method.wallet',
+}
 
 function isValidBookingId(value) {
   const id = String(value ?? '')
@@ -26,6 +32,10 @@ function getInitialBookingStatus() {
 function formatTime(value) {
   if (!value) return ''
   return String(value).slice(0, 5)
+}
+
+function paymentMethodLabel(value, t) {
+  return PAYMENT_METHOD_LABEL_KEYS[value] ? t(PAYMENT_METHOD_LABEL_KEYS[value]) : value || '—'
 }
 
 function scheduleSummary(date, startTime, endTime, language) {
@@ -475,7 +485,7 @@ function BookingsPage({ onNavigate }) {
                   <dl className="admin-booking-detail-grid">
                     <div><dt>{t('admin.bookings.detail.paymentId')}</dt><dd>{payment.payment_id}</dd></div>
                     <div><dt>{t('admin.bookings.detail.amount')}</dt><dd>{formatMoney(payment.amount, language)}</dd></div>
-                    <div><dt>{t('admin.bookings.detail.method')}</dt><dd>{payment.payment_method || '—'}</dd></div>
+                    <div><dt>{t('admin.bookings.detail.method')}</dt><dd>{paymentMethodLabel(payment.payment_method, t)}</dd></div>
                     <div><dt>{t('admin.bookings.detail.status')}</dt><dd><PaymentStatusBadge payment={payment} /></dd></div>
                     <div><dt>{t('admin.bookings.detail.paidAt')}</dt><dd>{formatDateTime(payment.paid_at, language)}</dd></div>
                     <div className="admin-booking-detail-wide"><dt>{t('admin.bookings.detail.transactionReference')}</dt><dd>{payment.transaction_ref || '—'}</dd></div>

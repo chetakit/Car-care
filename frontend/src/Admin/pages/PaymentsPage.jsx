@@ -8,6 +8,12 @@ import formatMoney from '../utils/formatMoney.js'
 
 const MAX_BOOKING_ID = 2147483647
 const TERMINAL_BOOKING_STATUSES = new Set(['CANCELLED', 'NO_SHOW'])
+const PAYMENT_METHOD_LABEL_KEYS = {
+  BANK_TRANSFER: 'admin.payments.method.bankTransfer',
+  CASH: 'admin.payments.method.cash',
+  SIMULATED: 'admin.payments.method.simulated',
+  WALLET: 'admin.payments.method.wallet',
+}
 
 // A failed attempt on a booking that still awaits payment can be retried.
 function isRetryableFailure(booking, payment) {
@@ -108,7 +114,7 @@ function PaymentQueue({ onOpen, selectedId }) {
             },
             { key: 'full_name', label: t('admin.payments.table.customer'), render: (row) => row.full_name || '—' },
             { key: 'final_amount', label: t('admin.payments.table.amount'), render: (row) => formatMoney(row.final_amount, language) },
-            { key: 'payment_method', label: t('admin.payments.table.method'), render: (row) => row.payment_method === 'SIMULATED' ? t('admin.payment.online') : formatMethod(row.payment_method) },
+            { key: 'payment_method', label: t('admin.payments.table.method'), render: (row) => row.payment_method === 'SIMULATED' ? t('admin.payment.online') : formatMethod(row.payment_method, t) },
             { key: 'booking_status', label: t('admin.payments.table.bookingStatus'), render: (row) => <StatusBadge value={row.booking_status} /> },
           ]}
           rowKey={(row) => row.booking_id}
@@ -120,8 +126,8 @@ function PaymentQueue({ onOpen, selectedId }) {
   )
 }
 
-function formatMethod(value) {
-  return value ? value.charAt(0) + value.slice(1).toLowerCase().replace('_', ' ') : '—'
+function formatMethod(value, t) {
+  return PAYMENT_METHOD_LABEL_KEYS[value] ? t(PAYMENT_METHOD_LABEL_KEYS[value]) : value || '—'
 }
 
 function PaymentsPage() {
@@ -373,7 +379,7 @@ function PaymentsPage() {
                 <div><dt>{t('admin.payments.detail.bookingId')}</dt><dd>{payment.booking_id ?? booking.booking_id}</dd></div>
                 <div><dt>{t('admin.payments.detail.paymentId')}</dt><dd>{payment.payment_id}</dd></div>
                 <div><dt>{t('admin.payments.detail.amount')}</dt><dd>{formatMoney(payment.amount, language)}</dd></div>
-                <div><dt>{t('admin.payments.detail.method')}</dt><dd>{payment.payment_method ?? '—'}</dd></div>
+                <div><dt>{t('admin.payments.detail.method')}</dt><dd>{formatMethod(payment.payment_method, t)}</dd></div>
                 <div><dt>{t('admin.payments.detail.status')}</dt><dd><PaymentStatusBadge payment={payment} /></dd></div>
                 <div><dt>{t('admin.payments.detail.paidAt')}</dt><dd>{formatDateTime(payment.paid_at, language)}</dd></div>
                 <div className="admin-payment-reference"><dt>{t('admin.payments.detail.reference')}</dt><dd>{payment.transaction_ref || '—'}</dd></div>

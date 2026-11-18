@@ -1,6 +1,31 @@
+import messages from '../../i18n/messages.js'
+
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 ).replace(/\/+$/, '')
+const LANGUAGE_STORAGE_KEY = 'car-care-language'
+
+// The API client runs outside React, so it reads the preference persisted by LanguageProvider.
+function getSelectedLanguage() {
+  if (typeof window === 'undefined') return 'TH'
+
+  try {
+    return window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'EN' ? 'EN' : 'TH'
+  } catch {
+    return 'TH'
+  }
+}
+
+function formatFrontendError(key, params = {}) {
+  const message = messages[getSelectedLanguage()]?.[key]
+  if (typeof message !== 'string') {
+    throw new Error(`Missing frontend error translation "${key}".`)
+  }
+
+  return message.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder, name) =>
+    Object.hasOwn(params, name) ? String(params[name]) : placeholder,
+  )
+}
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
@@ -30,7 +55,7 @@ export async function apiRequest(
   } catch (error) {
     if (error.name === 'AbortError') throw error
     throw new ApiError(
-      `Could not connect to the backend at ${API_BASE_URL}. Check that the API is running and that VITE_API_BASE_URL is correct.`,
+      formatFrontendError('api.error.connection', { baseUrl: API_BASE_URL }),
       0,
     )
   }
@@ -40,14 +65,18 @@ export async function apiRequest(
     payload = await response.json()
   } catch {
     if (response.status !== 204) {
-      throw new ApiError('The backend returned an invalid response.', response.status)
+      throw new ApiError(
+        formatFrontendError('api.error.invalidResponse'),
+        response.status,
+      )
     }
   }
 
   if (!response.ok) {
     if (response.status === 401) onUnauthorized?.()
     throw new ApiError(
-      payload?.message || `Request failed with status ${response.status}.`,
+      payload?.message ||
+        formatFrontendError('api.error.requestFailed', { status: response.status }),
       response.status,
       payload,
     )

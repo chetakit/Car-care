@@ -1,32 +1,19 @@
-// [STAFF] ข้อความภาษาไทย + ตัวช่วยจัดรูปแบบ สำหรับหน้าพนักงาน
+export const STATUS_KEYS = [
+  'PENDING_PAYMENT',
+  'CONFIRMED',
+  'CHECKED_IN',
+  'IN_SERVICE',
+  'COMPLETED',
+  'NO_SHOW',
+  'CANCELLED',
+]
 
-// ต้องตรงกับ bookings.booking_status ใน database
-export const STATUS_LABEL = {
-  PENDING_PAYMENT: 'รอชำระเงิน',
-  CONFIRMED: 'รอรับรถ',
-  CHECKED_IN: 'รับรถแล้ว',
-  IN_SERVICE: 'กำลังให้บริการ',
-  COMPLETED: 'บริการเสร็จสิ้น',
-  NO_SHOW: 'ไม่มาตามนัด',
-  CANCELLED: 'ลูกค้ายกเลิก',
-}
+export const FUEL_LEVEL_KEYS = ['EMPTY', 'QUARTER', 'HALF', 'THREE_QUARTER', 'FULL']
 
-// ต้องตรงกับ ENUM vehicle_check_ins.fuel_level
-export const FUEL_LABEL = {
-  EMPTY: 'E (หมด)',
-  QUARTER: '1/4',
-  HALF: '1/2',
-  THREE_QUARTER: '3/4',
-  FULL: 'เต็มถัง',
-}
-
-export const PAYMENT_LABEL = {
-  PENDING: 'รอชำระ',
-  PAID: 'ชำระแล้ว',
-  FAILED: 'ชำระไม่สำเร็จ',
-}
+export const PAYMENT_STATUS_KEYS = ['PENDING', 'PAID', 'FAILED']
 
 const pad = (n) => String(n).padStart(2, '0')
+const localeFor = (language) => (language === 'TH' ? 'th-TH' : 'en-US')
 
 export function toDateKey(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
@@ -40,9 +27,9 @@ export function shiftDays(key, days) {
   return toDateKey(date)
 }
 
-export function formatThaiDate(key) {
+export function formatDate(key, language = 'TH') {
   if (!key) return '—'
-  return new Date(`${key}T00:00:00`).toLocaleDateString('th-TH', {
+  return new Date(`${key}T00:00:00`).toLocaleDateString(localeFor(language), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -50,18 +37,18 @@ export function formatThaiDate(key) {
   })
 }
 
-export function formatShortDate(key) {
+export function formatShortDate(key, language = 'TH') {
   if (!key) return '—'
-  return new Date(`${key}T00:00:00`).toLocaleDateString('th-TH', {
+  return new Date(`${key}T00:00:00`).toLocaleDateString(localeFor(language), {
     day: 'numeric',
     month: 'short',
     year: '2-digit',
   })
 }
 
-export function formatDateTime(value) {
+export function formatDateTime(value, language = 'TH') {
   if (!value) return '—'
-  return new Date(value).toLocaleString('th-TH', {
+  return new Date(value).toLocaleString(localeFor(language), {
     day: 'numeric',
     month: 'short',
     year: '2-digit',
@@ -70,8 +57,8 @@ export function formatDateTime(value) {
   })
 }
 
-export function formatMoney(value) {
-  return `${Number(value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} ฿`
+export function formatMoney(value, language = 'TH') {
+  return `${Number(value ?? 0).toLocaleString(localeFor(language), { maximumFractionDigits: 2 })} ฿`
 }
 
 export function vehicleName(vehicle) {

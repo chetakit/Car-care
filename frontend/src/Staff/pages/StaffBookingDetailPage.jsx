@@ -14,19 +14,21 @@ import {
 } from '../api/staffBookingApi.js'
 import { LoadState, StaffLink, StaffModal, StatusBadge } from '../components/StaffUi.jsx'
 import useStaffRequest from '../hooks/useStaffRequest.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import {
-  FUEL_LABEL,
-  PAYMENT_LABEL,
-  STATUS_LABEL,
+  FUEL_LEVEL_KEYS,
+  PAYMENT_STATUS_KEYS,
+  STATUS_KEYS,
   formatDateTime,
   formatMoney,
   formatShortDate,
-  formatThaiDate,
+  formatDate,
   plateText,
   vehicleName,
 } from '../utils/staffFormat.js'
 
 export default function StaffBookingDetailPage({ bookingId, navigate }) {
+  const { language, t } = useLanguage()
   const api = useApi()
   const { data, setData, loading, error, reload } = useStaffRequest(bookingId, (signal) =>
     getStaffBooking(api, bookingId, signal),
@@ -42,7 +44,7 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
   if (!data) {
     return (
       <>
-        <StaffLink className="staff-back" navigate={navigate} to="/staff">‹ กลับไปคิวงาน</StaffLink>
+        <StaffLink className="staff-back" navigate={navigate} to="/staff">‹ {t('staff.detail.backToQueue')}</StaffLink>
         <LoadState error={error} loading={loading} onRetry={reload} />
       </>
     )
@@ -50,6 +52,11 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
 
   const { booking, customer, vehicle, services, payment, check_in: checkIn } = data
   const status = booking.booking_status
+  const paymentStatusLabel = payment
+    ? PAYMENT_STATUS_KEYS.includes(payment.payment_status)
+      ? t(`staff.paymentStatus.${payment.payment_status}`)
+      : payment.payment_status
+    : t('staff.payment.none')
   const nextStatuses = data.allowed_next_statuses ?? []
   const pastVisits = (vehicleBookings?.items ?? []).filter((b) => b.booking_id !== booking.booking_id)
   const totalMinutes = services.reduce((sum, s) => sum + Number(s.duration_minutes ?? 0), 0)
@@ -82,141 +89,145 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
   return (
     <>
       <StaffLink className="staff-back" navigate={navigate} to={`/staff?date=${booking.booking_date}`}>
-        ‹ กลับไปคิวงาน
+        ‹ {t('staff.detail.backToQueue')}
       </StaffLink>
 
       <div className="staff-page-head">
         <div>
-          <span className="staff-eyebrow">Staff · Booking Detail</span>
-          <h1>การจอง #{booking.booking_id} <StatusBadge status={status} /></h1>
+          <span className="staff-eyebrow">{t('staff.detail.eyebrow')}</span>
+          <h1>{t('staff.detail.title', { id: booking.booking_id })} <StatusBadge status={status} /></h1>
           <p className="staff-muted">
-            นัดหมาย {formatThaiDate(booking.booking_date)} เวลา {booking.start_time}–{booking.end_time} น.
+            {t('staff.detail.appointment', {
+              date: formatDate(booking.booking_date, language),
+              start: booking.start_time,
+              end: booking.end_time,
+            })}
           </p>
         </div>
         <div className="staff-actions">
           {status === 'CONFIRMED' && (
             <>
               <button className="staff-btn primary" onClick={() => setModal('checkin')} type="button">
-                รับรถเข้าร้าน
+                {t('staff.detail.checkIn')}
               </button>
               <button
                 className="staff-btn danger-outline"
                 disabled={!booking.appointment_started}
                 onClick={() => setModal('noshow')}
-                title={booking.appointment_started ? '' : 'บันทึกได้หลังเลยเวลานัด'}
+                title={booking.appointment_started ? '' : t('staff.detail.noShowDisabled')}
                 type="button"
               >
-                ลูกค้าไม่มา (No-show)
+                {t('staff.detail.noShow')}
               </button>
             </>
           )}
           {nextStatuses.length > 0 && (
             <button className="staff-btn primary" onClick={() => setModal('status')} type="button">
-              เปลี่ยนสถานะ
+              {t('staff.detail.changeStatus')}
             </button>
           )}
         </div>
       </div>
 
       {status === 'CANCELLED' && (
-        <div className="staff-alert">การจองนี้ถูกยกเลิกโดยลูกค้า — พนักงานดูข้อมูลได้อย่างเดียว</div>
+        <div className="staff-alert">{t('staff.detail.cancelledNotice')}</div>
       )}
 
       <div className="staff-grid">
         <section className="staff-card">
-          <h2>ข้อมูลลูกค้า</h2>
+          <h2>{t('staff.detail.customer')}</h2>
           <dl>
-            <dt>ชื่อ</dt><dd>{customer.full_name}</dd>
-            <dt>โทร</dt><dd>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : '—'}</dd>
-            <dt>อีเมล</dt><dd>{customer.email}</dd>
+            <dt>{t('staff.detail.name')}</dt><dd>{customer.full_name}</dd>
+            <dt>{t('staff.detail.phone')}</dt><dd>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : '—'}</dd>
+            <dt>{t('staff.detail.email')}</dt><dd>{customer.email}</dd>
           </dl>
         </section>
 
         <section className="staff-card">
-          <h2>ข้อมูลรถยนต์</h2>
+          <h2>{t('staff.detail.vehicle')}</h2>
           <div className="staff-plate">{plateText(vehicle)}</div>
           <dl>
-            <dt>ยี่ห้อ/รุ่น</dt><dd>{vehicleName(vehicle)}</dd>
-            <dt>ประเภท</dt><dd>{vehicle.type_name ?? '—'}</dd>
-            <dt>ปี</dt><dd>{vehicle.production_year ?? '—'}</dd>
-            <dt>สี</dt><dd>{vehicle.color ?? '—'}</dd>
+            <dt>{t('staff.detail.makeModel')}</dt><dd>{vehicleName(vehicle)}</dd>
+            <dt>{t('staff.detail.type')}</dt><dd>{vehicle.type_name ?? '—'}</dd>
+            <dt>{t('staff.detail.year')}</dt><dd>{vehicle.production_year ?? '—'}</dd>
+            <dt>{t('staff.detail.color')}</dt><dd>{vehicle.color ?? '—'}</dd>
           </dl>
         </section>
 
         <section className="staff-card span-2">
-          <h2>รายการบริการที่จอง</h2>
+          <h2>{t('staff.detail.bookedServices')}</h2>
           <table className="staff-table">
             <thead>
-              <tr><th>บริการ</th><th className="r">เวลา</th><th className="r">ราคา</th></tr>
+              <tr><th>{t('staff.detail.service')}</th><th className="r">{t('staff.detail.duration')}</th><th className="r">{t('staff.detail.price')}</th></tr>
             </thead>
             <tbody>
               {services.map((s) => (
                 <tr key={s.booking_service_id}>
                   <td>{s.service_name}</td>
-                  <td className="r">{s.duration_minutes} นาที</td>
-                  <td className="r">{formatMoney(s.unit_price)}</td>
+                  <td className="r">{t('staff.unit.minutes', { count: s.duration_minutes })}</td>
+                  <td className="r">{formatMoney(s.unit_price, language)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               {booking.discount_amount > 0 && (
                 <tr className="staff-muted">
-                  <td>ส่วนลด</td><td /><td className="r">−{formatMoney(booking.discount_amount)}</td>
+                  <td>{t('staff.detail.discount')}</td><td /><td className="r">−{formatMoney(booking.discount_amount, language)}</td>
                 </tr>
               )}
               <tr>
-                <td>รวม</td>
-                <td className="r">{totalMinutes} นาที</td>
-                <td className="r">{formatMoney(booking.final_amount)}</td>
+                <td>{t('staff.detail.total')}</td>
+                <td className="r">{t('staff.unit.minutes', { count: totalMinutes })}</td>
+                <td className="r">{formatMoney(booking.final_amount, language)}</td>
               </tr>
             </tfoot>
           </table>
           <p className="staff-muted staff-small">
-            การชำระเงิน: {payment ? PAYMENT_LABEL[payment.payment_status] ?? payment.payment_status : 'ยังไม่มีรายการชำระ'}
-            {payment?.payment_method === 'SIMULATED' && ' (จำลอง — ไม่ใช่การชำระเงินจริง)'}
+            {t('staff.detail.payment')}: {paymentStatusLabel}
+            {payment?.payment_method === 'SIMULATED' && ` (${t('staff.detail.simulatedPayment')})`}
           </p>
           {status === 'IN_SERVICE' && (
             <p className="staff-muted staff-small">
-              การจองจะเสร็จสิ้นได้เมื่อมีการชำระเต็มจำนวนและตรวจสอบการชำระเงินแล้ว
+              {t('staff.detail.completionRequirement')}
             </p>
           )}
           {!STAFF_MOCK && payment?.payment_status === 'PENDING' &&
             ['CASH', 'BANK_TRANSFER'].includes(payment.payment_method) &&
             ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'].includes(status) && (
               <button className="staff-btn" onClick={() => setModal('payment')} type="button">
-                ตรวจสอบและยืนยันการชำระเงิน
+                {t('staff.detail.verifyPayment')}
               </button>
             )}
           {booking.notes && (
-            <p className="staff-customer-note"><strong>หมายเหตุจากลูกค้า:</strong> {booking.notes}</p>
+            <p className="staff-customer-note"><strong>{t('staff.detail.customerNote')}</strong> {booking.notes}</p>
           )}
         </section>
 
         {checkIn && (
           <section className="staff-card span-2">
-            <h2>ข้อมูลการรับรถ</h2>
+            <h2>{t('staff.detail.checkInInfo')}</h2>
             <dl className="staff-dl-row">
-              <dt>เวลารับรถ</dt><dd>{formatDateTime(checkIn.checked_in_at)}</dd>
-              <dt>เลขไมล์</dt><dd>{Number(checkIn.mileage).toLocaleString()} กม.</dd>
-              <dt>น้ำมัน</dt><dd>{FUEL_LABEL[checkIn.fuel_level] ?? checkIn.fuel_level}</dd>
-              <dt>ผู้รับรถ</dt><dd>{checkIn.checked_in_by_name ?? '—'}</dd>
-              <dt>สภาพรถ</dt><dd>{checkIn.condition_note || '—'}</dd>
+              <dt>{t('staff.detail.checkedInAt')}</dt><dd>{formatDateTime(checkIn.checked_in_at, language)}</dd>
+              <dt>{t('staff.detail.mileage')}</dt><dd>{t('staff.unit.kilometers', { count: Number(checkIn.mileage).toLocaleString(language === 'TH' ? 'th-TH' : 'en-US') })}</dd>
+              <dt>{t('staff.detail.fuel')}</dt><dd>{FUEL_LEVEL_KEYS.includes(checkIn.fuel_level) ? t(`staff.fuel.${checkIn.fuel_level}`) : checkIn.fuel_level}</dd>
+              <dt>{t('staff.detail.checkedInBy')}</dt><dd>{checkIn.checked_in_by_name ?? '—'}</dd>
+              <dt>{t('staff.detail.condition')}</dt><dd>{checkIn.condition_note || '—'}</dd>
             </dl>
           </section>
         )}
 
         <section className="staff-card span-2">
-          <h2>ไทม์ไลน์สถานะและหมายเหตุ</h2>
-          {timeline.length === 0 && <p className="staff-muted">ยังไม่มีประวัติ</p>}
+          <h2>{t('staff.detail.timeline')}</h2>
+          {timeline.length === 0 && <p className="staff-muted">{t('staff.detail.noTimeline')}</p>}
           <ol className="staff-timeline">
             {timeline.map((item) => (
               <li className={item.status ? `t-${item.status.toLowerCase()}` : 't-note'} key={item.key}>
                 <div className="staff-t-dot" />
                 <div>
                   <div className="staff-t-head">
-                    {item.status ? <StatusBadge status={item.status} /> : <span className="staff-chip">📝 หมายเหตุ</span>}
+                    {item.status ? <StatusBadge status={item.status} /> : <span className="staff-chip">📝 {t('staff.detail.note')}</span>}
                     <span className="staff-muted staff-small">
-                      {formatDateTime(item.at)} · โดย {item.by ?? 'ระบบ'}
+                      {formatDateTime(item.at, language)} · {t('staff.detail.by', { name: item.by ?? t('staff.detail.system') })}
                     </span>
                   </div>
                   {item.text && <p>{item.text}</p>}
@@ -230,15 +241,15 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
         </section>
 
         <section className="staff-card span-2">
-          <h2>ประวัติการให้บริการของรถคันนี้</h2>
+          <h2>{t('staff.detail.vehicleHistory')}</h2>
           {pastVisits.length === 0 ? (
-            <p className="staff-muted">ไม่มีประวัติอื่น</p>
+            <p className="staff-muted">{t('staff.detail.noOtherVisits')}</p>
           ) : (
             <ul className="staff-mini-list">
               {pastVisits.map((b) => (
                 <li key={b.booking_id}>
                   <StaffLink navigate={navigate} to={`/staff/bookings/${b.booking_id}`}>#{b.booking_id}</StaffLink>
-                  <span>{formatShortDate(b.booking_date)} {b.start_time}</span>
+                  <span>{formatShortDate(b.booking_date, language)} {b.start_time}</span>
                   <span className="staff-muted">{b.service_names.join(', ')}</span>
                   <StatusBadge status={b.booking_status} />
                 </li>
@@ -308,9 +319,10 @@ function useSubmit(onSubmit) {
 function PaymentVerificationModal({ amount, method, onClose, onSubmit }) {
   const [reference, setReference] = useState('')
   const { error, saving, submit } = useSubmit(onSubmit)
+  const { language, t } = useLanguage()
   const isTransfer = method === 'BANK_TRANSFER'
   return (
-    <StaffModal onClose={onClose} title="ยืนยันการชำระเงิน">
+    <StaffModal onClose={onClose} title={t('staff.payment.title')}>
       <form className="staff-form" onSubmit={(event) => {
         event.preventDefault()
         submit({
@@ -319,17 +331,17 @@ function PaymentVerificationModal({ amount, method, onClose, onSubmit }) {
           ...(isTransfer ? { transfer_reference: reference.trim() } : {}),
         })
       }}>
-        <p>การจองนี้มียอด {formatMoney(amount)} — {isTransfer ? 'ตรวจสอบยอดโอนและเลขอ้างอิงกับธนาคารก่อนยืนยัน' : 'ยืนยันว่าได้รับเงินสดครบจำนวนแล้ว'}</p>
+        <p>{t(isTransfer ? 'staff.payment.transferDescription' : 'staff.payment.cashDescription', { amount: formatMoney(amount, language) })}</p>
         {isTransfer && (
-          <label>เลขอ้างอิงการโอน *
+          <label>{t('staff.payment.reference')} *
             <input maxLength={128} onChange={(event) => setReference(event.target.value)} required value={reference} />
           </label>
         )}
         {error && <p className="staff-error" role="alert">{error}</p>}
         <div className="staff-modal-actions">
-          <button className="staff-btn ghost" onClick={onClose} type="button">ยกเลิก</button>
+          <button className="staff-btn ghost" onClick={onClose} type="button">{t('staff.common.cancel')}</button>
           <button className="staff-btn primary" disabled={saving || (isTransfer && !reference.trim())} type="submit">
-            {saving ? 'กำลังบันทึก…' : 'ยืนยัน'}
+            {saving ? t('staff.common.saving') : t('staff.common.confirm')}
           </button>
         </div>
       </form>
@@ -343,6 +355,7 @@ function NoteForm({ onSubmit }) {
     await onSubmit(text)
     setNote('')
   })
+  const { t } = useLanguage()
   return (
     <>
       <form
@@ -355,11 +368,11 @@ function NoteForm({ onSubmit }) {
         <input
           maxLength={1000}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="เพิ่มหมายเหตุ (ไม่เปลี่ยนสถานะ)…"
+          placeholder={t('staff.note.placeholder')}
           value={note}
         />
         <button className="staff-btn" disabled={!note.trim() || saving} type="submit">
-          {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+          {saving ? t('staff.common.saving') : t('staff.common.save')}
         </button>
       </form>
       {error && <p className="staff-error">{error}</p>}
@@ -369,14 +382,17 @@ function NoteForm({ onSubmit }) {
 
 function CheckInModal({ onClose, onSubmit }) {
   const [form, setForm] = useState({ mileage: '', fuel_level: 'HALF', condition_note: '', note: '' })
-  const { error, setError, saving, submit } = useSubmit(onSubmit)
+  const [validationErrorKey, setValidationErrorKey] = useState('')
+  const { error, saving, submit } = useSubmit(onSubmit)
+  const { t } = useLanguage()
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
   const handle = (e) => {
     e.preventDefault()
+    setValidationErrorKey('')
     const mileage = Number(form.mileage)
     if (form.mileage === '' || !Number.isInteger(mileage) || mileage < 0) {
-      setError('กรุณากรอกเลขไมล์เป็นจำนวนเต็ม')
+      setValidationErrorKey('staff.validation.mileage')
       return
     }
     submit({
@@ -388,29 +404,33 @@ function CheckInModal({ onClose, onSubmit }) {
   }
 
   return (
-    <StaffModal onClose={onClose} title="บันทึกการรับรถเข้าร้าน">
+    <StaffModal onClose={onClose} title={t('staff.checkIn.title')}>
       <form className="staff-form" onSubmit={handle}>
-        <label>เลขไมล์ (กม.) *
+        <label>{t('staff.checkIn.mileage')} *
           <input autoFocus min="0" onChange={set('mileage')} step="1" type="number" value={form.mileage} />
         </label>
-        <label>ระดับน้ำมัน
+        <label>{t('staff.checkIn.fuel')}
           <select onChange={set('fuel_level')} value={form.fuel_level}>
-            {Object.entries(FUEL_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+            {FUEL_LEVEL_KEYS.map((value) => (
+              <option key={value} value={value}>{t(`staff.fuel.${value}`)}</option>
             ))}
           </select>
         </label>
-        <label>สภาพรถก่อนรับ (รอย / ความเสียหาย / ของในรถ)
+        <label>{t('staff.checkIn.condition')}
           <textarea maxLength={1000} onChange={set('condition_note')} rows="3" value={form.condition_note} />
         </label>
-        <label>หมายเหตุ
-          <input maxLength={1000} onChange={set('note')} placeholder="รับรถเข้าร้าน" value={form.note} />
+        <label>{t('staff.checkIn.note')}
+          <input maxLength={1000} onChange={set('note')} placeholder={t('staff.checkIn.notePlaceholder')} value={form.note} />
         </label>
-        {error && <p className="staff-error">{error}</p>}
+        {(validationErrorKey || error) && (
+          <p className="staff-error" role="alert">
+            {validationErrorKey ? t(validationErrorKey) : error}
+          </p>
+        )}
         <div className="staff-modal-actions">
-          <button className="staff-btn ghost" onClick={onClose} type="button">ยกเลิก</button>
+          <button className="staff-btn ghost" onClick={onClose} type="button">{t('staff.common.cancel')}</button>
           <button className="staff-btn primary" disabled={saving} type="submit">
-            {saving ? 'กำลังบันทึก…' : 'ยืนยันรับรถ'}
+            {saving ? t('staff.common.saving') : t('staff.checkIn.confirm')}
           </button>
         </div>
       </form>
@@ -419,49 +439,62 @@ function CheckInModal({ onClose, onSubmit }) {
 }
 
 const QUICK_REASONS = {
-  IN_SERVICE: ['เริ่มดำเนินการ', 'ช่างเริ่มงานแล้ว'],
-  COMPLETED: ['ดำเนินการครบทุกรายการ', 'ตรวจสอบคุณภาพแล้ว พร้อมส่งมอบ'],
+  IN_SERVICE: [
+    { key: 'staff.statusReason.started', value: 'เริ่มดำเนินการ' },
+    { key: 'staff.statusReason.workStarted', value: 'ช่างเริ่มงานแล้ว' },
+  ],
+  COMPLETED: [
+    { key: 'staff.statusReason.allServicesDone', value: 'ดำเนินการครบทุกรายการ' },
+    { key: 'staff.statusReason.qualityChecked', value: 'ตรวจสอบคุณภาพแล้ว พร้อมส่งมอบ' },
+  ],
 }
 
 function StatusModal({ current, options, onClose, onSubmit }) {
   const [next, setNext] = useState(options[0])
   const [reason, setReason] = useState('')
-  const { error, setError, saving, submit } = useSubmit(onSubmit)
+  const [validationErrorKey, setValidationErrorKey] = useState('')
+  const { error, saving, submit } = useSubmit(onSubmit)
+  const { t } = useLanguage()
 
   const handle = (e) => {
     e.preventDefault()
+    setValidationErrorKey('')
     if (!reason.trim()) {
-      setError('กรุณาระบุหมายเหตุ/เหตุผลในการเปลี่ยนสถานะ')
+      setValidationErrorKey('staff.validation.statusReason')
       return
     }
     submit(next, reason.trim())
   }
 
   return (
-    <StaffModal onClose={onClose} title="เปลี่ยนสถานะการให้บริการ">
+    <StaffModal onClose={onClose} title={t('staff.statusChange.title')}>
       <form className="staff-form" onSubmit={handle}>
-        <p className="staff-muted">สถานะปัจจุบัน: <StatusBadge status={current} /></p>
+        <p className="staff-muted">{t('staff.statusChange.current')}: <StatusBadge status={current} /></p>
         <div className="staff-radio-group">
           {options.map((s) => (
             <label className={`staff-radio ${next === s ? 'checked' : ''}`} key={s}>
               <input checked={next === s} name="status" onChange={() => setNext(s)} type="radio" />
-              {STATUS_LABEL[s]}
+              {STATUS_KEYS.includes(s) ? t(`staff.status.${s}`) : s}
             </label>
           ))}
         </div>
-        <label>หมายเหตุ / เหตุผล *
+        <label>{t('staff.statusChange.reason')} *
           <textarea autoFocus maxLength={1000} onChange={(e) => setReason(e.target.value)} rows="3" value={reason} />
         </label>
         <div className="staff-chips">
-          {(QUICK_REASONS[next] ?? []).map((r) => (
-            <button className="staff-chip clickable" key={r} onClick={() => setReason(r)} type="button">{r}</button>
+          {(QUICK_REASONS[next] ?? []).map(({ key, value }) => (
+            <button className="staff-chip clickable" key={key} onClick={() => setReason(value)} type="button">{t(key)}</button>
           ))}
         </div>
-        {error && <p className="staff-error">{error}</p>}
+        {(validationErrorKey || error) && (
+          <p className="staff-error" role="alert">
+            {validationErrorKey ? t(validationErrorKey) : error}
+          </p>
+        )}
         <div className="staff-modal-actions">
-          <button className="staff-btn ghost" onClick={onClose} type="button">ยกเลิก</button>
+          <button className="staff-btn ghost" onClick={onClose} type="button">{t('staff.common.cancel')}</button>
           <button className="staff-btn primary" disabled={saving} type="submit">
-            {saving ? 'กำลังบันทึก…' : 'บันทึกสถานะ'}
+            {saving ? t('staff.common.saving') : t('staff.statusChange.save')}
           </button>
         </div>
       </form>
@@ -471,38 +504,45 @@ function StatusModal({ current, options, onClose, onSubmit }) {
 
 function NoShowModal({ onClose, onSubmit }) {
   const [reason, setReason] = useState('')
-  const { error, setError, saving, submit } = useSubmit(onSubmit)
+  const [validationErrorKey, setValidationErrorKey] = useState('')
+  const { error, saving, submit } = useSubmit(onSubmit)
+  const { t } = useLanguage()
 
   const handle = (e) => {
     e.preventDefault()
+    setValidationErrorKey('')
     if (!reason.trim()) {
-      setError('กรุณาระบุรายละเอียด เช่น การติดต่อลูกค้า')
+      setValidationErrorKey('staff.validation.noShowReason')
       return
     }
     submit(reason.trim())
   }
 
   return (
-    <StaffModal onClose={onClose} title="บันทึกลูกค้าไม่มาตามนัด (No-show)">
+    <StaffModal onClose={onClose} title={t('staff.noShow.title')}>
       <form className="staff-form" onSubmit={handle}>
-        <label>รายละเอียด / การติดต่อลูกค้า *
+        <label>{t('staff.noShow.details')} *
           <textarea
             autoFocus
             maxLength={1000}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="เช่น โทรติดต่อ 2 ครั้ง ไม่รับสาย"
+            placeholder={t('staff.noShow.placeholder')}
             rows="3"
             value={reason}
           />
         </label>
         <p className="staff-muted staff-small">
-          การบันทึก No-show ไม่ใช่การยกเลิกการจอง — พนักงานไม่มีสิทธิ์ยกเลิกแทนลูกค้า
+          {t('staff.noShow.disclaimer')}
         </p>
-        {error && <p className="staff-error">{error}</p>}
+        {(validationErrorKey || error) && (
+          <p className="staff-error" role="alert">
+            {validationErrorKey ? t(validationErrorKey) : error}
+          </p>
+        )}
         <div className="staff-modal-actions">
-          <button className="staff-btn ghost" onClick={onClose} type="button">ปิด</button>
+          <button className="staff-btn ghost" onClick={onClose} type="button">{t('staff.common.close')}</button>
           <button className="staff-btn danger" disabled={saving} type="submit">
-            {saving ? 'กำลังบันทึก…' : 'ยืนยัน No-show'}
+            {saving ? t('staff.common.saving') : t('staff.noShow.confirm')}
           </button>
         </div>
       </form>

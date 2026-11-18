@@ -13,6 +13,12 @@ const WALLET_TRANSACTION_PAGE_SIZE = 10
 const ROLE_OPTIONS = ['ADMIN', 'STAFF', 'CUSTOMER']
 const BLANK_MEMBER = { full_name: '', email: '', phone: '', password: '', role: 'STAFF' }
 const MIN_PASSWORD_LENGTH = 8
+const PAYMENT_METHOD_LABEL_KEYS = {
+  BANK_TRANSFER: 'admin.payments.method.bankTransfer',
+  CASH: 'admin.payments.method.cash',
+  SIMULATED: 'admin.payments.method.simulated',
+  WALLET: 'admin.payments.method.wallet',
+}
 
 function isValidUserId(value) {
   const id = String(value ?? '')
@@ -20,7 +26,11 @@ function isValidUserId(value) {
 }
 
 function messageText(message, t) {
-  return message?.key ? t(message.key, message.params) : message
+  if (!message?.key) return message
+  const params = message.params?.role === undefined
+    ? message.params
+    : { ...message.params, role: roleLabel(message.params.role, t) }
+  return t(message.key, params)
 }
 
 function vehicleLabel(vehicle, t) {
@@ -28,6 +38,16 @@ function vehicleLabel(vehicle, t) {
     [vehicle.brand_name, vehicle.model_name].filter(Boolean).join(' '),
     vehicle.license_plate,
   ].filter(Boolean).join(' · ') || t('admin.members.vehicle.detailsUnavailable')
+}
+
+function roleLabel(value, t) {
+  return ROLE_OPTIONS.includes(value)
+    ? t(`admin.members.role.option.${value.toLowerCase()}`)
+    : value ?? ''
+}
+
+function paymentMethodLabel(value, t) {
+  return PAYMENT_METHOD_LABEL_KEYS[value] ? t(PAYMENT_METHOD_LABEL_KEYS[value]) : value || '—'
 }
 
 function CustomersPage({ user, role = 'CUSTOMER' }) {
@@ -112,8 +132,8 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
     if (!window.confirm(
       t('admin.members.confirm.roleChange', {
         name,
-        oldRole: selectedRoleUser.role,
-        newRole,
+        oldRole: roleLabel(selectedRoleUser.role, t),
+        newRole: roleLabel(newRole, t),
       }),
     )) return
 
@@ -570,7 +590,7 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
                 <dl className="admin-customer-detail-grid">
                   <div><dt>{t('admin.members.details.fullName')}</dt><dd>{displayedCustomer.full_name || '—'}</dd></div>
                   <div><dt>{t('admin.members.details.accountStatus')}</dt><dd><StatusBadge value={displayedCustomer.status} /></dd></div>
-                  <div><dt>{t('admin.members.details.role')}</dt><dd>{displayedCustomer.role}</dd></div>
+                  <div><dt>{t('admin.members.details.role')}</dt><dd>{roleLabel(displayedCustomer.role, t)}</dd></div>
                   <div><dt>{t('admin.members.details.email')}</dt><dd>{displayedCustomer.email || '—'}</dd></div>
                   <div><dt>{t('admin.members.details.phone')}</dt><dd>{displayedCustomer.phone || '—'}</dd></div>
                   <div><dt>{t('admin.members.details.registered')}</dt><dd>{formatDateTime(displayedCustomer.created_at, language)}</dd></div>
@@ -642,7 +662,7 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
                                 {paymentInfo ? paymentInfo.error
                                   ? <span className="admin-customer-unavailable">{t('admin.members.bookings.unavailable')}: {messageText(paymentInfo.error, t)}</span>
                                   : paymentInfo.payment
-                                    ? <><StatusBadge value={paymentInfo.payment.payment_status} /> <span>{paymentInfo.payment.payment_method}</span></>
+                                    ? <><StatusBadge value={paymentInfo.payment.payment_status} /> <span>{paymentMethodLabel(paymentInfo.payment.payment_method, t)}</span></>
                                     : <span>{t('admin.members.bookings.notAvailable')}</span>
                                   : t('admin.members.bookings.paymentLoading')}
                               </dd>
@@ -715,7 +735,7 @@ function CustomersPage({ user, role = 'CUSTOMER' }) {
         <AdminModal
           description={t('admin.members.role.description', {
             name: selectedRoleUser.full_name || selectedRoleUser.email || `#${selectedRoleUser.user_id}`,
-            role: selectedRoleUser.role,
+            role: roleLabel(selectedRoleUser.role, t),
           })}
           error={roleChangeError}
           onClose={() => {

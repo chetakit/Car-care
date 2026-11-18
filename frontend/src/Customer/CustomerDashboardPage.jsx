@@ -127,7 +127,7 @@ function CustomerDashboardPage({ user, onLogout }) {
   }, [api, bookingReload])
 
   const firstName =
-    user?.full_name?.trim().split(/\s+/)[0] || (language === 'TH' ? 'คุณ' : 'there')
+    user?.full_name?.trim().split(/\s+/)[0] || t('customer.dashboard.greetingFallback')
 
   return (
     <div className="customer-home customer-dashboard">

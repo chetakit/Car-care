@@ -23,7 +23,8 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
   const isAdmin = user?.role === 'ADMIN'
   const displayName =
     user?.full_name?.trim() ||
-    (isAdmin ? user?.email || 'Administrator' : 'Customer')
+    user?.email ||
+    t(isAdmin ? 'admin.account.fallbackName' : 'customer.account.fallbackName')
   const initials = displayName.slice(0, 1).toUpperCase()
   const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
   const isPublicLanding = currentPath === '/'

@@ -5,17 +5,19 @@ import { listStaffBookings } from '../api/staffBookingApi.js'
 import StaffCalendar from '../components/StaffCalendar.jsx'
 import { LoadState, StaffLink, StatusBadge } from '../components/StaffUi.jsx'
 import useStaffRequest from '../hooks/useStaffRequest.js'
-import { formatThaiDate, plateText, shiftDays, todayKey } from '../utils/staffFormat.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
+import { formatDate, plateText, shiftDays, todayKey } from '../utils/staffFormat.js'
 
 const GROUPS = [
-  { key: 'all', label: 'ทั้งหมด', match: () => true },
-  { key: 'waiting', label: 'รอรับรถ', match: (s) => s === 'CONFIRMED' },
-  { key: 'working', label: 'อยู่ในร้าน', match: (s) => s === 'CHECKED_IN' || s === 'IN_SERVICE' },
-  { key: 'done', label: 'เสร็จแล้ว', match: (s) => s === 'COMPLETED' },
-  { key: 'noshow', label: 'ไม่มา', match: (s) => s === 'NO_SHOW' },
+  { key: 'all', labelKey: 'staff.queue.group.all', match: () => true },
+  { key: 'waiting', labelKey: 'staff.queue.group.waiting', match: (s) => s === 'CONFIRMED' },
+  { key: 'working', labelKey: 'staff.queue.group.working', match: (s) => s === 'CHECKED_IN' || s === 'IN_SERVICE' },
+  { key: 'done', labelKey: 'staff.queue.group.done', match: (s) => s === 'COMPLETED' },
+  { key: 'noshow', labelKey: 'staff.queue.group.noShow', match: (s) => s === 'NO_SHOW' },
 ]
 
 export default function StaffQueuePage({ date: dateParam, navigate }) {
+  const { language, t } = useLanguage()
   const api = useApi()
   const date = dateParam || todayKey()
   const [group, setGroup] = useState('all')
@@ -41,24 +43,25 @@ export default function StaffQueuePage({ date: dateParam, navigate }) {
     <>
       <div className="staff-page-head">
         <div>
-          <span className="staff-eyebrow">Staff · Service Queue</span>
-          <h1>คิวงาน</h1>
-          <p className="staff-muted">{formatThaiDate(date)}</p>
+          <span className="staff-eyebrow">{t('staff.queue.eyebrow')}</span>
+          <h1>{t('staff.queue.title')}</h1>
+          <p className="staff-muted">{formatDate(date, language)}</p>
         </div>
         <div className="staff-date-nav">
-          <button className="staff-btn ghost" onClick={() => setDate(shiftDays(date, -1))} type="button">‹</button>
-          <input onChange={(e) => e.target.value && setDate(e.target.value)} type="date" value={date} />
-          <button className="staff-btn ghost" onClick={() => setDate(shiftDays(date, 1))} type="button">›</button>
+          <button aria-label={t('staff.queue.previousDay')} className="staff-btn ghost" onClick={() => setDate(shiftDays(date, -1))} type="button">‹</button>
+          <input aria-label={t('staff.queue.date')} onChange={(e) => e.target.value && setDate(e.target.value)} type="date" value={date} />
+          <button aria-label={t('staff.queue.nextDay')} className="staff-btn ghost" onClick={() => setDate(shiftDays(date, 1))} type="button">›</button>
           {date !== todayKey() && (
-            <button className="staff-btn ghost" onClick={() => setDate(todayKey())} type="button">วันนี้</button>
+            <button className="staff-btn ghost" onClick={() => setDate(todayKey())} type="button">{t('staff.queue.today')}</button>
           )}
           <button
+            aria-label={t('staff.queue.refresh')}
             className="staff-btn ghost"
             onClick={() => {
               reload()
               setCalendarRefresh((n) => n + 1)
             }}
-            title="โหลดใหม่"
+            title={t('staff.queue.refresh')}
             type="button"
           >
             ↻
@@ -82,21 +85,22 @@ export default function StaffQueuePage({ date: dateParam, navigate }) {
                 type="button"
               >
                 <span className="staff-stat-num">{items.filter((b) => g.match(b.booking_status)).length}</span>
-                <span className="staff-stat-label">{g.label}</span>
+                <span className="staff-stat-label">{t(g.labelKey)}</span>
               </button>
             ))}
           </div>
 
           <input
             className="staff-search"
+            aria-label={t('staff.queue.search')}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ค้นหา: เลขที่จอง, ชื่อลูกค้า, เบอร์โทร, ทะเบียนรถ…"
+            placeholder={t('staff.queue.searchPlaceholder')}
             value={query}
           />
 
           <LoadState
             empty={!loading && !error && rows.length === 0}
-            emptyText="ไม่มีรายการจองในเงื่อนไขนี้"
+            emptyText={t('staff.queue.empty')}
             error={error}
             loading={loading && !data}
             onRetry={reload}

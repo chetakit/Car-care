@@ -1,15 +1,22 @@
-// [STAFF] คอมโพเนนต์เล็ก ๆ ที่ใช้ร่วมกันในหน้าพนักงาน
-import { STATUS_LABEL } from '../utils/staffFormat.js'
+import { useLanguage } from '../../i18n/LanguageContext.jsx'
+import { STATUS_KEYS } from '../utils/staffFormat.js'
 
 export function StatusBadge({ status }) {
+  const { t } = useLanguage()
+  const label = STATUS_KEYS.includes(status)
+    ? t(`staff.status.${status}`)
+    : status
+
   return (
     <span className={`staff-badge staff-badge-${String(status).toLowerCase()}`}>
-      {STATUS_LABEL[status] ?? status}
+      {label}
     </span>
   )
 }
 
 export function StaffModal({ title, onClose, children }) {
+  const { t } = useLanguage()
+
   return (
     <div className="staff-modal-backdrop" onClick={onClose}>
       <div
@@ -20,7 +27,7 @@ export function StaffModal({ title, onClose, children }) {
       >
         <div className="staff-modal-head">
           <h3>{title}</h3>
-          <button aria-label="ปิด" className="staff-icon-btn" onClick={onClose} type="button">✕</button>
+          <button aria-label={t('staff.common.close')} className="staff-icon-btn" onClick={onClose} type="button">✕</button>
         </div>
         {children}
       </div>
@@ -28,19 +35,21 @@ export function StaffModal({ title, onClose, children }) {
   )
 }
 
-export function LoadState({ loading, error, empty, emptyText = 'ไม่มีข้อมูล', onRetry }) {
-  if (loading) return <div className="staff-empty">กำลังโหลด…</div>
+export function LoadState({ loading, error, empty, emptyText, onRetry }) {
+  const { t } = useLanguage()
+
+  if (loading) return <div className="staff-empty">{t('staff.common.loading')}</div>
   if (error) {
     return (
       <div className="staff-alert" role="alert">
         {error}
         {onRetry && (
-          <button className="staff-link-btn" onClick={onRetry} type="button"> ลองใหม่</button>
+          <button className="staff-link-btn" onClick={onRetry} type="button"> {t('staff.common.retry')}</button>
         )}
       </div>
     )
   }
-  if (empty) return <div className="staff-empty">{emptyText}</div>
+  if (empty) return <div className="staff-empty">{emptyText ?? t('staff.common.noData')}</div>
   return null
 }
 

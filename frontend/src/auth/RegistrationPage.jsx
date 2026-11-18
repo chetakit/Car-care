@@ -77,9 +77,7 @@ function RegistrationPage({ onNavigate }) {
       })
 
       if (response.data?.user?.role !== 'CUSTOMER') {
-        throw new Error(
-          'The registration response did not include the created customer account.',
-        )
+        throw new Error('auth.error.registrationResponseMissingCustomer')
       }
 
       const currentState = window.history.state

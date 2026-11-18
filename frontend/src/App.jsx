@@ -14,7 +14,7 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
-import { LanguageProvider } from './i18n/LanguageContext.jsx'
+import { LanguageProvider, useLanguage } from './i18n/LanguageContext.jsx'
 // [STAFF] หน้าพนักงาน (Staff & Service Management) — แทน StaffDashboard เดิม
 import StaffApp from './Staff/StaffApp.jsx'
 // [STAFF][MOCK] true เมื่อตั้ง VITE_STAFF_MOCK=true ใน frontend/.env.local
@@ -111,6 +111,7 @@ function SessionLoading({ message }) {
 }
 
 function AppContent() {
+  const { t } = useLanguage()
   const { authStatus, user, logout } = useAuth()
   const [pathname, setPathname] = useState(() => window.location.pathname)
   const currentPath = normalizePath(pathname)
@@ -176,7 +177,7 @@ function AppContent() {
   }, [authStatus, currentPath, user])
 
   if (authStatus === 'checking') {
-    return <SessionLoading message="Verifying your session…" />
+    return <SessionLoading message={t('app.session.verifying')} />
   }
   // [STAFF][MOCK] โหมดข้อมูลจำลอง: แสดงหน้าพนักงานทันที ไม่ต้องมี backend
   if (STAFF_MOCK && isStaffPath(currentPath)) {
@@ -186,7 +187,7 @@ function AppContent() {
   if (authStatus === 'authenticated' && user?.role === 'STAFF') {
     return isStaffPath(currentPath)
       ? <StaffApp onLogout={logout} user={user} />
-      : <SessionLoading message="Opening the Staff workspace…" />
+      : <SessionLoading message={t('app.session.openingStaff')} />
   }
   if (currentPath === '/services') {
     return (
@@ -211,7 +212,7 @@ function AppContent() {
     if (currentPath === '/') {
       return <CustomerLanding user={null} />
     }
-    return <SessionLoading message="Redirecting to sign in…" />
+    return <SessionLoading message={t('app.session.redirecting')} />
   }
 
   if (currentPath === '/customer/booking') {
@@ -224,14 +225,14 @@ function AppContent() {
     }
     return isAdminPath(currentPath)
       ? <AdminApp onLogout={logout} user={user} />
-      : <SessionLoading message="Opening the Admin workspace…" />
+      : <SessionLoading message={t('app.session.openingAdmin')} />
   }
   if (user?.role === 'CUSTOMER') {
     if (currentPath === '/') {
       return <CustomerLanding onLogout={logout} user={user} />
     }
     if (!isCustomerPath(currentPath)) {
-      return <SessionLoading message="Opening your Customer account…" />
+      return <SessionLoading message={t('app.session.openingCustomer')} />
     }
     if (currentPath === '/customer') {
       return <CustomerDashboardPage onLogout={logout} user={user} />
@@ -273,7 +274,7 @@ function AppContent() {
     return <CustomerNotFoundPage onLogout={logout} user={user} />
   }
 
-  return <SessionLoading message="Checking account access…" />
+  return <SessionLoading message={t('app.session.checkingAccess')} />
 }
 
 function App() {

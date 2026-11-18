@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
 
   const handleUnauthorized = useCallback(() => {
     clearSession()
-    setAuthError('Your session has expired. Please sign in again.')
+    setAuthError('auth.error.sessionExpired')
   }, [clearSession])
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
       .then((response) => {
         const sessionUser = response.data?.user
         if (!isSupportedUser(sessionUser)) {
-          throw new Error('This account role is not supported by the frontend.')
+          throw new Error('auth.error.unsupportedRole')
         }
         setUser(sessionUser)
         setAuthError('')
@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
         clearSession()
         setAuthError(
           error instanceof ApiError && (error.status === 401 || error.status === 403)
-            ? 'Your session has expired or is not authorized. Please sign in again.'
+            ? 'auth.error.sessionUnauthorized'
             : error.message,
         )
       })
@@ -85,10 +85,10 @@ export function AuthProvider({ children }) {
     })
     const { accessToken, user: signedInUser } = response.data ?? {}
     if (!accessToken) {
-      throw new Error('The login response did not include an access token.')
+      throw new Error('auth.error.loginResponseMissingToken')
     }
     if (!isSupportedUser(signedInUser)) {
-      throw new Error('This account role is not supported by the frontend.')
+      throw new Error('auth.error.unsupportedRole')
     }
 
     window.sessionStorage.setItem(TOKEN_KEY, accessToken)

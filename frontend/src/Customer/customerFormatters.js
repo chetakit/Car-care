@@ -28,6 +28,8 @@ const BOOKING_PAYMENT_STATUS_KEYS = {
 const PAYMENT_METHOD_KEYS = {
   SIMULATED: 'customer.formatter.paymentMethod.simulated',
   WALLET: 'customer.formatter.paymentMethod.wallet',
+  CASH: 'customer.formatter.paymentMethod.cash',
+  BANK_TRANSFER: 'customer.formatter.paymentMethod.bankTransfer',
 }
 
 function resolveLanguage(language, fallback) {
@@ -95,8 +97,11 @@ export function formatCustomerBookingPaymentStatus(payment, language) {
 export function formatCustomerPaymentMethod(value, language) {
   const selectedLanguage = resolveLanguage(language, 'EN')
   const method = String(value ?? '').trim().toUpperCase()
+  if (!method) return '—'
   const key = PAYMENT_METHOD_KEYS[method]
-  return key ? translate(selectedLanguage, key) : humanize(method) || '—'
+  return key
+    ? translate(selectedLanguage, key)
+    : translate(selectedLanguage, 'customer.formatter.paymentMethod.unknown')
 }
 
 function parseCustomerDate(value) {

@@ -7,7 +7,28 @@
 // ฟังก์ชันทุกตัวรับ/คืนค่ารูปแบบเดียวกับ backend จริง (ดู staffBookingApi.js)
 // ข้อมูลเก็บในหน่วยความจำ — รีเฟรชหน้าแล้วจะกลับเป็นค่าเริ่มต้น
 // =====================================================================
+import messages from '../../i18n/messages.js'
 import { shiftDays, todayKey } from '../utils/staffFormat.js'
+
+const LANGUAGE_STORAGE_KEY = 'car-care-language'
+
+// This adapter runs outside React; read the language preference persisted by LanguageProvider.
+function getMockErrorMessage(key) {
+  let language = 'TH'
+  if (typeof window !== 'undefined') {
+    try {
+      language = window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'EN' ? 'EN' : 'TH'
+    } catch {
+      language = 'TH'
+    }
+  }
+
+  const message = messages[language]?.[key]
+  if (typeof message !== 'string') {
+    throw new Error(`Missing Staff mock error translation "${key}".`)
+  }
+  return message
+}
 
 // ต้องตรงกับกติกาฝั่ง backend: พนักงานเปลี่ยนสถานะได้แค่ตามลำดับนี้ และยกเลิกไม่ได้
 const STATUS_TRANSITIONS = {
@@ -148,7 +169,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value))
 
 function find(bookingId) {
   const record = db.find((r) => r.booking.booking_id === Number(bookingId))
-  if (!record) throw new Error('ไม่พบการจองนี้')
+  if (!record) throw new Error(getMockErrorMessage('staff.mock.error.bookingNotFound'))
   return record
 }
 
@@ -231,7 +252,7 @@ export async function checkInBooking(_api, bookingId, body) {
   await delay()
   const record = find(bookingId)
   if (record.booking.booking_status !== 'CONFIRMED') {
-    throw new Error('รับรถได้เฉพาะการจองที่สถานะ "รอรับรถ"')
+    throw new Error(getMockErrorMessage('staff.mock.error.checkInNotConfirmed'))
   }
   record.check_in = {
     mileage: body.mileage,
@@ -247,9 +268,13 @@ export async function checkInBooking(_api, bookingId, body) {
 export async function changeBookingStatus(_api, bookingId, status, reason) {
   await delay()
   const record = find(bookingId)
-  if (status === 'CANCELLED') throw new Error('พนักงานไม่มีสิทธิ์ยกเลิกการจองแทนลูกค้า')
+  if (status === 'CANCELLED') {
+    throw new Error(getMockErrorMessage('staff.mock.error.cancelNotAllowed'))
+  }
   const allowed = STATUS_TRANSITIONS[record.booking.booking_status] ?? []
-  if (!allowed.includes(status)) throw new Error('เปลี่ยนเป็นสถานะนี้ไม่ได้')
+  if (!allowed.includes(status)) {
+    throw new Error(getMockErrorMessage('staff.mock.error.invalidStatusTransition'))
+  }
   pushHistory(record, status, reason)
   return toDetail(record)
 }
@@ -258,8 +283,12 @@ export async function markBookingNoShow(_api, bookingId, reason) {
   await delay()
   const record = find(bookingId)
   const detail = toDetail(record)
-  if (record.booking.booking_status !== 'CONFIRMED') throw new Error('บันทึก No-show ได้เฉพาะการจองที่ยังไม่รับรถ')
-  if (!detail.booking.appointment_started) throw new Error('บันทึก No-show ได้หลังเลยเวลานัดแล้วเท่านั้น')
+  if (record.booking.booking_status !== 'CONFIRMED') {
+    throw new Error(getMockErrorMessage('staff.mock.error.noShowNotConfirmed'))
+  }
+  if (!detail.booking.appointment_started) {
+    throw new Error(getMockErrorMessage('staff.mock.error.noShowTooEarly'))
+  }
   pushHistory(record, 'NO_SHOW', reason)
   return toDetail(record)
 }
@@ -267,7 +296,9 @@ export async function markBookingNoShow(_api, bookingId, reason) {
 export async function addBookingNote(_api, bookingId, note) {
   await delay()
   const record = find(bookingId)
-  if (record.booking.booking_status === 'CANCELLED') throw new Error('การจองที่ยกเลิกแล้วเพิ่มหมายเหตุไม่ได้')
+  if (record.booking.booking_status === 'CANCELLED') {
+    throw new Error(getMockErrorMessage('staff.mock.error.cancelledNoteNotAllowed'))
+  }
   record.notes.push({
     note_id: nextId++,
     note,
