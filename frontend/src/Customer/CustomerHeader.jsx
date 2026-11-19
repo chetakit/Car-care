@@ -61,12 +61,30 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
     }
   }, [profileOpen])
 
+  // Glass header once the page scrolls; checked at most once per frame.
+  const [scrolled, setScrolled] = useState(() => window.scrollY > 8)
+  useEffect(() => {
+    let frame = 0
+    const onScroll = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        setScrolled(window.scrollY > 8)
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [])
+
   function closeMobileNav() {
     setMobileNavOpen(false)
   }
 
   return (
-    <header className={`customer-header customer-header-landing${isCustomer ? ' customer-header-customer' : ''}`}>
+    <header className={`customer-header customer-header-landing${isCustomer ? ' customer-header-customer' : ''}${scrolled ? ' is-scrolled' : ''}`}>
       <div className="customer-container customer-header-inner">
         <a
           aria-label={customerLabel('customer.header.home', 'Car Care home')}

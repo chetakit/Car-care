@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createApiClient } from '../Admin/api/client.js'
 import useAuth from '../auth/useAuth.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
+import { formatCustomerMoney } from './customerFormatters.js'
+import { useHeroParallax, useRevealOnScroll } from './useLandingMotion.js'
 import { SERVICE_IMAGE_URL } from './serviceAssets.js'
 import { SHOP_LINE_ID, SHOP_PHONE, SHOP_PHONE_HREF } from './shopInfo.js'
 import './customer.css'
 
-const HERO_IMAGE_URL = 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7'
+// Bugatti Chiron at night — the red badge echoes the brand colour.
+const HERO_IMAGE_URL = 'https://images.unsplash.com/photo-1544636331-e26879cd4d9b'
 const HERO_IMAGE = `${HERO_IMAGE_URL}?auto=format&fit=crop&w=960&q=85`
 const HERO_IMAGE_SRCSET = [
   `${HERO_IMAGE_URL}?auto=format&fit=crop&w=640&q=85 640w`,
@@ -76,10 +79,9 @@ function BenefitMark({ kind }) {
 
 function CustomerLanding({ user, onLogout }) {
   const { token, handleUnauthorized } = useAuth()
-  const { t } = useLanguage()
-  const catalogPath = user?.role === 'CUSTOMER'
-    ? '/api/customer/catalog/services'
-    : '/api/public/catalog/services'
+  const { language, t } = useLanguage()
+  // The public catalog also carries each service's price per vehicle type.
+  const catalogPath = '/api/public/catalog/services'
   const bookingHref = '/customer/booking'
   const api = useMemo(
     () => createApiClient(token, handleUnauthorized),
@@ -90,6 +92,11 @@ function CustomerLanding({ user, onLogout }) {
   const [serviceReload, setServiceReload] = useState(0)
   const [heroImageFailed, setHeroImageFailed] = useState(false)
   const [serviceImageFailed, setServiceImageFailed] = useState(false)
+  const rootRef = useRef(null)
+  const heroImageRef = useRef(null)
+  useRevealOnScroll(rootRef, serviceState)
+  useHeroParallax(heroImageRef)
+
 
   useEffect(() => {
     const controller = new AbortController()
@@ -124,7 +131,7 @@ function CustomerLanding({ user, onLogout }) {
   }, [serviceState])
 
   return (
-    <div className="customer-home customer-landing">
+    <div className="customer-home customer-landing" ref={rootRef}>
       <CustomerHeader
         bookingAvailable={serviceState !== 'empty'}
         onLogout={onLogout}
@@ -135,20 +142,26 @@ function CustomerLanding({ user, onLogout }) {
         <section aria-labelledby="customer-hero-title" className="customer-hero" id="home">
           <div className="customer-container customer-hero-grid">
             <div className="customer-hero-copy">
-              <span className="customer-eyebrow">
+              <span className="customer-eyebrow customer-rise" style={{ '--rise-delay': '60ms' }}>
                 <span className="customer-eyebrow-dot" />
                 {t('customer.landing.eyebrow')}
               </span>
               <h1 id="customer-hero-title">
-                {t('customer.landing.heroTitle')}
-                <span> {t('customer.landing.heroTitleAccent')}</span>
+                <span className="customer-rise customer-hero-line" style={{ '--rise-delay': '160ms' }}>
+                  {t('customer.landing.heroTitle')}
+                </span>
+                {' '}
+                <span className="customer-rise customer-hero-line customer-hero-accent" style={{ '--rise-delay': '280ms' }}>
+                  {t('customer.landing.heroTitleAccent')}
+                  <span aria-hidden="true" className="customer-hero-underline" />
+                </span>
               </h1>
-              <p>
+              <p className="customer-rise" style={{ '--rise-delay': '420ms' }}>
                 {serviceState === 'empty'
                   ? t('customer.landing.noServicesDescription')
                   : t('customer.landing.heroDescription')}
               </p>
-              <div className="customer-hero-actions">
+              <div className="customer-hero-actions customer-rise" style={{ '--rise-delay': '540ms' }}>
                 {serviceState !== 'empty' && (
                   <a className="customer-button customer-button-primary" href={bookingHref}>
                     {t('customer.common.bookService')}
@@ -160,18 +173,10 @@ function CustomerLanding({ user, onLogout }) {
                   <ArrowIcon diagonal />
                 </a>
               </div>
-              <ul
-                aria-label={t('customer.landing.bookingBenefits')}
-                className="customer-hero-note"
-              >
-                <li>{t('customer.landing.chooseVehicleAndService')}</li>
-                <li>{t('customer.landing.chooseAvailableTime')}</li>
-                <li>{t('customer.landing.reviewBeforeConfirming')}</li>
-              </ul>
             </div>
 
-            <div className="customer-hero-visual">
-              <div className="customer-hero-image-wrap">
+            <div className="customer-hero-visual customer-rise" style={{ '--rise-delay': '200ms' }}>
+              <div className="customer-hero-image-wrap" ref={heroImageRef}>
                 {heroImageFailed ? (
                   <div
                     aria-label="Car Care"
@@ -193,12 +198,7 @@ function CustomerLanding({ user, onLogout }) {
                     srcSet={HERO_IMAGE_SRCSET}
                   />
                 )}
-              </div>
-              <div className="customer-image-caption">
-                <span>
-                  <strong>{t('customer.landing.personalizedCare')}</strong>
-                  <small>{t('customer.landing.chooseConvenientService')}</small>
-                </span>
+                {!heroImageFailed && <span aria-hidden="true" className="customer-hero-shine" />}
               </div>
             </div>
           </div>
@@ -206,7 +206,7 @@ function CustomerLanding({ user, onLogout }) {
 
         <section aria-labelledby="customer-services-title" className="customer-services" id="services">
           <div className="customer-container">
-            <div className="customer-section-heading">
+            <div className="customer-section-heading" data-reveal>
               <div>
                 <span className="customer-eyebrow">
                   {t('customer.landing.availableServicesEyebrow')}
@@ -231,7 +231,7 @@ function CustomerLanding({ user, onLogout }) {
             )}
 
             <div className="customer-services-layout">
-              <figure className="customer-services-visual">
+              <figure className="customer-services-visual" data-reveal>
                 {serviceImageFailed ? (
                   <div className="customer-services-image-fallback">
                     <BrandMark />
@@ -286,8 +286,13 @@ function CustomerLanding({ user, onLogout }) {
                 )}
                 {serviceState === 'ready' && (
                   <div className="customer-service-list">
-                    {services.slice(0, 3).map((service) => (
-                      <article className="customer-service-card" key={service.service_id}>
+                    {services.slice(0, 3).map((service, index) => (
+                      <article
+                        className="customer-service-card"
+                        data-reveal
+                        key={service.service_id}
+                        style={{ '--reveal-delay': `${index * 90}ms` }}
+                      >
                         <ServiceIcon name={service.service_name} />
                         <div className="customer-service-copy">
                           <h3>{service.service_name}</h3>
@@ -296,13 +301,22 @@ function CustomerLanding({ user, onLogout }) {
                               t('customer.landing.noServiceDescription')}
                           </p>
                         </div>
-                        {service.duration_minutes !== null && service.duration_minutes !== undefined && (
-                          <span className="customer-service-duration">
-                            {t('customer.landing.durationMinutes', {
-                              minutes: service.duration_minutes,
-                            })}
-                          </span>
-                        )}
+                        <span className="customer-service-side">
+                          {service.prices?.length > 0 && (
+                            <strong className="customer-service-price">
+                              {t('customer.services.priceFrom', {
+                                amount: formatCustomerMoney(service.prices[0].price, language),
+                              })}
+                            </strong>
+                          )}
+                          {service.duration_minutes !== null && service.duration_minutes !== undefined && (
+                            <span className="customer-service-duration">
+                              {t('customer.landing.durationMinutes', {
+                                minutes: service.duration_minutes,
+                              })}
+                            </span>
+                          )}
+                        </span>
                       </article>
                     ))}
                   </div>
@@ -333,7 +347,7 @@ function CustomerLanding({ user, onLogout }) {
           id="how-it-works"
         >
           <div className="customer-container">
-            <div className="customer-section-heading">
+            <div className="customer-section-heading" data-reveal>
               <div>
                 <span className="customer-eyebrow">
                   {t('customer.landing.bookingSteps')}
@@ -344,9 +358,13 @@ function CustomerLanding({ user, onLogout }) {
                 <p>{t('customer.landing.stepsDescription')}</p>
               </div>
             </div>
-            <ol className="customer-timeline">
+            <ol className="customer-timeline" data-reveal>
               {PROCESS_STEPS.map((step, index) => (
-                <li className={step.key === 'pay' ? 'is-key' : undefined} key={step.key}>
+                <li
+                  className={step.key === 'pay' ? 'is-key' : undefined}
+                  key={step.key}
+                  style={{ '--step': index }}
+                >
                   <span aria-hidden="true" className="customer-timeline-node">
                     {String(index + 1).padStart(2, '0')}
                   </span>
@@ -369,14 +387,18 @@ function CustomerLanding({ user, onLogout }) {
               ))}
             </ol>
 
-            <div className="customer-policy">
+            <div className="customer-policy" data-reveal>
               <div className="customer-policy-heading">
                 <h3>{t('customer.landing.policy.title')}</h3>
                 <p>{t('customer.landing.policy.description')}</p>
               </div>
               <ul className="customer-policy-grid">
-                {POLICY_RULES.map((rule) => (
-                  <li className={`customer-policy-card is-${rule.tone}`} key={rule.key}>
+                {POLICY_RULES.map((rule, index) => (
+                  <li
+                    className={`customer-policy-card is-${rule.tone}`}
+                    key={rule.key}
+                    style={{ '--reveal-delay': `${120 + index * 80}ms` }}
+                  >
                     <span className="customer-policy-figure">{rule.figure}</span>
                     <div>
                       <h4>{t(`customer.landing.policy.${rule.key}.title`)}</h4>
@@ -395,7 +417,7 @@ function CustomerLanding({ user, onLogout }) {
           id="about"
         >
           <div className="customer-container">
-            <div className="customer-section-heading customer-benefits-heading">
+            <div className="customer-section-heading customer-benefits-heading" data-reveal>
               <div>
                 <span className="customer-eyebrow">
                   {t('customer.landing.confidentChoice')}
@@ -407,17 +429,17 @@ function CustomerLanding({ user, onLogout }) {
               </div>
             </div>
             <div className="customer-benefit-grid">
-              <article className="customer-benefit-card">
+              <article className="customer-benefit-card" data-reveal style={{ '--reveal-delay': '0ms' }}>
                 <BenefitMark kind="service" />
                 <h3>{t('customer.landing.serviceDetailsTitle')}</h3>
                 <p>{t('customer.landing.serviceDetailsDescription')}</p>
               </article>
-              <article className="customer-benefit-card">
+              <article className="customer-benefit-card" data-reveal style={{ '--reveal-delay': '90ms' }}>
                 <BenefitMark kind="schedule" />
                 <h3>{t('customer.landing.availableSlotsTitle')}</h3>
                 <p>{t('customer.landing.availableSlotsDescription')}</p>
               </article>
-              <article className="customer-benefit-card">
+              <article className="customer-benefit-card" data-reveal style={{ '--reveal-delay': '180ms' }}>
                 <BenefitMark kind="clear" />
                 <h3>{t('customer.landing.reviewTitle')}</h3>
                 <p>{t('customer.landing.reviewDescription')}</p>
@@ -432,7 +454,7 @@ function CustomerLanding({ user, onLogout }) {
           id="contact"
         >
           <div className="customer-container customer-promo-inner">
-            <div className="customer-promo-copy">
+            <div className="customer-promo-copy" data-reveal>
               <span className="customer-eyebrow customer-eyebrow-light">
                 {serviceState === 'empty'
                   ? t('customer.landing.updateServices')
@@ -455,7 +477,7 @@ function CustomerLanding({ user, onLogout }) {
                 </a>
               )}
             </div>
-            <address className="customer-contact-card">
+            <address className="customer-contact-card" data-reveal style={{ '--reveal-delay': '120ms' }}>
               <h3>{t('customer.contact.title')}</h3>
               <dl>
                 <div>

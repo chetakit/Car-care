@@ -2739,3 +2739,347 @@
     transform: none;
   }
 }
+
+/* ======================= Premium landing motion =======================
+   Everything below animates only opacity and transform (GPU friendly).
+   Durations stay short and play once; reduced motion turns it all off. */
+.customer-landing {
+  --lux-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Glass header once the page scrolls. */
+.customer-header.customer-header-landing {
+  transition: background-color 280ms ease, box-shadow 280ms ease, border-color 280ms ease;
+}
+
+.customer-header.customer-header-landing.is-scrolled {
+  border-bottom-color: rgb(255 255 255 / 7%);
+  background: rgb(17 19 20 / 78%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 28%);
+  backdrop-filter: saturate(140%) blur(16px);
+}
+
+/* Hero entrance: each piece rises in turn (delay set inline). */
+.customer-rise {
+  animation: lux-rise 820ms var(--lux-ease) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+
+@keyframes lux-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.customer-landing .customer-hero h1 .customer-hero-line {
+  display: inline-block;
+  color: #f7f7f5;
+}
+
+.customer-landing .customer-hero h1 .customer-hero-accent {
+  position: relative;
+  color: #f05a63;
+}
+
+/* The red underline draws itself under the accent words. */
+.customer-hero-underline {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  left: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: #c62832;
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: lux-draw 900ms var(--lux-ease) 1000ms forwards;
+}
+
+@keyframes lux-draw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Hero photo: slow settle-in zoom; the wrapper gets the scroll parallax. */
+.customer-landing .customer-hero-image-wrap {
+  will-change: transform;
+  box-shadow: 0 40px 80px rgb(0 0 0 / 45%);
+}
+
+.customer-landing .customer-hero-image {
+  object-position: center 58%;
+  transform-origin: 50% 60%;
+  will-change: transform;
+  /* Slow camera push-in and drift, like a showroom film. Loops forever. */
+  animation: lux-camera 22s ease-in-out infinite alternate;
+}
+
+@keyframes lux-camera {
+  0% {
+    transform: scale(1.04) translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: scale(1.1) translate3d(-1.5%, -1%, 0);
+  }
+
+  100% {
+    transform: scale(1.14) translate3d(1.5%, -2%, 0);
+  }
+}
+
+/* A soft light sweep across the paint every few seconds. */
+.customer-hero-shine {
+  position: absolute;
+  z-index: 2;
+  inset: -20% auto -20% 0;
+  width: 38%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgb(255 255 255 / 0%) 25%,
+    rgb(255 255 255 / 16%) 50%,
+    rgb(255 255 255 / 0%) 75%,
+    transparent 100%
+  );
+  transform: translate3d(-160%, 0, 0) skewX(-14deg);
+  animation: lux-sweep 7s cubic-bezier(0.4, 0, 0.2, 1) 2.4s infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+@keyframes lux-sweep {
+  0% {
+    transform: translate3d(-160%, 0, 0) skewX(-14deg);
+  }
+
+  32%,
+  100% {
+    transform: translate3d(360%, 0, 0) skewX(-14deg);
+  }
+}
+
+/* Soft red light behind the photo, like a showroom spotlight. */
+.customer-landing .customer-hero-visual::before {
+  position: absolute;
+  z-index: 0;
+  inset: 12% -6% -4% 18%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(198 40 50 / 30%), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+/* Buttons: arrow nudges on hover. */
+.customer-landing .customer-button .customer-arrow,
+.customer-landing .customer-section-cta .customer-arrow {
+  transition: transform 260ms var(--lux-ease);
+}
+
+.customer-landing .customer-button:hover .customer-arrow,
+.customer-landing .customer-section-cta:hover .customer-arrow {
+  transform: translateX(4px);
+}
+
+.customer-landing .customer-button-primary {
+  transition: background-color 200ms ease, transform 200ms var(--lux-ease), box-shadow 200ms ease;
+}
+
+.customer-landing .customer-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgb(198 40 50 / 32%);
+}
+
+/* Scroll reveal: hidden only after the hook marks the page ready. */
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition:
+    opacity 760ms var(--lux-ease),
+    transform 760ms var(--lux-ease);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal-ready [data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Service rows: price on the right, gentle hover. */
+.customer-landing .customer-service-card {
+  transition: background-color 220ms ease;
+}
+
+.customer-landing .customer-service-card:hover {
+  background: rgb(255 255 255 / 55%);
+}
+
+.customer-landing .customer-service-icon {
+  transition: transform 260ms var(--lux-ease);
+}
+
+.customer-landing .customer-service-card:hover .customer-service-icon {
+  transform: translateY(-2px) rotate(-4deg);
+}
+
+.customer-service-side {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.customer-service-price {
+  color: #1b1e1f;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.customer-service-side .customer-service-duration {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Services photo zooms slowly on hover. */
+.customer-landing .customer-services-image {
+  transition: transform 1200ms var(--lux-ease);
+}
+
+.customer-landing .customer-services-visual:hover .customer-services-image {
+  transform: scale(1.05);
+}
+
+/* Timeline: the rail draws, then each step pops in. */
+.reveal-ready .customer-timeline[data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal-ready .customer-timeline::before {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 1200ms var(--lux-ease) 150ms;
+}
+
+.reveal-ready .customer-timeline.is-revealed::before {
+  transform: scaleX(1);
+}
+
+.reveal-ready .customer-timeline li {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 640ms var(--lux-ease),
+    transform 640ms var(--lux-ease);
+  transition-delay: calc(250ms + var(--step, 0) * 140ms);
+}
+
+.reveal-ready .customer-timeline.is-revealed li {
+  opacity: 1;
+  transform: none;
+}
+
+/* The 15:00 chip pulses once when the timeline arrives. */
+.reveal-ready .customer-timeline.is-revealed .customer-timeline-timer {
+  animation: lux-pulse 1400ms ease-out 1100ms 1;
+}
+
+@keyframes lux-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(240 90 99 / 45%); }
+  100% { box-shadow: 0 0 0 12px rgb(240 90 99 / 0%); }
+}
+
+/* Policy cards cascade after the panel. */
+.reveal-ready .customer-policy[data-reveal] .customer-policy-card {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition:
+    opacity 600ms var(--lux-ease),
+    transform 600ms var(--lux-ease),
+    border-color 200ms ease,
+    background-color 200ms ease;
+  transition-delay: var(--reveal-delay, 0ms), var(--reveal-delay, 0ms), 0ms, 0ms;
+}
+
+.reveal-ready .customer-policy.is-revealed .customer-policy-card {
+  opacity: 1;
+  transform: none;
+}
+
+/* Benefit icons lift a touch on hover. */
+.customer-landing .customer-benefit-mark {
+  transition: transform 300ms var(--lux-ease);
+}
+
+.customer-landing .customer-benefit-card:hover .customer-benefit-mark {
+  transform: translateY(-3px) scale(1.06);
+}
+
+/* Closing CTA: a slow red glow drifting behind the headline. */
+.customer-landing .customer-promo {
+  position: relative;
+  isolation: isolate;
+}
+
+.customer-landing .customer-promo::before {
+  position: absolute;
+  z-index: -1;
+  top: -40%;
+  left: -10%;
+  width: 60%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(198 40 50 / 22%), transparent);
+  content: "";
+  animation: lux-drift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes lux-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(40%, 18%, 0); }
+}
+
+@media (max-width: 960px) {
+  .reveal-ready .customer-timeline::before {
+    transform: scaleY(0);
+    transform-origin: center top;
+  }
+
+  .reveal-ready .customer-timeline.is-revealed::before {
+    transform: scaleY(1);
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-rise,
+  .customer-landing .customer-hero-image,
+  .customer-hero-shine,
+  .customer-landing .customer-promo::before {
+    animation: none;
+  }
+
+  .customer-hero-underline {
+    transform: scaleX(1);
+    animation: none;
+  }
+
+  .customer-landing .customer-button-primary:hover,
+  .customer-landing .customer-services-visual:hover .customer-services-image {
+    transform: none;
+  }
+
+  .customer-hero-shine {
+    display: none;
+  }
+}
