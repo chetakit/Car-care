@@ -204,7 +204,7 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
         </section>
 
         {checkIn && (
-          <section className="staff-card span-2">
+          <section className="staff-card span-2 span-full">
             <h2>{t('staff.detail.checkInInfo')}</h2>
             <dl className="staff-dl-row">
               <dt>{t('staff.detail.checkedInAt')}</dt><dd>{formatDateTime(checkIn.checked_in_at, language)}</dd>
@@ -216,7 +216,7 @@ export default function StaffBookingDetailPage({ bookingId, navigate }) {
           </section>
         )}
 
-        <section className="staff-card span-2">
+        <section className="staff-card span-2 span-wide">
           <h2>{t('staff.detail.timeline')}</h2>
           {timeline.length === 0 && <p className="staff-muted">{t('staff.detail.noTimeline')}</p>}
           <ol className="staff-timeline">

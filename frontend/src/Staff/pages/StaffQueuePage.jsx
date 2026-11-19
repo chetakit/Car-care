@@ -6,7 +6,7 @@ import StaffCalendar from '../components/StaffCalendar.jsx'
 import { LoadState, StaffLink, StatusBadge } from '../components/StaffUi.jsx'
 import useStaffRequest from '../hooks/useStaffRequest.js'
 import { useLanguage } from '../../i18n/LanguageContext.jsx'
-import { formatDate, plateText, shiftDays, todayKey } from '../utils/staffFormat.js'
+import { formatDate, plateText, todayKey } from '../utils/staffFormat.js'
 
 const GROUPS = [
   { key: 'all', labelKey: 'staff.queue.group.all', match: () => true },
@@ -47,24 +47,20 @@ export default function StaffQueuePage({ date: dateParam, navigate }) {
           <h1>{t('staff.queue.title')}</h1>
           <p className="staff-muted">{formatDate(date, language)}</p>
         </div>
-        <div className="staff-date-nav">
-          <button aria-label={t('staff.queue.previousDay')} className="staff-btn ghost" onClick={() => setDate(shiftDays(date, -1))} type="button">‹</button>
-          <input aria-label={t('staff.queue.date')} onChange={(e) => e.target.value && setDate(e.target.value)} type="date" value={date} />
-          <button aria-label={t('staff.queue.nextDay')} className="staff-btn ghost" onClick={() => setDate(shiftDays(date, 1))} type="button">›</button>
+        {/* [STAFF] เลือกวันผ่านปฏิทินด้านซ้ายแทนช่องเลือกวันที่เดิม เหลือแค่ปุ่ม "วันนี้" กับ "โหลดใหม่" */}
+        <div className="staff-actions">
           {date !== todayKey() && (
             <button className="staff-btn ghost" onClick={() => setDate(todayKey())} type="button">{t('staff.queue.today')}</button>
           )}
           <button
-            aria-label={t('staff.queue.refresh')}
             className="staff-btn ghost"
             onClick={() => {
               reload()
               setCalendarRefresh((n) => n + 1)
             }}
-            title={t('staff.queue.refresh')}
             type="button"
           >
-            ↻
+            <span aria-hidden="true">↻</span> {t('staff.queue.refresh')}
           </button>
         </div>
       </div>
@@ -115,15 +111,15 @@ export default function StaffQueuePage({ date: dateParam, navigate }) {
                 to={`/staff/bookings/${b.booking_id}`}
               >
                 <div className="staff-q-time">
-                  {b.start_time}
+                  <span>{b.start_time}</span>
                   <small>{b.end_time}</small>
                 </div>
-                <div>
-                  <div>
-                    <strong>{plateText(b)}</strong>
-                    <span className="staff-muted"> · {[b.brand_name, b.model_name].filter(Boolean).join(' ')}</span>
+                <div className="staff-q-main">
+                  <div className="staff-q-title">
+                    <span className="staff-q-plate">{plateText(b)}</span>
+                    <span className="staff-q-car">{[b.brand_name, b.model_name].filter(Boolean).join(' ')}</span>
                   </div>
-                  <div className="staff-muted staff-small">{b.full_name} · {b.phone || '—'}</div>
+                  <div className="staff-q-customer">{b.full_name} · {b.phone || '—'}</div>
                   <div className="staff-chips">
                     {b.service_names.map((name) => <span className="staff-chip" key={name}>{name}</span>)}
                   </div>
