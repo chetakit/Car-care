@@ -2400,106 +2400,158 @@
   }
 }
 
-/* Contact card beside the closing call-to-action (#contact). */
-.customer-landing .customer-promo-inner {
-  justify-content: space-between;
+/* Closing call-to-action: a dark card on a light band, so it reads as a
+   section of the page and not as a second footer. */
+.customer-landing .customer-promo {
+  padding: 72px 0 88px;
+  background: #fff;
 }
 
-.customer-contact-card {
-  flex: none;
-  width: min(100%, 360px);
-  padding: 22px 24px;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 4%);
-  font-style: normal;
+.customer-landing .customer-promo::before {
+  display: none;
 }
 
-.customer-contact-card h3 {
+.customer-promo-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 52px 56px;
+  border-radius: 24px;
+  color: #fff;
+  background: #141718;
+  box-shadow: 0 30px 60px rgb(20 23 24 / 18%);
+}
+
+/* Slow red glow drifting inside the card. */
+.customer-promo-card::before {
+  position: absolute;
+  z-index: -1;
+  top: -60%;
+  right: -10%;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(198 40 50 / 30%), transparent);
+  content: "";
+  animation: lux-drift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.customer-landing .customer-promo-card .customer-promo-copy {
+  max-width: 640px;
+}
+
+/* Footer: brand | menu | contact (the #contact target). */
+.customer-footer {
+  scroll-margin-top: 70px;
+}
+
+.customer-footer .customer-footer-main {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.6fr) minmax(0, 1fr);
+  gap: 48px;
+}
+
+.customer-footer-col h2 {
   margin: 0 0 14px;
-  color: #f7f7f5;
-  font-size: 15px;
-  font-weight: 650;
+  color: var(--customer-footer-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
 }
 
-.customer-contact-card dl {
+.customer-footer-links {
   display: grid;
-  gap: 12px;
+  gap: 9px;
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.customer-contact-card dl > div {
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgb(255 255 255 / 8%);
-}
-
-.customer-contact-card dl > div:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.customer-contact-card dt {
-  color: #8f9796;
-  font-size: 12px;
-}
-
-.customer-contact-card dd {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  color: #e9ecea;
+.customer-footer-links a {
+  color: var(--customer-footer-muted);
   font-size: 13px;
-  line-height: 1.6;
+  transition: color 160ms ease;
 }
 
-.customer-contact-card dd small {
-  color: #8f9796;
-  font-size: 12px;
-}
-
-.customer-contact-card a {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: rgb(255 255 255 / 30%);
-  text-underline-offset: 3px;
-  transition: text-decoration-color 140ms ease;
-}
-
-.customer-contact-card a:hover {
-  text-decoration-color: currentColor;
+.customer-footer-links a:hover,
+.customer-footer-links a:focus-visible {
+  color: #fff;
 }
 
 .customer-footer-contact {
   display: grid;
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 0;
-  color: var(--customer-footer-muted);
-  font-size: 12px;
+  gap: 10px;
+  margin: 0;
+}
+
+.customer-footer-contact > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
   line-height: 1.6;
-  list-style: none;
+}
+
+.customer-footer-contact dt {
+  color: #869691;
+}
+
+.customer-footer-contact dd {
+  display: grid;
+  margin: 0;
+  color: #e6ebe9;
+}
+
+.customer-footer-contact dd small {
+  color: #869691;
+  font-size: 12px;
 }
 
 .customer-footer-contact a {
   color: inherit;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: rgb(255 255 255 / 25%);
+  text-underline-offset: 3px;
 }
 
 .customer-footer-contact a:hover {
-  color: #fff;
+  text-decoration-color: currentColor;
 }
 
-@media (max-width: 760px) {
-  .customer-landing .customer-promo-inner {
-    flex-direction: column;
-    align-items: stretch;
+@media (max-width: 960px) {
+  .customer-footer .customer-footer-main {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .customer-contact-card {
-    width: 100%;
+  .customer-footer .customer-footer-brand-copy {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .customer-landing .customer-promo {
+    padding: 48px 0 56px;
+  }
+
+  .customer-promo-card {
+    padding: 32px 24px;
+    border-radius: 18px;
+  }
+
+  .customer-footer .customer-footer-main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .customer-footer .customer-footer-col {
+    width: auto;
+    justify-self: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-promo-card::before {
+    animation: none;
   }
 }
 
@@ -2761,7 +2813,7 @@
 
 /* Hero entrance: each piece rises in turn (delay set inline). */
 .customer-rise {
-  animation: lux-rise 820ms var(--lux-ease) both;
+  animation: lux-rise 820ms var(--lux-ease) backwards;
   animation-delay: var(--rise-delay, 0ms);
 }
 
@@ -2818,20 +2870,20 @@
   transform-origin: 50% 60%;
   will-change: transform;
   /* Slow camera push-in and drift, like a showroom film. Loops forever. */
-  animation: lux-camera 22s ease-in-out infinite alternate;
+  animation: lux-camera 14s ease-in-out infinite alternate;
 }
 
 @keyframes lux-camera {
   0% {
-    transform: scale(1.04) translate3d(0, 0, 0);
+    transform: scale(1.02) translate3d(0, 0, 0);
   }
 
   50% {
-    transform: scale(1.1) translate3d(-1.5%, -1%, 0);
+    transform: scale(1.12) translate3d(-2.5%, -1.5%, 0);
   }
 
   100% {
-    transform: scale(1.14) translate3d(1.5%, -2%, 0);
+    transform: scale(1.18) translate3d(2.5%, -3%, 0);
   }
 }
 
@@ -2845,12 +2897,12 @@
     100deg,
     transparent 0%,
     rgb(255 255 255 / 0%) 25%,
-    rgb(255 255 255 / 16%) 50%,
+    rgb(255 255 255 / 30%) 50%,
     rgb(255 255 255 / 0%) 75%,
     transparent 100%
   );
   transform: translate3d(-160%, 0, 0) skewX(-14deg);
-  animation: lux-sweep 7s cubic-bezier(0.4, 0, 0.2, 1) 2.4s infinite;
+  animation: lux-sweep 5s cubic-bezier(0.4, 0, 0.2, 1) 1.8s infinite;
   pointer-events: none;
   mix-blend-mode: screen;
 }
@@ -2860,9 +2912,93 @@
     transform: translate3d(-160%, 0, 0) skewX(-14deg);
   }
 
-  32%,
+  40%,
   100% {
     transform: translate3d(360%, 0, 0) skewX(-14deg);
+  }
+}
+
+/* Photo wipes in from the left when the page opens. */
+.customer-landing .customer-hero-image-wrap {
+  animation: lux-wipe 1200ms var(--lux-ease) 250ms backwards;
+}
+
+@keyframes lux-wipe {
+  from {
+    clip-path: inset(0 100% 0 0 round 4px 4px 4px 42px);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0 round 4px 4px 4px 42px);
+  }
+}
+
+/* 3D tilt that follows the mouse (variables set by useHeroTilt). */
+.customer-landing .customer-hero-visual {
+  transform: perspective(1100px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 600ms var(--lux-ease);
+}
+
+.customer-landing .customer-hero-visual.is-tilting {
+  transition: transform 120ms linear;
+}
+
+/* Glare that follows the cursor across the paint. */
+.customer-hero-glare {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--glare-x, 50%) var(--glare-y, 30%),
+    rgb(255 255 255 / 22%),
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+}
+
+.customer-hero-visual.is-tilting .customer-hero-glare {
+  opacity: 1;
+}
+
+/* A red light trail racing along the bottom edge, like a tail light. */
+.customer-hero-streak {
+  position: absolute;
+  z-index: 3;
+  bottom: 14%;
+  left: 0;
+  width: 34%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgb(240 90 99 / 95%), transparent);
+  box-shadow: 0 0 12px rgb(240 90 99 / 70%);
+  opacity: 0;
+  transform: translate3d(-120%, 0, 0);
+  animation: lux-streak 4.5s cubic-bezier(0.6, 0, 0.3, 1) 3s infinite;
+  pointer-events: none;
+}
+
+@keyframes lux-streak {
+  0% {
+    opacity: 0;
+    transform: translate3d(-120%, 0, 0);
+  }
+
+  8% {
+    opacity: 1;
+  }
+
+  34% {
+    opacity: 1;
+  }
+
+  42%,
+  100% {
+    opacity: 0;
+    transform: translate3d(320%, 0, 0);
   }
 }
 
@@ -3079,7 +3215,511 @@
     transform: none;
   }
 
-  .customer-hero-shine {
+  .customer-hero-shine,
+  .customer-hero-streak,
+  .customer-hero-glare {
     display: none;
+  }
+
+  .customer-landing .customer-hero-image-wrap {
+    animation: none;
+  }
+}
+
+/* Vehicle-type picker above the services list: pick a type, prices roll. */
+.customer-type-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.customer-type-picker button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #d9dcda;
+  border-radius: 999px;
+  color: #3d4545;
+  background: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    transform 220ms var(--lux-ease, ease);
+}
+
+.customer-type-picker button:hover {
+  border-color: #c62832;
+  color: #a91f28;
+  transform: translateY(-1px);
+}
+
+.customer-type-picker button:focus-visible {
+  outline: 2px solid #c62832;
+  outline-offset: 2px;
+}
+
+.customer-type-picker button.is-active {
+  border-color: #c62832;
+  color: #fff;
+  background: #c62832;
+  box-shadow: 0 8px 18px rgb(198 40 50 / 22%);
+}
+
+.customer-service-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.customer-service-price small {
+  color: #6a7372;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.customer-service-na {
+  color: #8a9392;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .customer-type-picker {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-right: -18px;
+    padding-right: 18px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .customer-type-picker::-webkit-scrollbar {
+    display: none;
+  }
+
+  .customer-type-picker button {
+    flex: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-type-picker button,
+  .customer-type-picker button:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Motion easing shared by every customer page (Home, Services). */
+.customer-home {
+  --lux-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ======================= Services page ======================= */
+.services-catalog-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.services-catalog-head .services-page-note {
+  margin-bottom: 0;
+}
+
+.services-catalog-count {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #4c5554;
+  background: #ecedeb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Vehicle-type bar: sticks under the header while browsing. */
+.services-toolbar {
+  position: sticky;
+  z-index: 20;
+  top: 84px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 26px;
+  padding: 12px 16px;
+  border: 1px solid #e4e6e4;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 10px 28px rgb(20 23 24 / 6%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+.services-toolbar-label {
+  flex: none;
+  color: #1b1e1f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.services-toolbar .customer-type-picker {
+  margin: 0;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.services-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 22px 22px 20px;
+  border: 1px solid #e4e6e4;
+  border-radius: 16px;
+  background: #fff;
+  transition:
+    border-color 220ms ease,
+    box-shadow 260ms ease,
+    transform 260ms var(--lux-ease),
+    opacity 260ms ease;
+}
+
+.services-card:hover {
+  border-color: #e7c3c6;
+  box-shadow: 0 18px 36px rgb(20 23 24 / 8%);
+  transform: translateY(-3px);
+}
+
+.services-card.is-unavailable {
+  opacity: 0.55;
+}
+
+.services-card.is-unavailable:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.services-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.services-card .customer-service-icon {
+  transition: transform 260ms var(--lux-ease);
+}
+
+.services-card:hover .customer-service-icon {
+  transform: translateY(-2px) rotate(-5deg);
+}
+
+.services-card-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #4c5554;
+  background: #f3f3f0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.services-card-duration svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.services-card h3 {
+  margin: 0 0 6px;
+  color: #1b1e1f;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.services-card p {
+  margin: 0 0 18px;
+  color: #5b6463;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.services-card-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #eef0ee;
+}
+
+.services-card-price {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.services-card-price small {
+  color: #6a7372;
+  font-size: 12px;
+}
+
+.services-card-price strong {
+  color: #1b1e1f;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  line-height: 1.15;
+}
+
+.services-card-book {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: #fff;
+  background: #c62832;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
+}
+
+.services-card-book svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  transition: transform 240ms var(--lux-ease);
+}
+
+.services-card-book:hover,
+.services-card-book:focus-visible {
+  color: #fff;
+  background: #a91f28;
+  box-shadow: 0 10px 22px rgb(198 40 50 / 25%);
+}
+
+.services-card-book:hover svg {
+  transform: translateX(3px);
+}
+
+@media (max-width: 960px) {
+  .services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .services-toolbar {
+    top: 0;
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .services-catalog-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .services-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .services-toolbar .customer-type-picker {
+    margin-right: -12px;
+    padding-right: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .services-card,
+  .services-card:hover,
+  .services-card:hover .customer-service-icon {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ======================= Navbar motion ======================= */
+
+/* Red reading-progress line along the bottom of the header. */
+.customer-scroll-progress {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #c62832, #f05a63);
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+  transition: bottom 320ms var(--lux-ease, ease);
+}
+
+/* Logo: the little car nudges forward on hover. */
+.customer-brand-mark svg {
+  transition: transform 320ms var(--lux-ease, ease);
+}
+
+.customer-brand:hover .customer-brand-mark svg {
+  transform: translateX(3px) rotate(-4deg);
+}
+
+/* Book button: a light glint sweeps across every few seconds. */
+.customer-header-landing .customer-nav .customer-nav-book {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.customer-header-landing .customer-nav .customer-nav-book::after {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 35%), transparent);
+  content: "";
+  transform: translateX(-130%) skewX(-18deg);
+  animation: nav-glint 6s ease-in-out 2s infinite;
+  pointer-events: none;
+}
+
+@keyframes nav-glint {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+
+  22%,
+  100% {
+    transform: translateX(330%) skewX(-18deg);
+  }
+}
+
+@media (min-width: 701px) {
+  /* Sliding underline under the menu. */
+  .customer-header-landing .customer-nav {
+    position: relative;
+  }
+
+  .customer-nav-indicator {
+    position: absolute;
+    bottom: -9px;
+    left: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: #f05a63;
+    box-shadow: 0 0 10px rgb(240 90 99 / 55%);
+    pointer-events: none;
+    transition:
+      transform 380ms var(--lux-ease, ease),
+      width 380ms var(--lux-ease, ease);
+  }
+
+  .customer-header-landing .customer-nav a.is-current {
+    color: #fff;
+  }
+
+  /* Compact header when scrolled: the background shrinks from the
+     bottom (transform only, so the page never jumps). */
+  .customer-header.customer-header-landing,
+  .customer-header.customer-header-landing.is-scrolled {
+    border-bottom-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .customer-header.customer-header-landing::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 9%);
+    background: rgb(17 19 20 / 96%);
+    content: "";
+    transform-origin: center top;
+    transition:
+      transform 360ms var(--lux-ease, ease),
+      background-color 360ms ease,
+      box-shadow 360ms ease;
+  }
+
+  .customer-header.customer-header-landing.is-scrolled::before {
+    background: rgb(17 19 20 / 80%);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 30%);
+    transform: scaleY(0.82);
+    backdrop-filter: saturate(140%) blur(16px);
+  }
+
+  .customer-header-landing .customer-header-inner {
+    transition: transform 360ms var(--lux-ease, ease);
+  }
+
+  .customer-header-landing.is-scrolled .customer-header-inner {
+    transform: translateY(-7px);
+  }
+
+  .customer-header-landing .customer-brand-mark {
+    transition: transform 360ms var(--lux-ease, ease);
+  }
+
+  .customer-header-landing.is-scrolled .customer-brand-mark {
+    transform: scale(0.88);
+  }
+
+  .customer-header-landing.is-scrolled .customer-scroll-progress {
+    bottom: 14px;
+  }
+}
+
+@media (max-width: 700px) {
+  .customer-nav-indicator {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-header-landing .customer-nav .customer-nav-book::after {
+    display: none;
+  }
+
+  .customer-nav-indicator,
+  .customer-header.customer-header-landing::before,
+  .customer-header-landing .customer-header-inner,
+  .customer-header-landing .customer-brand-mark,
+  .customer-brand-mark svg {
+    transition: none;
+  }
+
+  .customer-brand:hover .customer-brand-mark svg {
+    transform: none;
   }
 }

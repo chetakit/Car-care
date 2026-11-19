@@ -61,23 +61,106 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
     }
   }, [profileOpen])
 
-  // Glass header once the page scrolls; checked at most once per frame.
+  // Glass + compact header once the page scrolls, and the red reading
+  // progress bar. Checked at most once per animation frame.
   const [scrolled, setScrolled] = useState(() => window.scrollY > 8)
+  const progressRef = useRef(null)
+  const [atBottom, setAtBottom] = useState(false)
   useEffect(() => {
     let frame = 0
-    const onScroll = () => {
-      if (frame) return
-      frame = window.requestAnimationFrame(() => {
-        frame = 0
-        setScrolled(window.scrollY > 8)
-      })
+    const update = () => {
+      frame = 0
+      const y = window.scrollY
+      setScrolled(y > 8)
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      const progress = max > 0 ? Math.min(1, y / max) : 0
+      // The footer (contact) is short, so count the very bottom as "contact".
+      setAtBottom(max > 0 && y >= max - 4)
+      if (progressRef.current) progressRef.current.style.transform = `scaleX(${progress.toFixed(4)})`
     }
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update)
+    }
+    update()
     window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
     return () => {
       window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
       if (frame) window.cancelAnimationFrame(frame)
     }
   }, [])
+
+  // Which menu item is "current": the page, or on Home the section in view.
+  const pageKey = currentPath === '/services' ? 'services' : currentPath === '/' ? 'home' : ''
+  const [sectionKey, setSectionKey] = useState('')
+  useEffect(() => {
+    if (!isPublicLanding || !('IntersectionObserver' in window)) return undefined
+    const sections = [
+      ['home', 'home'],
+      ['services', 'services'],
+      ['how-it-works', 'how'],
+      ['contact', 'contact'],
+    ]
+    const visible = new Map()
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        visible.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0)
+      }
+      // The section taking up most of the band near the top of the screen wins.
+      let best = ''
+      let bestRatio = 0
+      for (const [id, key] of sections) {
+        const ratio = visible.get(id) ?? 0
+        if (ratio > bestRatio) {
+          best = key
+          bestRatio = ratio
+        }
+      }
+      if (best) setSectionKey(best)
+    }, { rootMargin: '-35% 0px -45% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] })
+
+    // Sections render after the catalog loads; look them up shortly after.
+    const timer = window.setTimeout(() => {
+      for (const [id] of sections) {
+        const element = document.getElementById(id)
+        if (element) observer.observe(element)
+      }
+    }, 300)
+    return () => {
+      window.clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [isPublicLanding])
+  const activeKey = (isPublicLanding && (atBottom ? 'contact' : sectionKey)) || pageKey
+
+  // Red underline that glides to the hovered item, else the current one.
+  const navRef = useRef(null)
+  const [hoverKey, setHoverKey] = useState('')
+  const [indicator, setIndicator] = useState(null)
+  useEffect(() => {
+    const place = () => {
+      const key = hoverKey || activeKey
+      const nav = navRef.current
+      const link = key ? nav?.querySelector(`[data-nav-key="${key}"]`) : null
+      if (!link || !nav || !link.offsetParent) {
+        setIndicator(null)
+        return
+      }
+      setIndicator({ left: link.offsetLeft, width: link.offsetWidth })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [activeKey, hoverKey, t])
+  const navLinkProps = (key) => ({
+    'aria-current': activeKey === key ? (pageKey === key && !sectionKey ? 'page' : 'location') : undefined,
+    className: activeKey === key ? 'is-current' : undefined,
+    onBlur: () => setHoverKey(''),
+    onFocus: () => setHoverKey(key),
+    onMouseEnter: () => setHoverKey(key),
+    'data-nav-key': key,
+  })
 
   function closeMobileNav() {
     setMobileNavOpen(false)
@@ -85,6 +168,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
 
   return (
     <header className={`customer-header customer-header-landing${isCustomer ? ' customer-header-customer' : ''}${scrolled ? ' is-scrolled' : ''}`}>
+      <span aria-hidden="true" className="customer-scroll-progress" ref={progressRef} />
       <div className="customer-container customer-header-inner">
         <a
           aria-label={customerLabel('customer.header.home', 'Car Care home')}
@@ -116,18 +200,27 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
           aria-label={customerLabel('customer.header.mainNavigation', 'Main navigation')}
           className={`customer-nav${mobileNavOpen ? ' is-open' : ''}`}
           id="customer-main-navigation"
+          onMouseLeave={() => setHoverKey('')}
+          ref={navRef}
         >
+          {indicator && (
+            <span
+              aria-hidden="true"
+              className="customer-nav-indicator"
+              style={{ transform: `translateX(${indicator.left}px)`, width: `${indicator.width}px` }}
+            />
+          )}
           {/* One menu on every page and for every role (guest, customer, admin). */}
-          <a href={homeHref} onClick={closeMobileNav}>
+          <a href={homeHref} onClick={closeMobileNav} {...navLinkProps('home')}>
             {customerLabel('customer.header.home', 'Home')}
           </a>
-          <a href={servicesHref} onClick={closeMobileNav}>
+          <a href={servicesHref} onClick={closeMobileNav} {...navLinkProps('services')}>
             {customerLabel('customer.header.ourServices', 'Our Services')}
           </a>
-          <a href={howItWorksHref} onClick={closeMobileNav}>
+          <a href={howItWorksHref} onClick={closeMobileNav} {...navLinkProps('how')}>
             {customerLabel('customer.header.howItWorks', 'How It Works')}
           </a>
-          <a href={contactHref} onClick={closeMobileNav}>
+          <a href={contactHref} onClick={closeMobileNav} {...navLinkProps('contact')}>
             {customerLabel('customer.header.contact', 'Contact')}
           </a>
           {bookingAvailable && (

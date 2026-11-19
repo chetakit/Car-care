@@ -58,6 +58,48 @@ export function useRevealOnScroll(rootRef, refreshKey) {
   }, [rootRef, refreshKey])
 }
 
+// 3D tilt + moving glare that follows the mouse over the hero photo.
+// Writes CSS variables once per frame; mouse/trackpad only (not touch).
+export function useHeroTilt(targetRef) {
+  useEffect(() => {
+    const target = targetRef.current
+    if (!target || prefersReducedMotion() || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      return undefined
+    }
+
+    let frame = 0
+    let next = null
+    const apply = () => {
+      frame = 0
+      if (!next) return
+      target.style.setProperty('--tilt-x', `${next.rx.toFixed(2)}deg`)
+      target.style.setProperty('--tilt-y', `${next.ry.toFixed(2)}deg`)
+      target.style.setProperty('--glare-x', `${next.gx.toFixed(1)}%`)
+      target.style.setProperty('--glare-y', `${next.gy.toFixed(1)}%`)
+    }
+    const onMove = (event) => {
+      const rect = target.getBoundingClientRect()
+      const x = (event.clientX - rect.left) / rect.width
+      const y = (event.clientY - rect.top) / rect.height
+      next = { ry: (x - 0.5) * 10, rx: (0.5 - y) * 8, gx: x * 100, gy: y * 100 }
+      target.classList.add('is-tilting')
+      if (!frame) frame = window.requestAnimationFrame(apply)
+    }
+    const onLeave = () => {
+      next = { rx: 0, ry: 0, gx: 50, gy: 30 }
+      target.classList.remove('is-tilting')
+      if (!frame) frame = window.requestAnimationFrame(apply)
+    }
+    target.addEventListener('pointermove', onMove)
+    target.addEventListener('pointerleave', onLeave)
+    return () => {
+      target.removeEventListener('pointermove', onMove)
+      target.removeEventListener('pointerleave', onLeave)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [targetRef])
+}
+
 // Gentle parallax for the hero photo: one transform per animation frame, only
 // while the hero is on screen, only on wide screens.
 export function useHeroParallax(targetRef) {

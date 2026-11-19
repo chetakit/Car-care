@@ -1,12 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../Admin/api/client.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import AnimatedPrice from './AnimatedPrice.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
-import { formatCustomerMoney } from './customerFormatters.js'
+import VehicleTypePicker from './VehicleTypePicker.jsx'
 import { SERVICE_IMAGE_URL } from './serviceAssets.js'
+import { useRevealOnScroll } from './useLandingMotion.js'
+import { buildPriceTypes, priceForType } from './vehicleTypePrices.js'
 import './customer.css'
+
+function ClockIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 4.8V8l2.2 1.4" />
+    </svg>
+  )
+}
 
 function ServicesPage({ user, onLogout }) {
   const { language, t } = useLanguage()
@@ -14,6 +26,10 @@ function ServicesPage({ user, onLogout }) {
   const [serviceState, setServiceState] = useState('loading')
   const [serviceReload, setServiceReload] = useState(0)
   const [imageFailed, setImageFailed] = useState(false)
+  // Vehicle type the customer picked ('' = all types, show "from" prices).
+  const [typeId, setTypeId] = useState('')
+  const rootRef = useRef(null)
+  useRevealOnScroll(rootRef, serviceState)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -34,8 +50,14 @@ function ServicesPage({ user, onLogout }) {
     return () => controller.abort()
   }, [serviceReload])
 
+  const priceTypes = buildPriceTypes(services)
+  const selectedType = priceTypes.find((type) => type.id === typeId)
+  const availableCount = typeId
+    ? services.filter((service) => priceForType(service, typeId) !== null).length
+    : services.length
+
   return (
-    <div className="customer-home customer-services-page">
+    <div className="customer-home customer-services-page" ref={rootRef}>
       <CustomerHeader
         bookingAvailable={serviceState !== 'empty'}
         onLogout={onLogout}
@@ -45,13 +67,17 @@ function ServicesPage({ user, onLogout }) {
         <section className="services-page-intro" aria-labelledby="services-page-title">
           <div className="customer-container services-page-intro-inner">
             <div>
-              <span className="services-page-eyebrow">
+              <span className="services-page-eyebrow customer-rise" style={{ '--rise-delay': '60ms' }}>
                 {t('customer.services.eyebrow')}
               </span>
-              <h1 id="services-page-title">{t('customer.services.title')}</h1>
-              <p>{t('customer.services.description')}</p>
+              <h1 className="customer-rise" id="services-page-title" style={{ '--rise-delay': '160ms' }}>
+                {t('customer.services.title')}
+              </h1>
+              <p className="customer-rise" style={{ '--rise-delay': '280ms' }}>
+                {t('customer.services.description')}
+              </p>
             </div>
-            <div className="services-page-image">
+            <div className="services-page-image customer-rise" style={{ '--rise-delay': '200ms' }}>
               {imageFailed ? (
                 <div className="services-page-image-fallback">
                   <BrandMark />
@@ -71,10 +97,27 @@ function ServicesPage({ user, onLogout }) {
 
         <section className="services-page-catalog" aria-labelledby="services-catalog-title">
           <div className="customer-container">
-            <h2 id="services-catalog-title">{t('customer.services.catalogTitle')}</h2>
-            <p className="services-page-note">
-              {t('customer.services.priceNote')}
-            </p>
+            <div className="services-catalog-head">
+              <div>
+                <h2 id="services-catalog-title">{t('customer.services.catalogTitle')}</h2>
+                <p className="services-page-note">{t('customer.services.pickTypeNote')}</p>
+              </div>
+              {serviceState === 'ready' && (
+                <span className="services-catalog-count" aria-live="polite">
+                  {selectedType
+                    ? t('customer.services.countForType', { count: availableCount, type: selectedType.name })
+                    : t('customer.services.count', { count: availableCount })}
+                </span>
+              )}
+            </div>
+
+            {serviceState === 'ready' && priceTypes.length > 0 && (
+              <div className="services-toolbar">
+                <span className="services-toolbar-label">{t('customer.services.yourCar')}</span>
+                <VehicleTypePicker onChange={setTypeId} types={priceTypes} value={typeId} />
+              </div>
+            )}
+
             {serviceState === 'loading' && (
               <div aria-live="polite" className="customer-catalog-message">
                 <span className="customer-loader" />
@@ -101,49 +144,57 @@ function ServicesPage({ user, onLogout }) {
               </div>
             )}
             {serviceState === 'ready' && (
-              <div className="services-page-grid">
-                {services.map((service) => (
-                  <article className="services-page-card" key={service.service_id}>
-                    <ServiceIcon name={service.service_name} />
-                    <h3>{service.service_name}</h3>
-                    <p>
-                      {service.description?.trim() ||
-                        t('customer.landing.noServiceDescription')}
-                    </p>
-                    <div className="services-page-meta">
-                      <span className="services-page-duration">
-                        {service.duration_minutes !== null && service.duration_minutes !== undefined
-                          ? t('customer.services.duration', {
-                              minutes: service.duration_minutes,
-                            })
-                          : t('customer.services.durationUnavailable')}
-                      </span>
-                      {service.prices?.length > 0 && (
-                        <span className="services-page-from">
-                          {t('customer.services.priceFrom', {
-                            amount: formatCustomerMoney(service.prices[0].price, language),
-                          })}
-                        </span>
-                      )}
-                    </div>
-                    {service.prices?.length > 0 && (
-                      <details className="services-page-prices">
-                        <summary>{t('customer.services.pricesByType')}</summary>
-                        <dl>
-                          {service.prices.map((item) => (
-                            <div key={item.vehicle_type_id}>
-                              <dt>{item.type_name}</dt>
-                              <dd>{formatCustomerMoney(item.price, language)}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </details>
-                    )}
-                    <a className="services-page-book" href="/customer/booking">
-                      {t('customer.common.bookService')}
-                    </a>
-                  </article>
-                ))}
+              <div className="services-grid">
+                {services.map((service, index) => {
+                  const price = priceForType(service, typeId)
+                  const offered = price !== null
+                  return (
+                    <article
+                      className={`services-card${offered ? '' : ' is-unavailable'}`}
+                      data-reveal
+                      key={service.service_id}
+                      style={{ '--reveal-delay': `${(index % 3) * 80}ms` }}
+                    >
+                      <div className="services-card-top">
+                        <ServiceIcon name={service.service_name} />
+                        {service.duration_minutes !== null && service.duration_minutes !== undefined && (
+                          <span className="services-card-duration">
+                            <ClockIcon />
+                            {t('customer.landing.durationMinutes', { minutes: service.duration_minutes })}
+                          </span>
+                        )}
+                      </div>
+                      <h3>{service.service_name}</h3>
+                      <p>
+                        {service.description?.trim() || t('customer.landing.noServiceDescription')}
+                      </p>
+                      <div className="services-card-foot">
+                        <div className="services-card-price">
+                          {offered ? (
+                            <>
+                              <small>
+                                {selectedType
+                                  ? t('customer.services.priceForType', { type: selectedType.name })
+                                  : t('customer.landing.priceFromLabel')}
+                              </small>
+                              <strong><AnimatedPrice language={language} value={price} /></strong>
+                            </>
+                          ) : (
+                            <small>{t('customer.landing.priceNotForType')}</small>
+                          )}
+                        </div>
+                        {offered && (
+                          <a className="services-card-book" href="/customer/booking">
+                            {t('customer.common.bookService')}
+                            <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">
+                              <path d="M3.5 10h12m-5-5 5 5-5 5" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
+                    </article>
+                  )
+                })}
               </div>
             )}
           </div>

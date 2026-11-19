@@ -4,11 +4,12 @@ import useAuth from '../auth/useAuth.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
+import AnimatedPrice from './AnimatedPrice.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
-import { formatCustomerMoney } from './customerFormatters.js'
-import { useHeroParallax, useRevealOnScroll } from './useLandingMotion.js'
+import VehicleTypePicker from './VehicleTypePicker.jsx'
+import { buildPriceTypes, priceForType } from './vehicleTypePrices.js'
+import { useHeroParallax, useHeroTilt, useRevealOnScroll } from './useLandingMotion.js'
 import { SERVICE_IMAGE_URL } from './serviceAssets.js'
-import { SHOP_LINE_ID, SHOP_PHONE, SHOP_PHONE_HREF } from './shopInfo.js'
 import './customer.css'
 
 // Bugatti Chiron at night — the red badge echoes the brand colour.
@@ -94,8 +95,14 @@ function CustomerLanding({ user, onLogout }) {
   const [serviceImageFailed, setServiceImageFailed] = useState(false)
   const rootRef = useRef(null)
   const heroImageRef = useRef(null)
+  const heroVisualRef = useRef(null)
+  // Vehicle type picked in the services section ('' = all types).
+  const [priceTypeId, setPriceTypeId] = useState('')
   useRevealOnScroll(rootRef, serviceState)
   useHeroParallax(heroImageRef)
+  useHeroTilt(heroVisualRef)
+
+  const priceTypes = buildPriceTypes(services)
 
 
   useEffect(() => {
@@ -175,7 +182,7 @@ function CustomerLanding({ user, onLogout }) {
               </div>
             </div>
 
-            <div className="customer-hero-visual customer-rise" style={{ '--rise-delay': '200ms' }}>
+            <div className="customer-hero-visual customer-rise" ref={heroVisualRef} style={{ '--rise-delay': '200ms' }}>
               <div className="customer-hero-image-wrap" ref={heroImageRef}>
                 {heroImageFailed ? (
                   <div
@@ -198,7 +205,13 @@ function CustomerLanding({ user, onLogout }) {
                     srcSet={HERO_IMAGE_SRCSET}
                   />
                 )}
-                {!heroImageFailed && <span aria-hidden="true" className="customer-hero-shine" />}
+                {!heroImageFailed && (
+                  <>
+                    <span aria-hidden="true" className="customer-hero-shine" />
+                    <span aria-hidden="true" className="customer-hero-glare" />
+                    <span aria-hidden="true" className="customer-hero-streak" />
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -284,8 +297,16 @@ function CustomerLanding({ user, onLogout }) {
                     {t('customer.landing.noServicesAvailable')}
                   </div>
                 )}
+                {serviceState === 'ready' && priceTypes.length > 0 && (
+                  <VehicleTypePicker
+                    data-reveal
+                    onChange={setPriceTypeId}
+                    types={priceTypes}
+                    value={priceTypeId}
+                  />
+                )}
                 {serviceState === 'ready' && (
-                  <div className="customer-service-list">
+                  <div aria-live="polite" className="customer-service-list">
                     {services.slice(0, 3).map((service, index) => (
                       <article
                         className="customer-service-card"
@@ -302,13 +323,18 @@ function CustomerLanding({ user, onLogout }) {
                           </p>
                         </div>
                         <span className="customer-service-side">
-                          {service.prices?.length > 0 && (
-                            <strong className="customer-service-price">
-                              {t('customer.services.priceFrom', {
-                                amount: formatCustomerMoney(service.prices[0].price, language),
-                              })}
-                            </strong>
-                          )}
+                          {(() => {
+                            if (!service.prices?.length) return null
+                            const price = priceForType(service, priceTypeId)
+                            return price === null ? (
+                              <span className="customer-service-na">{t('customer.landing.priceNotForType')}</span>
+                            ) : (
+                              <strong className="customer-service-price">
+                                {!priceTypeId && <small>{t('customer.landing.priceFromLabel')}</small>}
+                                <AnimatedPrice language={language} value={price} />
+                              </strong>
+                            )
+                          })()}
                           {service.duration_minutes !== null && service.duration_minutes !== undefined && (
                             <span className="customer-service-duration">
                               {t('customer.landing.durationMinutes', {
@@ -451,10 +477,11 @@ function CustomerLanding({ user, onLogout }) {
         <section
           aria-labelledby="customer-booking-title"
           className="customer-promo"
-          id="contact"
+          id="book-now"
         >
-          <div className="customer-container customer-promo-inner">
-            <div className="customer-promo-copy" data-reveal>
+          <div className="customer-container">
+            <div className="customer-promo-card" data-reveal>
+              <div className="customer-promo-copy">
               <span className="customer-eyebrow customer-eyebrow-light">
                 {serviceState === 'empty'
                   ? t('customer.landing.updateServices')
@@ -476,31 +503,8 @@ function CustomerLanding({ user, onLogout }) {
                   <ArrowIcon />
                 </a>
               )}
+              </div>
             </div>
-            <address className="customer-contact-card" data-reveal style={{ '--reveal-delay': '120ms' }}>
-              <h3>{t('customer.contact.title')}</h3>
-              <dl>
-                <div>
-                  <dt>{t('customer.contact.address')}</dt>
-                  <dd>{t('customer.contact.addressValue')}</dd>
-                </div>
-                <div>
-                  <dt>{t('customer.contact.phone')}</dt>
-                  <dd><a href={SHOP_PHONE_HREF}>{SHOP_PHONE}</a></dd>
-                </div>
-                <div>
-                  <dt>LINE</dt>
-                  <dd>{SHOP_LINE_ID}</dd>
-                </div>
-                <div>
-                  <dt>{t('customer.contact.hours')}</dt>
-                  <dd>
-                    {t('customer.contact.hoursValue')}
-                    <small>{t('customer.contact.closed')}</small>
-                  </dd>
-                </div>
-              </dl>
-            </address>
           </div>
         </section>
       </main>
