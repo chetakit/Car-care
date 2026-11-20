@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import AdminApp from './Admin/AdminApp.jsx'
 import { AuthProvider } from './auth/AuthContext.jsx'
-import LoginPage from './auth/LoginPage.jsx'
-import RegistrationPage from './auth/RegistrationPage.jsx'
+import AuthGaragePage from './auth/AuthGaragePage.jsx'
 import useAuth from './auth/useAuth.js'
 import CustomerBookingPage from './Customer/CustomerBookingPage.jsx'
 import CustomerDashboardPage from './Customer/CustomerDashboardPage.jsx'
@@ -209,14 +208,15 @@ function AppContent() {
   if (authStatus !== 'authenticated') {
     if (currentPath === '/login') {
       return (
-        <LoginPage
+        <AuthGaragePage
+          mode="login"
           onNavigate={navigateAuthLink}
           registrationSuccess={window.history.state?.registrationSuccess === true}
         />
       )
     }
     if (currentPath === '/register') {
-      return <RegistrationPage onNavigate={navigateAuthLink} />
+      return <AuthGaragePage mode="register" onNavigate={navigateAuthLink} />
     }
     if (currentPath === '/') {
       return <CustomerLanding user={null} />

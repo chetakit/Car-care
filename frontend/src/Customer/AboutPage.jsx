@@ -281,6 +281,16 @@ function AboutPage({ user, onLogout }) {
               {t('customer.about.photoCredit')}{' '}
               <a href="https://unsplash.com/license" rel="noreferrer" target="_blank">Unsplash</a>
             </p>
+            <p className="about-photo-credit" data-reveal>
+              {t('customer.about.soundCredit')}{' '}
+              <a href="https://pixabay.com/service/license-summary/" rel="noreferrer" target="_blank">Pixabay</a>
+            </p>
+            <p className="about-photo-credit" data-reveal>
+              {t('customer.about.modelCredit')}{' '}
+              <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noreferrer" target="_blank">CC BY-NC-SA 4.0</a>
+              {' · '}
+              <a href="https://sketchfab.com/3d-models/2019-lamborghini-urus-9ef2fd625ba54ea39226ea5d043c0e13" rel="noreferrer" target="_blank">Sketchfab</a>
+            </p>
           </div>
         </section>
       </main>

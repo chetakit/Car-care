@@ -77,7 +77,9 @@ export function AuthProvider({ children }) {
     return () => controller.abort()
   }, [authStatus, clearSession, token])
 
-  const login = useCallback(async (email, password) => {
+  // options.beforeCommit runs after the server accepts and before the session
+  // is saved (the login page uses it to play the drive-off animation).
+  const login = useCallback(async (email, password, options = {}) => {
     setAuthError('')
     const response = await apiRequest('/api/auth/login', {
       method: 'POST',
@@ -89,6 +91,14 @@ export function AuthProvider({ children }) {
     }
     if (!isSupportedUser(signedInUser)) {
       throw new Error('auth.error.unsupportedRole')
+    }
+
+    if (options.beforeCommit) {
+      try {
+        await options.beforeCommit(signedInUser)
+      } catch {
+        // An animation problem must never block signing in.
+      }
     }
 
     window.sessionStorage.setItem(TOKEN_KEY, accessToken)
