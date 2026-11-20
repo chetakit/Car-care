@@ -147,6 +147,18 @@ function CustomerLanding({ user, onLogout }) {
 
       <main>
         <section aria-labelledby="customer-hero-title" className="customer-hero" id="home">
+          {/* Animated backdrop: drifting glows, a perspective road grid
+              rolling toward the viewer, and the odd speed streak. */}
+          <div aria-hidden="true" className="customer-hero-bg">
+            <span className="hero-bg-glow is-red" />
+            <span className="hero-bg-glow is-cool" />
+            <span className="hero-bg-floor">
+              <span className="hero-bg-grid" />
+            </span>
+            <span className="hero-bg-streak" style={{ '--streak-top': '22%', '--streak-delay': '0s' }} />
+            <span className="hero-bg-streak" style={{ '--streak-top': '58%', '--streak-delay': '2.6s' }} />
+            <span className="hero-bg-streak" style={{ '--streak-top': '78%', '--streak-delay': '5.1s' }} />
+          </div>
           <div className="customer-container customer-hero-grid">
             <div className="customer-hero-copy">
               <span className="customer-eyebrow customer-rise" style={{ '--rise-delay': '60ms' }}>
@@ -384,6 +396,16 @@ function CustomerLanding({ user, onLogout }) {
                 <p>{t('customer.landing.stepsDescription')}</p>
               </div>
             </div>
+            <div className="customer-timeline-wrap">
+            {/* Decorative road behind the rail: lane dashes roll past and a
+                headlight glides from step 1 to step 5. */}
+            <span aria-hidden="true" className="customer-road">
+              <span className="customer-road-lane is-top" />
+              <span className="customer-road-lane is-bottom" />
+              <span className="customer-road-track">
+                <span className="customer-road-car" />
+              </span>
+            </span>
             <ol className="customer-timeline" data-reveal>
               {PROCESS_STEPS.map((step, index) => (
                 <li
@@ -412,6 +434,7 @@ function CustomerLanding({ user, onLogout }) {
                 </li>
               ))}
             </ol>
+            </div>
 
             <div className="customer-policy" data-reveal>
               <div className="customer-policy-heading">

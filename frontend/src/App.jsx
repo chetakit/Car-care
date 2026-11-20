@@ -14,6 +14,7 @@ import CustomerWalletPage from './Customer/CustomerWalletPage.jsx'
 import MyBookingsPage from './Customer/MyBookingsPage.jsx'
 import MyVehiclesPage from './Customer/MyVehiclesPage.jsx'
 import ServicesPage from './Customer/ServicesPage.jsx'
+import AboutPage from './Customer/AboutPage.jsx'
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext.jsx'
 // [STAFF] หน้าพนักงาน (Staff & Service Management) — แทน StaffDashboard เดิม
 import StaffApp from './Staff/StaffApp.jsx'
@@ -138,7 +139,7 @@ function AppContent() {
     if (STAFF_MOCK && isStaffPath(currentPath)) return
 
     if (authStatus !== 'authenticated') {
-      const isPublicPath = currentPath === '/' || currentPath === '/services'
+      const isPublicPath = currentPath === '/' || currentPath === '/services' || currentPath === '/about'
       if (
         !isPublicPath &&
         currentPath !== '/login' &&
@@ -163,7 +164,7 @@ function AppContent() {
         window.history.state?.customerReturnTo,
       )
       navigateTo(destination || '/', true)
-    } else if (currentPath === '/' || currentPath === '/services') {
+    } else if (currentPath === '/' || currentPath === '/services' || currentPath === '/about') {
       return
     } else if (user?.role === 'ADMIN') {
       if (currentPath === '/admin') {
@@ -188,6 +189,14 @@ function AppContent() {
     return isStaffPath(currentPath)
       ? <StaffApp onLogout={logout} user={user} />
       : <SessionLoading message={t('app.session.openingStaff')} />
+  }
+  if (currentPath === '/about') {
+    return (
+      <AboutPage
+        onLogout={user?.role === 'ADMIN' ? logoutAdminFromHome : logout}
+        user={user}
+      />
+    )
   }
   if (currentPath === '/services') {
     return (
