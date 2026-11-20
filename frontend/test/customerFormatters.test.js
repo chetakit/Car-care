@@ -130,14 +130,11 @@ test('dates, times, timestamps, and THB amounts use the selected locale', () => 
         timeStyle: 'short',
       }).format(timestamp),
     )
-    assert.equal(
-      formatCustomerMoney(1234.5, language),
-      new Intl.NumberFormat(locale, { style: 'currency', currency: 'THB' }).format(1234.5),
-    )
+    // Amount first, baht sign after, the same as the admin pages.
+    assert.equal(formatCustomerMoney(1234.5, language), '1,234.50 ฿')
   }
 
   assert.notEqual(formatCustomerDate('2026-11-17', 'TH'), formatCustomerDate('2026-11-17', 'EN'))
-  assert.notEqual(formatCustomerMoney(1234.5, 'TH'), formatCustomerMoney(1234.5, 'EN'))
 })
 
 test('invalid dates and times use localized fallback labels', () => {
