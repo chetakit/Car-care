@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../Admin/api/client.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import AnimatedPrice from './AnimatedPrice.jsx'
+import AvailabilityCalendar from './AvailabilityCalendar.jsx'
 import CustomerHeader, { BrandMark } from './CustomerHeader.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import ServiceIcon from './ServiceIcon.jsx'
@@ -199,6 +200,7 @@ function ServicesPage({ user, onLogout }) {
             )}
           </div>
         </section>
+        <AvailabilityCalendar />
       </main>
       <CustomerFooter />
     </div>

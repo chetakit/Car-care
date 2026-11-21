@@ -175,9 +175,18 @@ function CustomerBookingPage({ user, onLogout }) {
     prices: {},
   })
   const [priceReload, setPriceReload] = useState(0)
-  const [scheduleRangeStart, setScheduleRangeStart] = useState(() =>
-    localDateString(new Date()),
-  )
+  // A day picked in the availability calendar on /services (?date=YYYY-MM-DD).
+  const [preferredDate] = useState(() => {
+    const date = new URLSearchParams(window.location.search).get('date') || ''
+    return /^d{4}-d{2}-d{2}$/.test(date) && date >= localDateString(new Date()) ? date : ''
+  })
+  const [scheduleRangeStart, setScheduleRangeStart] = useState(() => {
+    const todayValue = localDateString(new Date())
+    // Open the week of the picked day when it is beyond the first two weeks.
+    return preferredDate && preferredDate > shiftDate(todayValue, BOOKING_WINDOW_DAYS - 1)
+      ? preferredDate
+      : todayValue
+  })
   const [schedules, setSchedules] = useState([])
   const [scheduleState, setScheduleState] = useState('idle')
   const [scheduleReload, setScheduleReload] = useState(0)
@@ -363,7 +372,10 @@ function CustomerBookingPage({ user, onLogout }) {
         })
         setSchedules(normalizedItems)
         setSelectedDate(
-          normalizedItems.find(scheduleIsSelectable)?.schedule_date ||
+          normalizedItems.find(
+            (schedule) => schedule.schedule_date === preferredDate && scheduleIsSelectable(schedule),
+          )?.schedule_date ||
+            normalizedItems.find(scheduleIsSelectable)?.schedule_date ||
             normalizedItems[0]?.schedule_date ||
             '',
         )
@@ -374,7 +386,7 @@ function CustomerBookingPage({ user, onLogout }) {
       })
 
     return () => controller.abort()
-  }, [api, rangeEnd, scheduleRangeStart, scheduleReload, scheduleState, step, totalDurationMinutes])
+  }, [api, preferredDate, rangeEnd, scheduleRangeStart, scheduleReload, scheduleState, step, totalDurationMinutes])
 
   useEffect(() => {
     if (step !== 4 || couponsState === 'ready' || couponsState === 'error') {
