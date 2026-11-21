@@ -301,15 +301,17 @@ erDiagram
 
 | กลุ่ม | ตาราง | จำนวนแถวจริง |
 |---|---|---|
-| ผู้ใช้ | `users` (role: ADMIN / CUSTOMER / STAFF) | 10 |
-| รถ | `vehicle_types` · `vehicle_brands` · `vehicle_models` · `vehicles` | 7 · 14 · 25 · 9 |
+| ผู้ใช้ | `users` (role: ADMIN / CUSTOMER / STAFF) | 11 |
+| รถ | `vehicle_types` · `vehicle_brands` · `vehicle_models` · `vehicles` | 7 · 18 · 157 · 9 |
 | บริการและราคา | `services` · `service_prices` (ราคาแยกตามประเภทรถ) | 10 · 52 |
 | เวลาให้บริการ | `business_hours` · `schedules` | 7 · 160 |
-| การจอง | `bookings` · `booking_services` · `booking_status_history` | 14 · 18 · 12 |
-| พนักงาน | `vehicle_check_ins` · `booking_notes` | 2 · 1 |
+| การจอง | `bookings` · `booking_services` · `booking_status_history` | 14 · 18 · 14 |
+| พนักงาน | `vehicle_check_ins` · `booking_notes` | 3 · 1 |
 | คูปอง | `coupons` · `coupon_usages` | 5 · 1 |
 | การเงิน | `payments` · `payment_verifications` · `refunds` · `wallets` · `wallet_transactions` | 10 · 0 · 2 · 2 · 3 |
 | ตรวจสอบย้อนหลัง | `audit_logs` | 1 |
+
+จำนวนแถวนับ ณ 21 พ.ย. 2569 ข้อมูลรถมี 18 ยี่ห้อ 157 รุ่น (Sedan 28 · Hatchback 19 · SUV 40 · Pickup 18 · Van 20 · Motorcycle 32) ครอบคลุมทุกประเภทที่แต่ละยี่ห้อขายในไทย และลบข้อมูลทดสอบ API ออกแล้ว ถ้ารุ่นรถไม่มีในรายการ ลูกค้าเลือก "รุ่นอื่นๆ / Other (ประเภท)" ของยี่ห้อนั้น หรือยี่ห้อ "อื่นๆ / Other" ได้ ราคาคิดตามประเภทรถ จึงจองต่อได้ทันที แล้ว Admin เพิ่มรุ่นจริงภายหลังได้จากหน้า Admin
 
 **จุดออกแบบที่สำคัญ**
 - **สถานะการจอง** เป็น ENUM 7 ค่า: `PENDING_PAYMENT`, `CONFIRMED`, `CHECKED_IN`, `IN_SERVICE`, `COMPLETED`, `CANCELLED`, `NO_SHOW` และทุกครั้งที่เปลี่ยนจะบันทึกลง `booking_status_history` พร้อมผู้เปลี่ยนและเหตุผล
