@@ -1,5 +1,15 @@
 const pool = require("../../shared/config/db");
 const verifiedPaymentSql = require("../../shared/services/verifiedPaymentSql");
+const { SHOP_TODAY_SQL: TODAY, toShopTimeSql } = require("../../shared/services/shopTime");
+
+// "Today" and "this month" follow the shop's calendar (Thailand, UTC+7),
+// not the database server's UTC date.
+const PAID_AT = toShopTimeSql("p.paid_at");
+const PROCESSED_AT = toShopTimeSql("r.processed_at");
+const inToday = (column) => `${column} >= ${TODAY}
+              AND ${column} < ${TODAY} + INTERVAL 1 DAY`;
+const inThisMonth = (column) => `${column} >= DATE_FORMAT(${TODAY}, '%Y-%m-01')
+              AND ${column} < DATE_FORMAT(${TODAY} + INTERVAL 1 MONTH, '%Y-%m-01')`;
 
 function toNumber(value) {
   const number = Number(value);
@@ -20,7 +30,7 @@ async function getSummary() {
     ),
     pool.execute("SELECT COUNT(*) AS totalVehicles FROM vehicles"),
     pool.execute(
-      "SELECT COUNT(*) AS todayBookings FROM bookings WHERE booking_date = CURRENT_DATE()",
+      `SELECT COUNT(*) AS todayBookings FROM bookings WHERE booking_date = ${TODAY}`,
     ),
     pool.execute(
       "SELECT booking_status, COUNT(*) AS count FROM bookings GROUP BY booking_status",
@@ -36,13 +46,11 @@ async function getSummary() {
       FROM (
         SELECT
           COALESCE(SUM(CASE
-            WHEN p.paid_at >= CURRENT_DATE()
-              AND p.paid_at < CURRENT_DATE() + INTERVAL 1 DAY
+            WHEN ${inToday(PAID_AT)}
             THEN p.amount ELSE 0
           END), 0) AS todayGrossRevenue,
           COALESCE(SUM(CASE
-            WHEN p.paid_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-              AND p.paid_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+            WHEN ${inThisMonth(PAID_AT)}
             THEN p.amount ELSE 0
           END), 0) AS monthlyGrossRevenue
         FROM payments p
@@ -52,13 +60,11 @@ async function getSummary() {
       CROSS JOIN (
         SELECT
           COALESCE(SUM(CASE
-            WHEN r.processed_at >= CURRENT_DATE()
-              AND r.processed_at < CURRENT_DATE() + INTERVAL 1 DAY
+            WHEN ${inToday(PROCESSED_AT)}
             THEN r.refund_amount ELSE 0
           END), 0) AS todayRefunds,
           COALESCE(SUM(CASE
-            WHEN r.processed_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-              AND r.processed_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+            WHEN ${inThisMonth(PROCESSED_AT)}
             THEN r.refund_amount ELSE 0
           END), 0) AS monthlyRefunds
         FROM refunds r

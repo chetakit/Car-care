@@ -62,7 +62,11 @@ test("Dashboard revenue uses paid and processed timestamps with exclusive end da
     }
     if (sql.includes("AS totalCustomers")) return [[{ totalCustomers: 0 }]];
     if (sql.includes("AS totalVehicles")) return [[{ totalVehicles: 0 }]];
-    if (sql.includes("AS todayBookings")) return [[{ todayBookings: 0 }]];
+    if (sql.includes("AS todayBookings")) {
+      // booking_date is a shop-local date, so compare with the shop's today.
+      assert.match(sql, /booking_date = DATE\(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\)/);
+      return [[{ todayBookings: 0 }]];
+    }
     if (sql.includes("GROUP BY booking_status")) return [[]];
     if (sql.includes("FROM bookings b")) return [[]];
     throw new Error(`Unexpected dashboard query: ${sql}`);
@@ -78,15 +82,17 @@ test("Dashboard revenue uses paid and processed timestamps with exclusive end da
     assert.equal(summary.monthlyRefunds, 120);
     assert.equal(summary.monthlyRevenue, 530);
     assert.match(revenueQuery, /payment_status = 'PAID'/);
-    assert.match(revenueQuery, /paid_at >= CURRENT_DATE\(\)/);
-    assert.match(revenueQuery, /paid_at < CURRENT_DATE\(\) \+ INTERVAL 1 DAY/);
-    assert.match(revenueQuery, /paid_at >= DATE_FORMAT\(CURRENT_DATE\(\), '%Y-%m-01'\)/);
-    assert.match(revenueQuery, /paid_at < DATE_FORMAT\(CURRENT_DATE\(\) \+ INTERVAL 1 MONTH, '%Y-%m-01'\)/);
+    // Days and months follow shop time (UTC+7): stored UTC timestamps are
+    // shifted by 7 hours and compared with the shop's date, not CURRENT_DATE().
+    const shopToday = String.raw`DATE\(UTC_TIMESTAMP\(\) \+ INTERVAL 7 HOUR\)`;
+    for (const column of [String.raw`\(p\.paid_at \+ INTERVAL 7 HOUR\)`, String.raw`\(r\.processed_at \+ INTERVAL 7 HOUR\)`]) {
+      assert.match(revenueQuery, new RegExp(`${column} >= ${shopToday}`));
+      assert.match(revenueQuery, new RegExp(`${column} < ${shopToday} \\+ INTERVAL 1 DAY`));
+      assert.match(revenueQuery, new RegExp(`${column} >= DATE_FORMAT\\(${shopToday}, '%Y-%m-01'\\)`));
+      assert.match(revenueQuery, new RegExp(`${column} < DATE_FORMAT\\(${shopToday} \\+ INTERVAL 1 MONTH, '%Y-%m-01'\\)`));
+    }
+    assert.doesNotMatch(revenueQuery, /CURRENT_DATE/);
     assert.match(revenueQuery, /refund_status = 'REFUNDED'/);
-    assert.match(revenueQuery, /processed_at >= CURRENT_DATE\(\)/);
-    assert.match(revenueQuery, /processed_at < CURRENT_DATE\(\) \+ INTERVAL 1 DAY/);
-    assert.match(revenueQuery, /processed_at >= DATE_FORMAT\(CURRENT_DATE\(\), '%Y-%m-01'\)/);
-    assert.match(revenueQuery, /processed_at < DATE_FORMAT\(CURRENT_DATE\(\) \+ INTERVAL 1 MONTH, '%Y-%m-01'\)/);
     assert.match(revenueQuery, /payments\.todayGrossRevenue - refunds\.todayRefunds AS todayRevenue/);
     assert.match(revenueQuery, /payments\.monthlyGrossRevenue - refunds\.monthlyRefunds AS monthlyRevenue/);
     assert.match(revenueQuery, /p\.payment_method = 'WALLET'/);

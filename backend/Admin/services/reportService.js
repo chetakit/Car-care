@@ -1,5 +1,9 @@
 const pool = require("../../shared/config/db");
 const verifiedPaymentSql = require("../../shared/services/verifiedPaymentSql");
+const { toShopTimeSql } = require("../../shared/services/shopTime");
+
+// paid_at is stored in UTC; group and filter it by the shop's (Thai) calendar day.
+const PAID_AT_SHOP = toShopTimeSql("p.paid_at");
 
 const BOOKING_STATUSES = [
   "PENDING_PAYMENT",
@@ -80,7 +84,7 @@ async function bookings({ date_from, date_to, group_by }) {
 }
 
 async function revenue({ date_from, date_to, group_by }) {
-  const filters = dateConditions("p.paid_at", date_from, date_to);
+  const filters = dateConditions(PAID_AT_SHOP, date_from, date_to);
   const whereClause = filters.whereClause
     ? `${filters.whereClause} AND ${verifiedPaymentSql}`
     : ` WHERE ${verifiedPaymentSql}`;
@@ -92,7 +96,7 @@ async function revenue({ date_from, date_to, group_by }) {
       filters.values,
     ),
     pool.execute(
-      `SELECT ${bucketExpression(group_by, "p.paid_at")} AS period,
+      `SELECT ${bucketExpression(group_by, PAID_AT_SHOP)} AS period,
         COALESCE(SUM(p.amount), 0) AS revenue,
         COUNT(*) AS successfulPayments
       FROM payments p INNER JOIN bookings b ON b.booking_id = p.booking_id${whereClause}
