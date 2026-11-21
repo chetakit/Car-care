@@ -93,6 +93,7 @@ function couponReasonText(error, t) {
   }
   if (/not active yet/i.test(message)) return t('customer.booking.couponReason.notStarted')
   if (/expired/i.test(message)) return t('customer.booking.couponReason.expired')
+  if (/already used this coupon/i.test(message)) return t('customer.booking.couponReason.perUser')
   if (/usage limit/i.test(message)) return t('customer.booking.couponReason.limit')
   if (/not valid/i.test(message)) return t('customer.booking.couponReason.invalid')
   return t('customer.booking.couponCheckError')

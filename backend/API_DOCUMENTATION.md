@@ -112,6 +112,18 @@ The create request accepts `vehicle_id`, `schedule_id`, and `service_ids`, with 
 
 Each booking contains `booking_id`, `booking_date`, `start_time`, `end_time`, `booking_status`, `total_amount`, `discount_amount`, `final_amount`, `vehicle`, `services`, and `payment`. `vehicle` is `null` or contains `vehicle_id`, `license_plate`, `production_year`, `province`, `color`, `model_name`, `brand_name`, and `type_name`. Each service contains `booking_service_id`, `service_id`, `service_name`, `unit_price`, and `duration_minutes`. Payment is `null` when unavailable and otherwise contains `payment_id`, `amount`, `payment_method`, `payment_status`, `paid_at`. The Customer response does not include payment transaction references.
 
+## Audit log
+
+Every successful change by an ADMIN or STAFF account on the routes below is written to `audit_logs` automatically (middleware `shared/middleware/auditTrail.js`): admin create/update/status for users (and role), services (and prices), coupons, vehicle types/brands/models, slot capacity; payment create/simulate/wallet (admin) and verify (staff/admin); admin cancellations; staff check-in, status, no-show and notes. Each row has `user_id`, `action`, `table_name`, `record_id`, `old_value` and `new_value` (only the fields that changed; passwords and tokens are never stored) and `reason`. Requests that fail or come from other roles are not logged.
+
+| Method and URL | Request | Success | Errors |
+|---|---|---|---|
+| `GET /api/admin/audit-logs` | ADMIN only. Optional `page` (default 1), `limit` (1–100, default 20), `action` (prefix such as `PAYMENT` or `USER_ROLE_CHANGED`), `q` (part of the actor's name or e-mail). | `200`, `data: { items, pagination }`, newest first; each item has `audit_log_id`, `action`, `table_name`, `record_id`, `old_value`, `new_value`, `reason`, `created_at` (UTC ISO) and `actor { user_id, full_name, email, role }`. There is no API to change or delete entries. | `400` invalid query, `401`, `403`, `500`. |
+
+## Coupons: per-customer limit
+
+`coupons.per_user_limit` (admin create/update field, `null` = no limit, otherwise a whole number of at least 1) caps how often one customer may use a coupon. It is checked by the coupon preview and again inside booking creation (with the coupon row locked); the customer's available-coupon list hides coupons they have used up. Refusal message: `You have already used this coupon.` (or `… N times.`). Uses given back on unpaid cancellation/expiry do not count.
+
 ## Admin payment lookup
 
 | Method and URL | Request | Success | Errors |

@@ -24,7 +24,7 @@ function centsToDecimal(cents) {
 }
 
 const COUPON_COLUMNS = `coupon_id, coupon_code, description, discount_type, discount_value,
-  max_discount, min_order_amount, usage_limit, used_count, status,
+  max_discount, min_order_amount, usage_limit, per_user_limit, used_count, status,
   (${SHOP_NOW_SQL} >= start_date AND ${SHOP_NOW_SQL} <= end_date) AS is_live,
   (${SHOP_NOW_SQL} < start_date) AS not_started`;
 
@@ -74,6 +74,24 @@ function calculateDiscount(coupon, subtotalCents) {
   return discountCents;
 }
 
+// Throws when this customer has already used the coupon as often as its
+// per-account limit allows. A use counts while its coupon_usages row exists
+// (a booking cancelled before payment gives the use back).
+async function assertPerUserLimit(executor, coupon, userId) {
+  if (!coupon || coupon.per_user_limit === null || coupon.per_user_limit === undefined) return;
+  const [rows] = await executor.execute(
+    "SELECT COUNT(*) AS uses FROM coupon_usages WHERE coupon_id = ? AND user_id = ?",
+    [coupon.coupon_id, userId],
+  );
+  if (Number(rows[0]?.uses ?? 0) >= Number(coupon.per_user_limit)) {
+    throw new CouponError(
+      Number(coupon.per_user_limit) === 1
+        ? "You have already used this coupon."
+        : `You have already used this coupon ${coupon.per_user_limit} times.`,
+    );
+  }
+}
+
 // Reserve one use of the coupon for a booking. Runs inside the caller's transaction.
 async function recordCouponUse(connection, coupon, { bookingId, userId, discountCents }) {
   const [update] = await connection.execute(
@@ -113,6 +131,7 @@ module.exports = {
   centsToDecimal,
   findCoupon,
   calculateDiscount,
+  assertPerUserLimit,
   recordCouponUse,
   releaseCouponForBooking,
 };

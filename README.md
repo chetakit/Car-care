@@ -126,7 +126,7 @@ stateDiagram-v2
 
 ## 2. API implementation: Endpoint และ HTTP Methods
 
-ทั้งระบบมี **88 endpoint** นับจาก route ที่เปิดใช้ใน `backend/app.js`
+ทั้งระบบมี **89 endpoint** นับจาก route ที่เปิดใช้ใน `backend/app.js`
 
 | กลุ่ม | จำนวน | สิทธิ์ที่ต้องมี |
 |---|---|---|
@@ -134,14 +134,14 @@ stateDiagram-v2
 | Public | 2 | ไม่ต้องล็อกอิน |
 | Customer | 17 | CUSTOMER |
 | Shared: payments / cancellations / wallet | 9 | CUSTOMER (เฉพาะของตัวเอง) หรือ ADMIN, ยืนยันรับเงินใช้ STAFF/ADMIN |
-| Admin | 43 | ADMIN |
+| Admin | 44 | ADMIN |
 | Staff | 6 | STAFF |
 | Notifications (กระดิ่งแจ้งเตือน) | 2 | ทุก role ที่ล็อกอิน (เห็นเฉพาะของตัวเอง) |
 | System (`/`, `/api/health/db`) | 2 | ไม่ต้องล็อกอิน |
 
 | HTTP Method | จำนวน | ตัวอย่าง |
 |---|---|---|
-| `GET` | 47 | `GET /api/customer/bookings`, `GET /api/admin/reports/revenue`, `GET /api/staff/bookings?date=` |
+| `GET` | 48 | `GET /api/customer/bookings`, `GET /api/admin/reports/revenue`, `GET /api/staff/bookings?date=` |
 | `POST` | 22 | `POST /api/auth/login`, `POST /api/customer/bookings`, `POST /api/payments/:bookingId` |
 | `PATCH` | 17 | `PATCH /api/admin/users/:id/role`, `PATCH /api/customer/profile`, `PATCH /api/staff/bookings/:id/status` |
 | `PUT` | 1 | `PUT /api/admin/services/:id/prices` (แทนที่ตารางราคาของบริการทั้งชุด) |
@@ -149,7 +149,7 @@ stateDiagram-v2
 
 ระบบเลือกใช้ `PATCH` เป็นหลักแทน `PUT` เพราะส่วนใหญ่แก้แค่บางฟิลด์ ส่วน "ลบ" ข้อมูลหลักใช้การเปลี่ยน `status` เป็น `INACTIVE` (เช่น `PATCH .../:id/status`) เพื่อไม่ให้ข้อมูลเก่าที่อ้างอิงอยู่เสีย
 
-### รายการ API ทั้งหมด (88 ตัว)
+### รายการ API ทั้งหมด (89 ตัว)
 
 **สิทธิ์:** `Public` = ไม่ต้องล็อกอิน · `CUSTOMER` / `ADMIN` / `STAFF` = ต้องล็อกอินด้วย role นั้น · `CUSTOMER/ADMIN` = ลูกค้า (เฉพาะข้อมูลของตัวเอง) หรือ Admin
 
@@ -204,7 +204,7 @@ stateDiagram-v2
 | 34 | `GET` | `/api/wallet/transactions` | ดูรายการเงินเข้า-ออกของกระเป๋า | CUSTOMER/ADMIN |
 | 35 | `GET` | `/api/wallet/refunds` | ดูรายการคืนเงิน | CUSTOMER/ADMIN |
 
-#### Admin: ผู้ดูแลระบบ (43)
+#### Admin: ผู้ดูแลระบบ (44)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
 | 36 | `GET` | `/api/admin/dashboard/summary` | ตัวเลขสรุปบนแดชบอร์ด | ADMIN |
@@ -250,28 +250,29 @@ stateDiagram-v2
 | 76 | `GET` | `/api/admin/reports/bookings` | รายงานการจอง | ADMIN |
 | 77 | `GET` | `/api/admin/reports/revenue` | รายงานรายได้ | ADMIN |
 | 78 | `GET` | `/api/admin/payments/lookup?q=` | ค้นหาในหน้าการชำระเงิน: ชื่อลูกค้า อีเมล เบอร์ ทะเบียน (บางส่วน) หรือหมายเลข/เลขอ้างอิงการชำระเงิน (ตรงตัว) คืนรายการการจองให้เลือก | ADMIN |
+| 79 | `GET` | `/api/admin/audit-logs?page=&limit=&action=&q=` | ประวัติการแก้ไข: ใคร ทำอะไร กับรายการไหน ค่าเดิม → ค่าใหม่ (อ่านอย่างเดียว) | ADMIN |
 
 #### Staff: พนักงาน (6)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
-| 79 | `GET` | `/api/staff/bookings` | คิวงานรายวัน (`?date=`) และประวัติ (`?date_from=&date_to=`) | STAFF |
-| 80 | `GET` | `/api/staff/bookings/:id` | รายละเอียดลูกค้า รถ บริการ การรับรถ และไทม์ไลน์ | STAFF |
-| 81 | `POST` | `/api/staff/bookings/:id/check-in` | บันทึกการรับรถเข้าร้าน (เลขไมล์, น้ำมัน, สภาพรถ) | STAFF |
-| 82 | `PATCH` | `/api/staff/bookings/:id/status` | เปลี่ยนสถานะการให้บริการพร้อมเหตุผล | STAFF |
-| 83 | `POST` | `/api/staff/bookings/:id/no-show` | บันทึกลูกค้าไม่มาตามนัด | STAFF |
-| 84 | `POST` | `/api/staff/bookings/:id/notes` | เพิ่มหมายเหตุโดยไม่เปลี่ยนสถานะ | STAFF |
+| 80 | `GET` | `/api/staff/bookings` | คิวงานรายวัน (`?date=`) และประวัติ (`?date_from=&date_to=`) | STAFF |
+| 81 | `GET` | `/api/staff/bookings/:id` | รายละเอียดลูกค้า รถ บริการ การรับรถ และไทม์ไลน์ | STAFF |
+| 82 | `POST` | `/api/staff/bookings/:id/check-in` | บันทึกการรับรถเข้าร้าน (เลขไมล์, น้ำมัน, สภาพรถ) | STAFF |
+| 83 | `PATCH` | `/api/staff/bookings/:id/status` | เปลี่ยนสถานะการให้บริการพร้อมเหตุผล | STAFF |
+| 84 | `POST` | `/api/staff/bookings/:id/no-show` | บันทึกลูกค้าไม่มาตามนัด | STAFF |
+| 85 | `POST` | `/api/staff/bookings/:id/notes` | เพิ่มหมายเหตุโดยไม่เปลี่ยนสถานะ | STAFF |
 
 #### Notifications: กระดิ่งแจ้งเตือน (2)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
-| 85 | `GET` | `/api/notifications?limit=` | แจ้งเตือนล่าสุดของตัวเอง พร้อมจำนวนที่ยังไม่อ่าน | ทุก role |
-| 86 | `POST` | `/api/notifications/read` | ทำเครื่องหมายว่าอ่านแล้ว (ส่ง `ids` หรือไม่ส่ง = ทั้งหมด) | ทุก role |
+| 86 | `GET` | `/api/notifications?limit=` | แจ้งเตือนล่าสุดของตัวเอง พร้อมจำนวนที่ยังไม่อ่าน | ทุก role |
+| 87 | `POST` | `/api/notifications/read` | ทำเครื่องหมายว่าอ่านแล้ว (ส่ง `ids` หรือไม่ส่ง = ทั้งหมด) | ทุก role |
 
 #### System (2)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
-| 87 | `GET` | `/` | ตรวจว่า backend ทำงานอยู่ | Public |
-| 88 | `GET` | `/api/health/db` | ตรวจการเชื่อมต่อฐานข้อมูล | Public |
+| 88 | `GET` | `/` | ตรวจว่า backend ทำงานอยู่ | Public |
+| 89 | `GET` | `/api/health/db` | ตรวจการเชื่อมต่อฐานข้อมูล | Public |
 
 ทุก response ใช้รูปแบบเดียวกัน: สำเร็จ `{ "status": "success", "data": ... }` และผิดพลาด `{ "status": "error", "message": "..." }`
 
@@ -367,6 +368,7 @@ ORDER BY t.created_at DESC;
 | [`2026-11-15_payment_verifications.sql`](database/migrations/2026-11-15_payment_verifications.sql) | ตาราง `payment_verifications` |
 | [`2026-11-16_pay_before_confirm.sql`](database/migrations/2026-11-16_pay_before_confirm.sql) | สถานะ `PENDING_PAYMENT` |
 | [`2026-11-21_notifications.sql`](database/migrations/2026-11-21_notifications.sql) | ตาราง `notifications` (ต้องรันด้วยบัญชีที่สร้างตารางได้ เช่น root เพราะบัญชีของแอปมีสิทธิ์แค่อ่าน/เขียนข้อมูล) |
+| [`2026-11-22_coupon_per_user_limit.sql`](database/migrations/2026-11-22_coupon_per_user_limit.sql) | คอลัมน์ `coupons.per_user_limit` + index ของ `coupon_usages` (ใช้บัญชี root, ในหน้า Railway ให้รันทีละคำสั่ง) |
 
 ---
 
@@ -443,7 +445,7 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 **ผลล่าสุด (21 พ.ย. 2569)**
 | ส่วน | ผล |
 |---|---|
-| Backend: 22 ไฟล์เทสต์ | `tests 184 · pass 184 · fail 0` |
+| Backend: 24 ไฟล์เทสต์ | `tests 193 · pass 193 · fail 0` |
 | Frontend: ESLint ทั้งโปรเจกต์ | ไม่มี error |
 | Frontend: build | สำเร็จ |
 | Frontend: unit test | `tests 6 · pass 6 · fail 0` |
@@ -454,6 +456,8 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 | `customerRegistrationService`, `customerRegistrationValidator` | สมัครสมาชิก, อีเมลซ้ำ, ข้อมูลไม่ถูกต้อง |
 | `customerProfileRoutes`, `customerVehicleRoutes` | โปรไฟล์และรถของลูกค้า |
 | `customerCatalogRoutes`, `customerServiceCatalogRoutes` | แคตตาล็อกรถ บริการ และราคา |
+| `auditTrail` | การกระทำที่บันทึก, เก็บแค่ช่องที่เปลี่ยน, ไม่เก็บรหัสผ่าน, ไม่บันทึกคำขอที่ถูกปฏิเสธ (และไม่เสีย query เพิ่ม), หน้าประวัติเปิดได้เฉพาะ Admin |
+| `couponPerUserLimit` | สิทธิ์คูปองต่อคน: ไม่จำกัด / ยังไม่ครบ / ครบแล้วถูกปฏิเสธ, Admin ตั้งค่าได้เฉพาะเลขจำนวนเต็มตั้งแต่ 1 |
 | `adminPaymentLookupRoutes` | Admin ค้นด้วยหมายเลข/เลขอ้างอิง/ชื่อ/อีเมล/เบอร์/ทะเบียน, ตัวอักษร % และ _ ไม่ถูกตีความเป็น wildcard, สิทธิ์เฉพาะ Admin |
 | `notificationRoutes` | กระดิ่งแจ้งเตือน: ต้องล็อกอิน, เห็นเฉพาะของตัวเอง, อ่านแล้วบางรายการ/ทั้งหมด, ก่อนรัน migration แสดงว่าง, แจ้งเตือนล้มเหลวไม่ทำให้งานหลักพัง |
 | `publicAvailabilityRoutes` | ปฏิทินช่วงเวลาว่างแบบไม่ต้องล็อกอิน: สถานะว่าง/เต็ม/ผ่านแล้ว, ไม่เปิดเผยข้อมูลการจอง, ตรวจ query ไม่ถูกต้อง |
@@ -502,12 +506,14 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 
 ### ✅ เสร็จแล้ว
 - **Auth:** ล็อกอินรวมทุก role, สมัครสมาชิกลูกค้า, ตรวจ session, ออกจากระบบ, หน้า Login/Register แบบโรงรถพร้อมรถ Urus 3D และเสียงเครื่องยนต์, ปุ่มแสดง/ซ่อนรหัสผ่าน
+- **Audit log:** บันทึกอัตโนมัติทุกครั้งที่ Admin/พนักงานเปลี่ยนข้อมูลสำคัญ (ราคา, สิทธิ์ผู้ใช้, เปิด/ปิดบัญชี, คูปอง, บริการ, ข้อมูลรถ, จำนวนรถต่อรอบ, ยืนยันการโอน, ยกเลิกโดย Admin, งานของพนักงาน) พร้อมค่าเดิม → ค่าใหม่ ไม่เก็บรหัสผ่าน ดูได้ที่หน้า "ประวัติการแก้ไข" ของ Admin
+- **คูปอง:** จำกัดจำนวนครั้งรวม และจำกัดจำนวนครั้งต่อลูกค้า 1 คน (`per_user_limit`) การจองที่หมดเวลาจ่ายหรือยกเลิกก่อนจ่ายคืนสิทธิ์ให้
 - **แจ้งเตือนในเว็บ (กระดิ่ง):** ลูกค้าได้รับเมื่อจ่ายเงินสำเร็จ, ไม่จ่ายใน 15 นาที, รับรถ, เริ่มบริการ, รถเสร็จพร้อมรับ, ไม่มาตามนัด, ยกเลิก/คืนเงิน และเตือนนัดล่วงหน้า 1 วัน · พนักงานได้รับเมื่อมีคิวใหม่วันนี้และการโอนรอตรวจ · Admin ได้รับเมื่อมีการโอนรอตรวจและการยกเลิก · มี toast เด้งเมื่อมีแจ้งเตือนใหม่ (เช็กทุก 20 วินาที)
 - **หน้าเกี่ยวกับโปรเจกต์ `/about`:** ทีมผู้พัฒนาและโมดูลที่รับผิดชอบ, อาจารย์ผู้สอน, License, เครดิตเทคโนโลยี/รูป/เสียง/โมเดล 3D, footer ใหม่ลิงก์มาหน้านี้
 - **ลูกค้า:** หน้าแรกพร้อมแอนิเมชันและดูราคาตามประเภทรถ, หน้าบริการ, โปรไฟล์, จัดการรถ, ดูเวลาว่าง (เวลาที่ผ่านแล้วกดไม่ได้), จองต่อหลายรอบ, เลือกและตรวจสิทธิ์คูปอง, จ่ายก่อนยืนยันภายใน 15 นาที (ออนไลน์จำลอง/โอน/กระเป๋าเงิน), ยกเลิกพร้อมคืนเงินเข้ากระเป๋า, ประวัติการจอง, สลับภาษาไทย/อังกฤษ
 - **Admin:** แดชบอร์ด, จัดการประเภท/ยี่ห้อ/รุ่นรถ, บริการและราคา (10 บริการ ราคาตามประเภทรถ), ตารางเวลาและจำนวนรถต่อรอบ, ผู้ใช้และสิทธิ์ (สร้าง/ตั้ง STAFF), คูปองพร้อมประวัติการใช้, ดูการจองพร้อมประวัติ, รายงานการจองและรายได้, การชำระเงินและกระเป๋าเงิน
 - **พนักงาน:** คิวงานรายวันพร้อมปฏิทิน, รายละเอียดลูกค้า/รถ/บริการ, รับรถ, เปลี่ยนสถานะพร้อมเหตุผล, หมายเหตุ, No-show, ยืนยันรับเงินสด/เงินโอน, ประวัติการให้บริการ
-- **ระบบ:** ฐานข้อมูล 23 ตารางบน Railway พร้อม `schema.sql` และ migration 4 ไฟล์, สคริปต์สร้างตารางเวลา, API 88 endpoint, เทสต์ backend ผ่าน 184/184, เอกสาร API, frontend deploy บน Vercel
+- **ระบบ:** ฐานข้อมูล 23 ตารางบน Railway พร้อม `schema.sql` และ migration 5 ไฟล์, สคริปต์สร้างตารางเวลา, API 89 endpoint, เทสต์ backend ผ่าน 193/193, เอกสาร API, frontend deploy บน Vercel
 
 ### 🔄 กำลังดำเนินการ
 - ทดสอบวงจรเต็มกับข้อมูลจริง: ลูกค้าจอง → ชำระเงิน → พนักงานรับรถ → ปิดงาน → Admin ดูรายงาน
@@ -521,8 +527,6 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 - **การชำระเงินเป็นแบบจำลอง:** ยังไม่เชื่อมผู้ให้บริการชำระเงินจริง และคืนเงินอัตโนมัติได้เฉพาะการจองที่จ่ายแล้ว (ออนไลน์จำลองหรือกระเป๋าเงิน)
 - **ยังไม่มีเทสต์การจองพร้อมกันกับ MySQL จริง:** เทสต์การจองใช้ฐานข้อมูลจำลอง จึงยังพิสูจน์ไม่ได้ว่าล็อกช่วงเวลาถูกต้องเมื่อมีคนจองพร้อมกัน
 - **ยังไม่มีปุ่มลืมรหัสผ่านและการต่ออายุ token:** ผู้ใช้ต้องล็อกอินใหม่เมื่อ token หมดอายุ
-- **ตาราง `audit_logs` มีแล้วแต่โค้ดยังไม่ได้บันทึกลงไป**
-- **คูปองยังไม่จำกัดจำนวนครั้งต่อบัญชี:** จำกัดแค่จำนวนครั้งรวมของคูปองนั้น
 - **โมเดลรถ 3D ใช้สัญญาอนุญาต CC BY-NC-SA:** ใช้ได้กับงานส่งมหาวิทยาลัย ถ้าจะใช้เชิงพาณิชย์ต้องเปลี่ยนโมเดล
 - **หน้า Login หนักกว่าหน้าอื่น:** โหลดเพิ่ม ~2.3 MB (โค้ด 3D + โมเดล + เสียง) และยังไม่ได้ทดสอบบนมือถือจริงรุ่นต่ำ
 
@@ -530,9 +534,7 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 1. Deploy backend (เช่น Railway) แล้วตั้ง `VITE_API_BASE_URL` บน Vercel ให้ทุกคนใช้งานได้
 2. เพิ่ม API Gateway หรือ reverse proxy หน้า backend
 3. เพิ่มเทสต์ integration กับ MySQL จริง โดยเฉพาะการจองช่วงเวลาเดียวกันพร้อมกัน
-4. จำกัดการใช้คูปองต่อบัญชี
-5. บันทึกการกระทำสำคัญของ Admin/Staff ลง `audit_logs`
-6. เพิ่มลืมรหัสผ่านและการต่ออายุ token
+4. เพิ่มลืมรหัสผ่านและการต่ออายุ token
 
 ---
 

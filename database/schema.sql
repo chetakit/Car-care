@@ -7,6 +7,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 --   * 2026-11-15_payment_verifications.sql  (payment_verifications)
 --   * 2026-11-16_pay_before_confirm.sql     (booking_status PENDING_PAYMENT)
 --   * 2026-11-21_notifications.sql          (notifications)
+--   * 2026-11-22_coupon_per_user_limit.sql  (coupons.per_user_limit)
 -- Use this file to create a fresh database. For an existing database,
 -- run the migration files instead.
 -- =====================================================================
@@ -130,6 +131,7 @@ CREATE TABLE `coupon_usages` (
   UNIQUE KEY `booking_id` (`booking_id`),
   KEY `coupon_id` (`coupon_id`),
   KEY `user_id` (`user_id`),
+  KEY `idx_coupon_usages_coupon_user` (`coupon_id`,`user_id`),
   CONSTRAINT `coupon_usages_ibfk_1` FOREIGN KEY (`coupon_id`) REFERENCES `coupons` (`coupon_id`),
   CONSTRAINT `coupon_usages_ibfk_2` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`booking_id`),
   CONSTRAINT `coupon_usages_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
@@ -145,6 +147,7 @@ CREATE TABLE `coupons` (
   `max_discount` decimal(10,2) DEFAULT NULL,
   `min_order_amount` decimal(10,2) NOT NULL DEFAULT '0.00',
   `usage_limit` int DEFAULT NULL,
+  `per_user_limit` int DEFAULT NULL,
   `used_count` int NOT NULL DEFAULT '0',
   `start_date` datetime NOT NULL,
   `end_date` datetime NOT NULL,
@@ -158,7 +161,8 @@ CREATE TABLE `coupons` (
   CONSTRAINT `coupons_chk_3` CHECK ((`min_order_amount` >= 0)),
   CONSTRAINT `coupons_chk_4` CHECK (((`usage_limit` is null) or (`usage_limit` >= 0))),
   CONSTRAINT `coupons_chk_5` CHECK ((`used_count` >= 0)),
-  CONSTRAINT `coupons_chk_6` CHECK ((`end_date` > `start_date`))
+  CONSTRAINT `coupons_chk_6` CHECK ((`end_date` > `start_date`)),
+  CONSTRAINT `coupons_chk_7` CHECK (((`per_user_limit` is null) or (`per_user_limit` >= 1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `notifications` (

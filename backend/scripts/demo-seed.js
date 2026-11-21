@@ -254,7 +254,7 @@ async function ensureSchedules(conn, firstDate, lastDate) {
 async function loadCoupons(conn) {
   const [rows] = await conn.query(
     `SELECT coupon_id, coupon_code, discount_type, discount_value, max_discount, min_order_amount,
-      usage_limit, used_count, status,
+      usage_limit, per_user_limit, used_count, status,
       DATE_FORMAT(start_date, '%Y-%m-%d %H:%i:%s') AS start_at,
       DATE_FORMAT(end_date, '%Y-%m-%d %H:%i:%s') AS end_at
     FROM coupons
@@ -263,6 +263,7 @@ async function loadCoupons(conn) {
   return rows.map((c) => ({
     ...c,
     used_count: Number(c.used_count),
+    usesByUser: new Map(), // user_id -> uses in this seed (for per_user_limit)
     // Coupon dates are stored in shop time.
     startWall: wallAt(...c.start_at.split(" ")),
     endWall: wallAt(...c.end_at.split(" ")),
@@ -549,6 +550,7 @@ async function seed(conn, password) {
           plan.createdWall >= c.startWall &&
           plan.createdWall <= c.endWall &&
           (c.usage_limit === null || c.used_count < Number(c.usage_limit)) &&
+          (c.per_user_limit === null || (c.usesByUser.get(customerId) || 0) < Number(c.per_user_limit)) &&
           subtotalCents >= toCents(c.min_order_amount ?? "0"),
       );
       if (usable.length) {
@@ -590,6 +592,7 @@ async function seed(conn, password) {
     if (coupon) {
       await conn.query("UPDATE coupons SET used_count = used_count + 1 WHERE coupon_id = ?", [coupon.coupon_id]);
       coupon.used_count += 1;
+      coupon.usesByUser.set(customerId, (coupon.usesByUser.get(customerId) || 0) + 1);
       batch.add("coupon_usages", {
         coupon_id: coupon.coupon_id,
         booking_id: plan.bookingId,

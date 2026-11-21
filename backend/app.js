@@ -13,6 +13,8 @@ const publicServiceCatalogRoutes = require("./Public/routes/serviceCatalogRoutes
 const publicAvailabilityRoutes = require("./Public/routes/availabilityRoutes");
 const notificationRoutes = require("./shared/routes/notificationRoutes");
 const paymentLookupRoutes = require("./Admin/routes/paymentLookupRoutes");
+const auditLogRoutes = require("./Admin/routes/auditLogRoutes");
+const { auditTrail } = require("./shared/middleware/auditTrail");
 const customerBookingRoutes = require("./Customer/routes/bookingRoutes");
 const customerBookingHistoryRoutes = require("./Customer/routes/bookingHistoryRoutes");
 const customerScheduleRoutes = require("./Customer/routes/scheduleRoutes");
@@ -37,6 +39,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+// Record admin/staff changes in audit_logs (see shared/middleware/auditTrail.js).
+app.use(auditTrail);
 app.use("/api/auth", loginRoutes);
 app.use("/api/auth", sessionRoutes);
 app.use("/api/admin/auth", authRoutes);
@@ -64,6 +68,7 @@ app.use("/api/admin/bookings", bookingRoutes);
 app.use("/api/staff/bookings", staffBookingRoutes);
 app.use("/api/admin/reports", reportRoutes);
 app.use("/api/admin/payments", paymentLookupRoutes);
+app.use("/api/admin/audit-logs", auditLogRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/cancellations", cancellationRoutes);
 app.use("/api/wallet", walletRoutes);

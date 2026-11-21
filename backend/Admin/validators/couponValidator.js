@@ -10,6 +10,7 @@ const CREATE_FIELDS = new Set([
   "max_discount",
   "min_order_amount",
   "usage_limit",
+  "per_user_limit",
   "start_date",
   "end_date",
   "status",
@@ -22,6 +23,7 @@ const UPDATE_FIELDS = new Set([
   "max_discount",
   "min_order_amount",
   "usage_limit",
+  "per_user_limit",
   "start_date",
   "end_date",
 ]);
@@ -274,6 +276,16 @@ function validateCouponFields(body, allowedFields, res) {
       res,
       "usage_limit must be null or a non-negative MySQL integer.",
     );
+    return false;
+  }
+  if (
+    Object.hasOwn(body, "per_user_limit") &&
+    body.per_user_limit !== null &&
+    (!Number.isSafeInteger(body.per_user_limit) ||
+      body.per_user_limit < 1 ||
+      body.per_user_limit > MAX_MYSQL_INT)
+  ) {
+    sendValidationError(res, "per_user_limit must be null or a whole number of at least 1.");
     return false;
   }
 

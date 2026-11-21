@@ -5,7 +5,7 @@ class DuplicateCouponCodeError extends Error {}
 class CouponValidationError extends Error {}
 
 const COUPON_COLUMNS =
-  "coupon_id, coupon_code, description, discount_type, discount_value, max_discount, min_order_amount, usage_limit, used_count, start_date, end_date, status, created_at, updated_at";
+  "coupon_id, coupon_code, description, discount_type, discount_value, max_discount, min_order_amount, usage_limit, per_user_limit, used_count, start_date, end_date, status, created_at, updated_at";
 const CREATE_FIELDS = Object.freeze({
   coupon_code: "coupon_code",
   description: "description",
@@ -14,6 +14,7 @@ const CREATE_FIELDS = Object.freeze({
   max_discount: "max_discount",
   min_order_amount: "min_order_amount",
   usage_limit: "usage_limit",
+  per_user_limit: "per_user_limit",
   start_date: "start_date",
   end_date: "end_date",
   status: "status",
@@ -26,6 +27,7 @@ const UPDATE_FIELDS = Object.freeze({
   max_discount: "max_discount",
   min_order_amount: "min_order_amount",
   usage_limit: "usage_limit",
+  per_user_limit: "per_user_limit",
   start_date: "start_date",
   end_date: "end_date",
 });

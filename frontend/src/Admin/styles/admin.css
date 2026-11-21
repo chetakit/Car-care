@@ -2694,3 +2694,57 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Audit log page */
+.admin-audit-filters {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-audit-filters label {
+  display: grid;
+  gap: 6px;
+  color: var(--admin-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.admin-audit-actor {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-audit-actor small {
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-audit-action {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #fbeced;
+  color: #a91f28;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-audit-changes {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  font-size: 12.5px;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+.admin-audit-changes code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f2f1;
+  font-size: 11.5px;
+}

@@ -349,6 +349,7 @@ async function create(
       coupon = await coupons.findCoupon(connection, couponCode, { lock: true });
       try {
         discountCents = coupons.calculateDiscount(coupon, totalCents);
+        await coupons.assertPerUserLimit(connection, coupon, userId);
       } catch (error) {
         if (error instanceof coupons.CouponError) {
           throw new BookingValidationError(error.message);

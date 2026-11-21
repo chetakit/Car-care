@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './components/AdminLayout.jsx'
+import AuditLogPage from './pages/AuditLogPage.jsx'
 import BookingsPage from './pages/BookingsPage.jsx'
 import CouponsPage from './pages/CouponsPage.jsx'
 import CustomersPage from './pages/CustomersPage.jsx'
@@ -32,6 +33,7 @@ const navigationItems = [
   { id: 'payments', label: 'admin.navigation.payments', icon: 'credit-card' },
   { id: 'wallet', label: 'admin.navigation.wallet', icon: 'wallet' },
   { id: 'reports', label: 'admin.navigation.reports', icon: 'chart' },
+  { id: 'audit-logs', label: 'admin.navigation.auditLogs', icon: 'history' },
 ]
 
 const pages = {
@@ -46,6 +48,7 @@ const pages = {
   wallet: WalletPage,
   reports: ReportsPage,
   staff: StaffPage,
+  'audit-logs': AuditLogPage,
 }
 
 function getPageFromPath(pathname) {

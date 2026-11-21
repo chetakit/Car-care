@@ -22,7 +22,12 @@ router.get("/available", authenticateToken, requireCustomer, async (req, res) =>
         AND ${SHOP_NOW_SQL} >= start_date
         AND ${SHOP_NOW_SQL} <= end_date
         AND (usage_limit IS NULL OR used_count < usage_limit)
+        AND (per_user_limit IS NULL OR (
+          SELECT COUNT(*) FROM coupon_usages cu
+          WHERE cu.coupon_id = coupons.coupon_id AND cu.user_id = ?
+        ) < per_user_limit)
       ORDER BY coupon_code ASC, coupon_id ASC`,
+      [req.user.user_id],
     );
     return res.status(200).json({ status: "success", data: { items } });
   } catch (error) {
@@ -52,6 +57,7 @@ router.get("/preview", authenticateToken, requireCustomer, async (req, res) => {
   try {
     const coupon = await coupons.findCoupon(pool, code);
     const discountCents = coupons.calculateDiscount(coupon, subtotalCents);
+    await coupons.assertPerUserLimit(pool, coupon, req.user.user_id);
     return res.status(200).json({
       status: "success",
       data: {
