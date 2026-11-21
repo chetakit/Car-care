@@ -13,6 +13,7 @@ import StaffQueuePage from './pages/StaffQueuePage.jsx'
 import { StaffLink } from './components/StaffUi.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import LanguageToggle from '../i18n/LanguageToggle.jsx'
+import NotificationBell from '../notifications/NotificationBell.jsx'
 import './styles/staff.css'
 
 function navigate(path) {
@@ -80,6 +81,7 @@ export default function StaffApp({ user, onLogout }) {
           <LanguageToggle />
         </nav>
         <div className="staff-user">
+          <NotificationBell role="STAFF" variant="dark" />
           <span className="staff-avatar">{user?.full_name?.[0] ?? 'S'}</span>
           <span className="staff-user-name">{user?.full_name}</span>
           <button className="staff-link-btn" onClick={onLogout} type="button">{t('staff.nav.signOut')}</button>

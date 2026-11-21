@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import AdminAccountMenu from '../Admin/components/AdminAccountMenu.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import LanguageToggle from '../i18n/LanguageToggle.jsx'
+import NotificationBell from '../notifications/NotificationBell.jsx'
 import './customer-theme.css'
 
 export function BrandMark() {
@@ -235,6 +236,7 @@ function CustomerHeader({ user, onLogout, bookingAvailable = true }) {
           <LanguageToggle />
         </nav>
 
+        {user && <NotificationBell role={isAdmin ? 'ADMIN' : 'CUSTOMER'} variant="dark" />}
         {isAdmin ? (
           <AdminAccountMenu onLogout={onLogout} user={user} variant="home" />
         ) : (

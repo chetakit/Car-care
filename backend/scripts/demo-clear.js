@@ -79,6 +79,11 @@ async function main() {
       await run("wallet_transactions", "DELETE FROM wallet_transactions WHERE wallet_id IN (?)", [walletIds]);
       await run("wallets", "DELETE FROM wallets WHERE wallet_id IN (?)", [walletIds]);
     }
+    // Bell notifications: those about demo bookings went with the bookings
+    // (ON DELETE CASCADE); remove the ones addressed to demo accounts too.
+    await run("notifications", "DELETE FROM notifications WHERE user_id IN (?)", [userIds]).catch((error) => {
+      if (error.code !== "ER_NO_SUCH_TABLE") throw error;
+    });
     await run("vehicles", "DELETE FROM vehicles WHERE user_id IN (?)", [userIds]);
     await run("coupon_usages", "DELETE FROM coupon_usages WHERE user_id IN (?)", [userIds]);
 

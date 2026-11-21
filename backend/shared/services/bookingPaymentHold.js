@@ -1,4 +1,5 @@
 const { releaseCouponForBooking } = require("./couponPricing");
+const { notifyBooking, TYPES: NOTIFY } = require("./notificationService");
 
 // A PENDING_PAYMENT booking holds its schedule slot for this many minutes.
 // After that it no longer counts toward capacity, cannot be paid, and is
@@ -42,6 +43,7 @@ async function expireUnpaidBookings(pool) {
         [bookingId, EXPIRY_REASON],
       );
       await releaseCouponForBooking(connection, bookingId);
+      await notifyBooking(connection, bookingId, NOTIFY.PAYMENT_EXPIRED);
     }
     await connection.commit();
     return rows.length;

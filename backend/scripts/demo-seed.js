@@ -199,6 +199,7 @@ async function createVehicles(conn, users) {
     vehicles.push({
       vehicle_id: id,
       owner,
+      plate: spec.plate,
       year: spec.year,
       typeId: model.vehicle_type_id,
       isMotorcycle: model.type_name === "Motorcycle",
@@ -722,6 +723,7 @@ async function seed(conn, password) {
     }
   }
 
+  await addDemoNotifications(conn, batch, plans, users);
   await batch.flush(conn);
   for (const wallet of wallets.values()) {
     await conn.query("UPDATE wallets SET balance = ? WHERE wallet_id = ?", [
@@ -731,6 +733,61 @@ async function seed(conn, password) {
   }
 
   return { users, vehicles, plans, schedulesCreated, wallets };
+}
+
+// Sample bell notifications for the demo accounts, matching what the app
+// itself sends (skipped when the notifications migration has not been run).
+async function addDemoNotifications(conn, batch, plans, users) {
+  const [[{ present }]] = await conn.query(
+    "SELECT COUNT(*) AS present FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'notifications'",
+  );
+  if (Number(present) === 0) return 0;
+  let count = 0;
+  const add = (user, type, plan, atWall, extra = {}) => {
+    if (!atWall || atWall > nowWall) return;
+    batch.add("notifications", {
+      user_id: user.user_id,
+      type,
+      booking_id: plan.bookingId,
+      data: JSON.stringify({ date: plan.date, start_time: plan.slot.start_time.slice(0, 5), plate: plan.vehicle.plate, ...extra }),
+      // Older than a day = already seen.
+      read_at: nowWall - atWall > DAY ? toDb(atWall + between(5, 120) * MIN) : null,
+      created_at: toDb(atWall),
+    });
+    count += 1;
+  };
+  const recent = (wall) => wall && nowWall - wall < 3 * DAY;
+  for (const plan of plans) {
+    if (plan.outcome === "EXPIRED" || !plan.bookingId) continue;
+    if (plan.owner === users.customer) {
+      add(users.customer, "PAYMENT_CONFIRMED", plan, plan.payWall, { method: plan.method, amount: Number(plan.finalAmount) });
+      add(users.customer, "VEHICLE_CHECKED_IN", plan, plan.checkInWall);
+      add(users.customer, "SERVICE_STARTED", plan, plan.serviceWall);
+      add(users.customer, "SERVICE_COMPLETED", plan, plan.completeWall);
+      add(users.customer, "NO_SHOW", plan, plan.noShowWall);
+      if (plan.outcome === "CANCELLED") {
+        add(users.customer, "BOOKING_CANCELLED", plan, plan.cancelWall, { refund_amount: Number(calculateRefund(plan.finalAmount).refundAmount) });
+      }
+      if (plan.outcome === "CONFIRMED" && plan.date === addDays(today, 1)) {
+        add(users.customer, "APPOINTMENT_REMINDER", plan, Math.max(plan.payWall, nowWall - between(1, 6) * HOUR));
+      }
+    }
+    for (const staff of [users.staff, users.staff2]) {
+      if (plan.method === "BANK_TRANSFER" && recent(plan.createdWall)) {
+        add(staff, "TRANSFER_PENDING", plan, plan.createdWall + 2 * MIN, { amount: Number(plan.finalAmount) });
+      }
+      if (plan.date === today && isoDate(plan.payWall) === today) {
+        add(staff, "NEW_BOOKING_TODAY", plan, plan.payWall, { amount: Number(plan.finalAmount) });
+      }
+    }
+    if (plan.method === "BANK_TRANSFER" && recent(plan.createdWall)) {
+      add(users.admin, "TRANSFER_PENDING", plan, plan.createdWall + 2 * MIN, { amount: Number(plan.finalAmount) });
+    }
+    if (plan.outcome === "CANCELLED" && recent(plan.cancelWall)) {
+      add(users.admin, "BOOKING_CANCELLED", plan, plan.cancelWall, { refund_amount: Number(calculateRefund(plan.finalAmount).refundAmount) });
+    }
+  }
+  return count;
 }
 
 function summarise({ users, vehicles, plans, schedulesCreated, wallets }) {

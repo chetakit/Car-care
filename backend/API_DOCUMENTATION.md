@@ -112,6 +112,23 @@ The create request accepts `vehicle_id`, `schedule_id`, and `service_ids`, with 
 
 Each booking contains `booking_id`, `booking_date`, `start_time`, `end_time`, `booking_status`, `total_amount`, `discount_amount`, `final_amount`, `vehicle`, `services`, and `payment`. `vehicle` is `null` or contains `vehicle_id`, `license_plate`, `production_year`, `province`, `color`, `model_name`, `brand_name`, and `type_name`. Each service contains `booking_service_id`, `service_id`, `service_name`, `unit_price`, and `duration_minutes`. Payment is `null` when unavailable and otherwise contains `payment_id`, `amount`, `payment_method`, `payment_status`, `paid_at`. The Customer response does not include payment transaction references.
 
+## Admin payment lookup
+
+| Method and URL | Request | Success | Errors |
+|---|---|---|---|
+| `GET /api/admin/payments/lookup` | ADMIN only. Required `q` (1–128 characters, trimmed). Digits: exact `payment_id` or part of a phone number. Text: exact `transaction_ref` (`SIM-…`, `WAL-…`) or bank transfer reference, or part of the customer's name, e-mail, phone or licence plate (`%` and `_` are matched literally). | `200`, `data: { items }` (up to 20 bookings, latest appointment first); each item has `booking_id`, `booking_date`, `start_time`, `booking_status`, `amount`, `customer { user_id, full_name, email, phone }`, `license_plate`, and the payment fields `payment_id`, `payment_method`, `payment_status`, `transaction_ref`, `transfer_reference` (null when the booking has no payment). | `400` missing/too long `q` or unsupported query, `401`, `403`, `500`. |
+
+## Notifications
+
+In-app notifications for every signed-in role (ADMIN, STAFF, CUSTOMER). The user always comes from the token; nobody can read or mark another user's notifications.
+
+| Method and URL | Request | Success | Errors |
+|---|---|---|---|
+| `GET /api/notifications` | Optional `limit` (1–50, default 20); no other query parameter accepted. | `200`, `data: { items, unread_count }`; each item has `notification_id`, `type`, `booking_id`, `data` (object with `date`, `start_time`, `plate` and type-specific fields such as `amount`, `refund_amount`, `fee`, `method`), `read_at` and `created_at` (UTC ISO strings), newest first. Before the notifications migration is run the list is empty. | `400` invalid query, `401`, `403`, `500`. |
+| `POST /api/notifications/read` | JSON body: optional `ids` (up to 100 positive integers). Without `ids`, every unread notification of the user is marked. | `200`, `data: { updated }` | `400` invalid body, `401`, `403`, `500`. |
+
+Types: `PAYMENT_CONFIRMED`, `PAYMENT_EXPIRED`, `TRANSFER_PENDING` (staff/admin), `NEW_BOOKING_TODAY` (staff), `VEHICLE_CHECKED_IN`, `SERVICE_STARTED`, `SERVICE_COMPLETED`, `NO_SHOW`, `BOOKING_CANCELLED` (customer and admin), `APPOINTMENT_REMINDER` (sent once, the day before). Notifications are written in the same transaction as the change they describe; a failure to write one never fails that change.
+
 ## Admin APIs
 
 All `/api/admin/...` business routes require an ADMIN token. Collection lists return the standard paginated response described above. Detail and mutation responses use `data: <entity>`; creates return `201`, other successful reads/updates return `200`.

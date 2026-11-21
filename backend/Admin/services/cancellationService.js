@@ -1,6 +1,7 @@
 const pool = require("../../shared/config/db");
 const { releaseCouponForBooking } = require("../../shared/services/couponPricing");
 const { SHOP_NOW_SQL } = require("../../shared/services/shopTime");
+const { notifyBooking, TYPES: NOTIFY } = require("../../shared/services/notificationService");
 
 class CancellationNotFoundError extends Error {}
 class CancellationConflictError extends Error {}
@@ -215,6 +216,9 @@ async function cancel(bookingId, { reason }, user) {
       await markBookingCancelled(connection, booking, user, reason);
       // Nothing was paid, so the coupon use is given back.
       await releaseCouponForBooking(connection, bookingId);
+      await notifyBooking(connection, bookingId, NOTIFY.BOOKING_CANCELLED, { refund_amount: 0 }, {
+        roles: user.role === "ADMIN" ? [] : ["ADMIN"],
+      });
       return {
         booking_id: bookingId,
         booking_status: "CANCELLED",
@@ -283,6 +287,13 @@ async function cancel(bookingId, { reason }, user) {
     }
 
     await markBookingCancelled(connection, booking, user, reason);
+    await notifyBooking(
+      connection,
+      bookingId,
+      NOTIFY.BOOKING_CANCELLED,
+      { refund_amount: Number(refundAmount), fee: Number(cancellationFee) },
+      { roles: user.role === "ADMIN" ? [] : ["ADMIN"] },
+    );
 
     const [walletRows] = await connection.execute(
       "SELECT balance FROM wallets WHERE wallet_id = ?",

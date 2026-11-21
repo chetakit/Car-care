@@ -5,6 +5,7 @@ import useApi from '../hooks/useApi.js'
 import useRemoteData from '../hooks/useRemoteData.js'
 import { formatDateTime } from '../utils/formatDate.js'
 import formatMoney from '../utils/formatMoney.js'
+import formatStatusLabel from '../utils/formatStatusLabel.js'
 
 const MAX_BOOKING_ID = 2147483647
 const TERMINAL_BOOKING_STATUSES = new Set(['CANCELLED', 'NO_SHOW'])
@@ -134,8 +135,13 @@ function PaymentsPage() {
   const { language, t } = useLanguage()
   const initialBookingId = new URLSearchParams(window.location.search).get('booking_id') ?? ''
   const [bookingId, setBookingId] = useState(initialBookingId)
+  const [searchMode, setSearchMode] = useState('booking') // 'booking' | 'payment'
+  const [paymentQuery, setPaymentQuery] = useState('')
+  const [paymentMatches, setPaymentMatches] = useState(null)
   const [searchedBookingId, setSearchedBookingId] = useState('')
   const [booking, setBooking] = useState(null)
+  // Who the booking belongs to and which car, shown above the payment details.
+  const [bookingParty, setBookingParty] = useState(null)
   const [payment, setPayment] = useState(null)
   const [walletBalance, setWalletBalance] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('SIMULATED')
@@ -198,6 +204,10 @@ function PaymentsPage() {
       }
 
       setBooking(bookingData)
+      setBookingParty({
+        customer: bookingResponse.data?.customer ?? null,
+        vehicle: bookingResponse.data?.vehicle ?? null,
+      })
       // Cash cannot confirm an unpaid booking, so never carry it over to one.
       if (bookingData?.booking_status === 'PENDING_PAYMENT') {
         setPaymentMethod((current) => (current === 'CASH' ? 'SIMULATED' : current))
@@ -248,8 +258,55 @@ function PaymentsPage() {
   // Opening a row from the payment list fills the Booking ID and loads it.
   function openFromQueue(id) {
     if (loading || action) return
+    setSearchMode('booking')
     setBookingId(id)
     void loadPayment(undefined, id)
+  }
+
+  // Search by payment number or reference: find its booking, then open it.
+  async function lookupPayment(event) {
+    event.preventDefault()
+    const query = paymentQuery.trim()
+    if (!query || query.length > 128) {
+      setError({ key: 'admin.payments.lookup.invalid' })
+      return
+    }
+    setLoading(true)
+    setError('')
+    setNotice('')
+    setPaymentMatches(null)
+    let items
+    try {
+      const response = await api(`/api/admin/payments/lookup?q=${encodeURIComponent(query)}`)
+      items = response.data?.items ?? []
+    } catch (lookupError) {
+      setError(lookupError.message || { key: 'admin.payments.lookup.failed' })
+      setLoading(false)
+      return
+    }
+    setLoading(false)
+    if (items.length === 0) {
+      setBooking(null)
+      setPayment(null)
+      setError({ key: 'admin.payments.lookup.notFound', params: { query } })
+      return
+    }
+    if (items.length > 1) {
+      // Several bookings match (for example a customer's name): let the Admin pick.
+      setBooking(null)
+      setPayment(null)
+      setPaymentMatches(items)
+      return
+    }
+    await openMatch(items[0])
+  }
+
+  async function openMatch(match) {
+    setPaymentMatches(null)
+    const id = String(match.booking_id)
+    setBookingId(id)
+    await loadPayment(undefined, id)
+    setNotice({ key: 'admin.payments.lookup.found', params: { name: match.customer?.full_name || '—', booking: id } })
   }
 
   useEffect(() => {
@@ -323,6 +380,50 @@ function PaymentsPage() {
         eyebrow={t('admin.payments.eyebrow')}
         title={t('admin.payments.title')}
       />
+      <div aria-label={t('admin.payments.lookup.modeLabel')} className="admin-search-mode" role="group">
+        {['booking', 'payment'].map((mode) => (
+          <button
+            aria-pressed={searchMode === mode}
+            className={searchMode === mode ? 'is-active' : ''}
+            disabled={loading || Boolean(action)}
+            key={mode}
+            onClick={() => {
+              setSearchMode(mode)
+              setError('')
+              setPaymentMatches(null)
+            }}
+            type="button"
+          >
+            {t(mode === 'booking' ? 'admin.payments.lookup.byBooking' : 'admin.payments.lookup.byPayment')}
+          </button>
+        ))}
+      </div>
+      {searchMode === 'payment' ? (
+        <form className="admin-filter-bar admin-payment-search" onSubmit={lookupPayment}>
+          <label className="admin-lookup-field" htmlFor="payment-lookup-query">
+            {t('admin.payments.lookup.label')}
+            <input
+              aria-describedby="payment-lookup-hint"
+              autoComplete="off"
+              disabled={loading || Boolean(action)}
+              id="payment-lookup-query"
+              maxLength="128"
+              onChange={(event) => {
+                setPaymentQuery(event.target.value)
+                setError('')
+              }}
+              placeholder={t('admin.payments.lookup.placeholder')}
+              required
+              type="text"
+              value={paymentQuery}
+            />
+            <small id="payment-lookup-hint">{t('admin.payments.lookup.hint')}</small>
+          </label>
+          <button className="admin-primary-button" disabled={loading || Boolean(action)} type="submit">
+            {loading ? t('admin.payments.search.searching') : t('admin.payments.search.submit')}
+          </button>
+        </form>
+      ) : (
       <form className="admin-filter-bar admin-payment-search" onSubmit={loadPayment}>
         <label className="admin-lookup-field" htmlFor="payment-booking-id">
           {t('admin.payments.form.bookingId')}
@@ -357,8 +458,40 @@ function PaymentsPage() {
           {loading ? t('admin.payments.search.searching') : t('admin.payments.search.submit')}
         </button>
       </form>
+      )}
 
-      {error && <div className="admin-alert admin-alert-error" role="alert">{messageText(error, t)}</div>}
+      {searchMode === 'payment' && paymentMatches && !loading && (
+        <section aria-label={t('admin.payments.lookup.matches')} className="admin-panel admin-wallet-matches">
+          <p className="admin-wallet-matches-note">
+            {t('admin.payments.lookup.choose', { count: paymentMatches.length })}
+          </p>
+          <ul>
+            {paymentMatches.map((match) => (
+              <li key={match.booking_id}>
+                <button onClick={() => openMatch(match)} type="button">
+                  <strong>{match.customer?.full_name || '—'} · {match.license_plate || '—'}</strong>
+                  <span>
+                    {t('admin.payments.lookup.matchLine', {
+                      booking: match.booking_id,
+                      date: match.booking_date,
+                      time: match.start_time,
+                      amount: formatMoney(match.amount, language),
+                    })}
+                  </span>
+                  <small>
+                    {match.payment_id
+                      ? `${t('admin.payments.detail.paymentId')} #${match.payment_id} · ${formatMethod(match.payment_method, t)} · ${formatStatusLabel(match.payment_status, language)}`
+                      : t('admin.payments.lookup.noPayment')}
+                    {' · '}{formatStatusLabel(match.booking_status, language)}
+                  </small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {error &&<div className="admin-alert admin-alert-error" role="alert">{messageText(error, t)}</div>}
       {notice && !error && <div className="admin-alert admin-alert-success" role="status">{messageText(notice, t)}</div>}
       {loading && <RequestState loading loadingMessage={t('admin.payments.loadingBooking')} />}
       {!booking && <PaymentQueue key={queueRefreshKey} onOpen={openFromQueue} selectedId={searchedBookingId} />}
@@ -372,6 +505,47 @@ function PaymentsPage() {
             </div>
             <StatusBadge value={booking.booking_status} />
           </div>
+
+          {bookingParty?.customer && (
+            <div className="admin-payment-party">
+              <div className="admin-payment-party-item">
+                <span className="admin-payment-party-label">{t('admin.payments.party.customer')}</span>
+                <strong>{bookingParty.customer.full_name || '—'}</strong>
+                <small>
+                  {[bookingParty.customer.email, bookingParty.customer.phone].filter(Boolean).join(' · ') || '—'}
+                  {' · #'}{bookingParty.customer.user_id}
+                </small>
+              </div>
+              {bookingParty.vehicle && (
+                <div className="admin-payment-party-item">
+                  <span className="admin-payment-party-label">{t('admin.payments.party.vehicle')}</span>
+                  <strong>{bookingParty.vehicle.license_plate || '—'}</strong>
+                  <small>{[bookingParty.vehicle.brand_name, bookingParty.vehicle.model_name, bookingParty.vehicle.type_name].filter(Boolean).join(' · ')}</small>
+                </div>
+              )}
+              <div className="admin-payment-party-item">
+                <span className="admin-payment-party-label">{t('admin.payments.party.appointment')}</span>
+                <strong>{booking.booking_date || '—'}</strong>
+                <small>{[booking.start_time, booking.end_time].filter(Boolean).map((value) => String(value).slice(0, 5)).join('–')}</small>
+              </div>
+              <div className="admin-payment-party-item">
+                <span className="admin-payment-party-label">{t('admin.payments.party.wallet')}</span>
+                <strong>{walletBalance === null ? '—' : formatMoney(walletBalance, language)}</strong>
+                <a
+                  className="admin-payment-party-link"
+                  href={`/admin/wallet?user_id=${bookingParty.customer.user_id}`}
+                  onClick={(event) => {
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return
+                    event.preventDefault()
+                    window.history.pushState({}, '', event.currentTarget.getAttribute('href'))
+                    window.dispatchEvent(new PopStateEvent('popstate'))
+                  }}
+                >
+                  {t('admin.payments.party.openWallet')}
+                </a>
+              </div>
+            </div>
+          )}
 
           {paymentLookupComplete && payment ? (
             <>

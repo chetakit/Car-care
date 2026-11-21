@@ -1,4 +1,5 @@
 const { randomUUID } = require("crypto");
+const { notifyBooking, TYPES: NOTIFY } = require("../../shared/services/notificationService");
 const pool = require("../../shared/config/db");
 const { HOLD_EXPIRED_SQL } = require("../../shared/services/bookingPaymentHold");
 
@@ -161,6 +162,14 @@ async function confirmPaidBooking(connection, booking, user, paymentMethod) {
     VALUES (?, 'PENDING_PAYMENT', 'CONFIRMED', ?, ?)`,
     [booking.booking_id, user.user_id, `Paid by ${paymentMethod}.`],
   );
+  // Tell the customer; staff hear about it when the booking is for today.
+  await notifyBooking(
+    connection,
+    booking.booking_id,
+    NOTIFY.PAYMENT_CONFIRMED,
+    { method: paymentMethod, amount: Number(booking.final_amount) },
+    { rolesIfToday: ["STAFF"], roleType: NOTIFY.NEW_BOOKING_TODAY },
+  );
 }
 
 async function getLockedPayment(connection, bookingId) {
@@ -320,6 +329,9 @@ async function createForBooking(bookingId, { payment_method }, user) {
         WHERE payment_id = ?`,
         [existingPayment.payment_id],
       );
+      if (payment_method === "BANK_TRANSFER") {
+        await notifyBooking(connection, bookingId, NOTIFY.TRANSFER_PENDING, { amount: Number(amount) }, { toCustomer: false, roles: ["STAFF", "ADMIN"] });
+      }
       return toPayment(retried[0]);
     }
     if (existingPayment) {
@@ -333,6 +345,10 @@ async function createForBooking(bookingId, { payment_method }, user) {
       VALUES (?, ?, ?, 'PENDING')`,
       [bookingId, amount, payment_method],
     );
+    if (payment_method === "BANK_TRANSFER") {
+      // Staff/admin must check the transfer before the 15-minute hold ends.
+      await notifyBooking(connection, bookingId, NOTIFY.TRANSFER_PENDING, { amount: Number(amount) }, { toCustomer: false, roles: ["STAFF", "ADMIN"] });
+    }
     const [rows] = await connection.execute(
       `SELECT payment_id, booking_id, amount, payment_method, payment_status,
         transaction_ref, paid_at, created_at, updated_at

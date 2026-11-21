@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import { DataTable, PageHeading, Pagination, RequestState, StatusBadge } from '../components/AdminPageState.jsx'
 import useApi from '../hooks/useApi.js'
@@ -48,6 +48,30 @@ function WalletPage() {
   const suffix = section === 'transactions' ? `/transactions?${query}` : section === 'refunds' ? `/refunds?${query}` : `?user_id=${encodeURIComponent(appliedUserId)}`
   const path = appliedUserId ? `/api/wallet${suffix}` : ''
   const { data, loading, error, refresh } = useRemoteData(path, Boolean(appliedUserId))
+
+  // Opened by user ID (typed, or from a link such as the Payments page):
+  // look the customer up so the page says whose wallet this is.
+  const [fetchedMember, setFetchedMember] = useState(null)
+  useEffect(() => {
+    if (!appliedUserId || (selectedMember && String(selectedMember.user_id) === appliedUserId)) return undefined
+    let alive = true
+    api(`/api/admin/users/${encodeURIComponent(appliedUserId)}`)
+      .then((response) => {
+        if (alive && response.data) setFetchedMember(response.data)
+      })
+      .catch(() => {
+        if (alive) setFetchedMember(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [api, appliedUserId, selectedMember])
+  const member =
+    selectedMember && String(selectedMember.user_id) === appliedUserId
+      ? selectedMember
+      : fetchedMember && String(fetchedMember.user_id) === appliedUserId
+        ? fetchedMember
+        : null
 
   function selectMember(member) {
     setSelectedMember(member)
@@ -142,8 +166,13 @@ function WalletPage() {
       {appliedUserId && (
         <p className="admin-wallet-selected-customer" role="status">
           {t('admin.wallet.selectedCustomer', {
-            customer: selectedMember?.full_name ? `${selectedMember.full_name} (User #${appliedUserId})` : `User #${appliedUserId}`,
+            customer: member?.full_name ? `${member.full_name} (User #${appliedUserId})` : `User #${appliedUserId}`,
           })}
+          {member && (member.email || member.phone) && (
+            <small className="admin-wallet-selected-contact">
+              {[member.email, member.phone].filter(Boolean).join(' · ')}
+            </small>
+          )}
         </p>
       )}
       {appliedUserId && (

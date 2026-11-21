@@ -6,6 +6,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 --   * 2026-11-15_staff_service.sql          (booking_notes, vehicle_check_ins)
 --   * 2026-11-15_payment_verifications.sql  (payment_verifications)
 --   * 2026-11-16_pay_before_confirm.sql     (booking_status PENDING_PAYMENT)
+--   * 2026-11-21_notifications.sql          (notifications)
 -- Use this file to create a fresh database. For an existing database,
 -- run the migration files instead.
 -- =====================================================================
@@ -159,6 +160,21 @@ CREATE TABLE `coupons` (
   CONSTRAINT `coupons_chk_5` CHECK ((`used_count` >= 0)),
   CONSTRAINT `coupons_chk_6` CHECK ((`end_date` > `start_date`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `notifications` (
+  `notification_id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `booking_id` int DEFAULT NULL,
+  `data` json DEFAULT NULL,
+  `read_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`notification_id`),
+  KEY `idx_notifications_user_read` (`user_id`,`read_at`,`created_at`),
+  KEY `idx_notifications_booking` (`booking_id`),
+  CONSTRAINT `fk_notifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_notifications_booking` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`booking_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `payments` (
   `payment_id` int NOT NULL AUTO_INCREMENT,

@@ -2,6 +2,7 @@ import AdminIcon from './AdminIcon.jsx'
 import AdminAccountMenu from './AdminAccountMenu.jsx'
 import { useLanguage } from '../../i18n/LanguageContext.jsx'
 import LanguageToggle from '../../i18n/LanguageToggle.jsx'
+import NotificationBell from '../../notifications/NotificationBell.jsx'
 
 function AdminHeader({ pageTitle, user, onMenuClick, onLogout }) {
   const { t } = useLanguage()
@@ -30,6 +31,7 @@ function AdminHeader({ pageTitle, user, onMenuClick, onLogout }) {
 
       <div className="admin-header-actions">
         <LanguageToggle />
+        <NotificationBell role="ADMIN" />
         <AdminAccountMenu onLogout={onLogout} user={user} />
       </div>
     </header>

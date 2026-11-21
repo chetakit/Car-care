@@ -7,6 +7,7 @@
 //                   (สร้างจาก database/migrations/2026-11-15_staff_service.sql)
 // =====================================================================
 const pool = require("../../shared/config/db");
+const { notifyBooking, TYPES: NOTIFY } = require("../../shared/services/notificationService");
 const {
   CancellationConflictError,
   recordNoShowForfeit,
@@ -406,6 +407,7 @@ async function checkIn(bookingId, data, user) {
       userId: user.user_id,
       reason: data.note ?? "Vehicle checked in.",
     });
+    await notifyBooking(connection, bookingId, NOTIFY.VEHICLE_CHECKED_IN);
   });
   return getById(bookingId);
 }
@@ -437,6 +439,8 @@ async function changeStatus(bookingId, { status, reason }, user) {
       userId: user.user_id,
       reason,
     });
+    if (status === "IN_SERVICE") await notifyBooking(connection, bookingId, NOTIFY.SERVICE_STARTED);
+    if (status === "COMPLETED") await notifyBooking(connection, bookingId, NOTIFY.SERVICE_COMPLETED);
   });
   return getById(bookingId);
 }
@@ -461,6 +465,7 @@ async function markNoShow(bookingId, reason, user) {
       userId: user.user_id,
       reason,
     });
+    await notifyBooking(connection, bookingId, NOTIFY.NO_SHOW);
     // ไม่มาตามนัด = ริบเงิน 100% (บันทึกใน refunds: คืน 0 บาท, ค่าธรรมเนียมเต็มจำนวน)
     try {
       await recordNoShowForfeit(connection, bookingId, reason);

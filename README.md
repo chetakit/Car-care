@@ -43,7 +43,7 @@ flowchart LR
     MOD["Routes → Validators →<br/>Controllers → Services"]
     SWP["Payment hold sweeper<br/>(ทุก 60 วินาที)"]
   end
-  DB[("MySQL 8.4<br/>Railway · 22 ตาราง")]
+  DB[("MySQL 8.4<br/>Railway · 23 ตาราง")]
   AUTH & CUS & ADM & STF --> CLI -->|"HTTP JSON + Bearer token"| APP --> MW --> MOD -->|"SQL (mysql2 pool)"| DB
   SWP -->|"ยกเลิกการจองที่ไม่จ่ายใน 15 นาที"| DB
 ```
@@ -126,7 +126,7 @@ stateDiagram-v2
 
 ## 2. API implementation: Endpoint และ HTTP Methods
 
-ทั้งระบบมี **85 endpoint** นับจาก route ที่เปิดใช้ใน `backend/app.js`
+ทั้งระบบมี **88 endpoint** นับจาก route ที่เปิดใช้ใน `backend/app.js`
 
 | กลุ่ม | จำนวน | สิทธิ์ที่ต้องมี |
 |---|---|---|
@@ -134,21 +134,22 @@ stateDiagram-v2
 | Public | 2 | ไม่ต้องล็อกอิน |
 | Customer | 17 | CUSTOMER |
 | Shared: payments / cancellations / wallet | 9 | CUSTOMER (เฉพาะของตัวเอง) หรือ ADMIN, ยืนยันรับเงินใช้ STAFF/ADMIN |
-| Admin | 42 | ADMIN |
+| Admin | 43 | ADMIN |
 | Staff | 6 | STAFF |
+| Notifications (กระดิ่งแจ้งเตือน) | 2 | ทุก role ที่ล็อกอิน (เห็นเฉพาะของตัวเอง) |
 | System (`/`, `/api/health/db`) | 2 | ไม่ต้องล็อกอิน |
 
 | HTTP Method | จำนวน | ตัวอย่าง |
 |---|---|---|
-| `GET` | 45 | `GET /api/customer/bookings`, `GET /api/admin/reports/revenue`, `GET /api/staff/bookings?date=` |
-| `POST` | 21 | `POST /api/auth/login`, `POST /api/customer/bookings`, `POST /api/payments/:bookingId` |
+| `GET` | 47 | `GET /api/customer/bookings`, `GET /api/admin/reports/revenue`, `GET /api/staff/bookings?date=` |
+| `POST` | 22 | `POST /api/auth/login`, `POST /api/customer/bookings`, `POST /api/payments/:bookingId` |
 | `PATCH` | 17 | `PATCH /api/admin/users/:id/role`, `PATCH /api/customer/profile`, `PATCH /api/staff/bookings/:id/status` |
 | `PUT` | 1 | `PUT /api/admin/services/:id/prices` (แทนที่ตารางราคาของบริการทั้งชุด) |
 | `DELETE` | 1 | `DELETE /api/customer/vehicles/:vehicleId` |
 
 ระบบเลือกใช้ `PATCH` เป็นหลักแทน `PUT` เพราะส่วนใหญ่แก้แค่บางฟิลด์ ส่วน "ลบ" ข้อมูลหลักใช้การเปลี่ยน `status` เป็น `INACTIVE` (เช่น `PATCH .../:id/status`) เพื่อไม่ให้ข้อมูลเก่าที่อ้างอิงอยู่เสีย
 
-### รายการ API ทั้งหมด (85 ตัว)
+### รายการ API ทั้งหมด (88 ตัว)
 
 **สิทธิ์:** `Public` = ไม่ต้องล็อกอิน · `CUSTOMER` / `ADMIN` / `STAFF` = ต้องล็อกอินด้วย role นั้น · `CUSTOMER/ADMIN` = ลูกค้า (เฉพาะข้อมูลของตัวเอง) หรือ Admin
 
@@ -203,7 +204,7 @@ stateDiagram-v2
 | 34 | `GET` | `/api/wallet/transactions` | ดูรายการเงินเข้า-ออกของกระเป๋า | CUSTOMER/ADMIN |
 | 35 | `GET` | `/api/wallet/refunds` | ดูรายการคืนเงิน | CUSTOMER/ADMIN |
 
-#### Admin: ผู้ดูแลระบบ (42)
+#### Admin: ผู้ดูแลระบบ (43)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
 | 36 | `GET` | `/api/admin/dashboard/summary` | ตัวเลขสรุปบนแดชบอร์ด | ADMIN |
@@ -248,22 +249,29 @@ stateDiagram-v2
 | 75 | `GET` | `/api/admin/bookings/:id` | ดูรายละเอียดการจอง | ADMIN |
 | 76 | `GET` | `/api/admin/reports/bookings` | รายงานการจอง | ADMIN |
 | 77 | `GET` | `/api/admin/reports/revenue` | รายงานรายได้ | ADMIN |
+| 78 | `GET` | `/api/admin/payments/lookup?q=` | ค้นหาในหน้าการชำระเงิน: ชื่อลูกค้า อีเมล เบอร์ ทะเบียน (บางส่วน) หรือหมายเลข/เลขอ้างอิงการชำระเงิน (ตรงตัว) คืนรายการการจองให้เลือก | ADMIN |
 
 #### Staff: พนักงาน (6)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
-| 78 | `GET` | `/api/staff/bookings` | คิวงานรายวัน (`?date=`) และประวัติ (`?date_from=&date_to=`) | STAFF |
-| 79 | `GET` | `/api/staff/bookings/:id` | รายละเอียดลูกค้า รถ บริการ การรับรถ และไทม์ไลน์ | STAFF |
-| 80 | `POST` | `/api/staff/bookings/:id/check-in` | บันทึกการรับรถเข้าร้าน (เลขไมล์, น้ำมัน, สภาพรถ) | STAFF |
-| 81 | `PATCH` | `/api/staff/bookings/:id/status` | เปลี่ยนสถานะการให้บริการพร้อมเหตุผล | STAFF |
-| 82 | `POST` | `/api/staff/bookings/:id/no-show` | บันทึกลูกค้าไม่มาตามนัด | STAFF |
-| 83 | `POST` | `/api/staff/bookings/:id/notes` | เพิ่มหมายเหตุโดยไม่เปลี่ยนสถานะ | STAFF |
+| 79 | `GET` | `/api/staff/bookings` | คิวงานรายวัน (`?date=`) และประวัติ (`?date_from=&date_to=`) | STAFF |
+| 80 | `GET` | `/api/staff/bookings/:id` | รายละเอียดลูกค้า รถ บริการ การรับรถ และไทม์ไลน์ | STAFF |
+| 81 | `POST` | `/api/staff/bookings/:id/check-in` | บันทึกการรับรถเข้าร้าน (เลขไมล์, น้ำมัน, สภาพรถ) | STAFF |
+| 82 | `PATCH` | `/api/staff/bookings/:id/status` | เปลี่ยนสถานะการให้บริการพร้อมเหตุผล | STAFF |
+| 83 | `POST` | `/api/staff/bookings/:id/no-show` | บันทึกลูกค้าไม่มาตามนัด | STAFF |
+| 84 | `POST` | `/api/staff/bookings/:id/notes` | เพิ่มหมายเหตุโดยไม่เปลี่ยนสถานะ | STAFF |
+
+#### Notifications: กระดิ่งแจ้งเตือน (2)
+| # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|---|
+| 85 | `GET` | `/api/notifications?limit=` | แจ้งเตือนล่าสุดของตัวเอง พร้อมจำนวนที่ยังไม่อ่าน | ทุก role |
+| 86 | `POST` | `/api/notifications/read` | ทำเครื่องหมายว่าอ่านแล้ว (ส่ง `ids` หรือไม่ส่ง = ทั้งหมด) | ทุก role |
 
 #### System (2)
 | # | Method | Endpoint | ใช้ทำอะไร | สิทธิ์ |
 |---|---|---|---|---|
-| 84 | `GET` | `/` | ตรวจว่า backend ทำงานอยู่ | Public |
-| 85 | `GET` | `/api/health/db` | ตรวจการเชื่อมต่อฐานข้อมูล | Public |
+| 87 | `GET` | `/` | ตรวจว่า backend ทำงานอยู่ | Public |
+| 88 | `GET` | `/api/health/db` | ตรวจการเชื่อมต่อฐานข้อมูล | Public |
 
 ทุก response ใช้รูปแบบเดียวกัน: สำเร็จ `{ "status": "success", "data": ... }` และผิดพลาด `{ "status": "error", "message": "..." }`
 
@@ -273,7 +281,7 @@ stateDiagram-v2
 
 ## 3. Database: โครงสร้างข้อมูลและผลการบันทึกข้อมูลจริง
 
-MySQL 8.4 บน Railway (database `railway`) มี **22 ตาราง** โครงสร้างทั้งหมดอยู่ใน [`database/schema.sql`](database/schema.sql) (ใช้สร้างฐานข้อมูลใหม่ในเครื่องได้)
+MySQL 8.4 บน Railway (database `railway`) มี **23 ตาราง** โครงสร้างทั้งหมดอยู่ใน [`database/schema.sql`](database/schema.sql) (ใช้สร้างฐานข้อมูลใหม่ในเครื่องได้)
 
 ```mermaid
 erDiagram
@@ -298,6 +306,8 @@ erDiagram
   bookings ||--o| vehicle_check_ins : "รับรถ"
   bookings ||--o{ booking_notes : "หมายเหตุพนักงาน"
   coupons ||--o{ coupon_usages : "การใช้คูปอง"
+  users ||--o{ notifications : "แจ้งเตือน"
+  bookings ||--o{ notifications : "เกี่ยวกับการจอง"
 ```
 
 | กลุ่ม | ตาราง | จำนวนแถวจริง |
@@ -311,6 +321,7 @@ erDiagram
 | คูปอง | `coupons` · `coupon_usages` | 5 · 1 |
 | การเงิน | `payments` · `payment_verifications` · `refunds` · `wallets` · `wallet_transactions` | 10 · 0 · 2 · 2 · 3 |
 | ตรวจสอบย้อนหลัง | `audit_logs` | 1 |
+| แจ้งเตือน | `notifications` (เพิ่ม 21 พ.ย.) | เริ่มใช้หลังรัน migration |
 
 จำนวนแถวนับ ณ 21 พ.ย. 2569 ข้อมูลรถมี 18 ยี่ห้อ 157 รุ่น (Sedan 28 · Hatchback 19 · SUV 40 · Pickup 18 · Van 20 · Motorcycle 32) ครอบคลุมทุกประเภทที่แต่ละยี่ห้อขายในไทย และลบข้อมูลทดสอบ API ออกแล้ว ถ้ารุ่นรถไม่มีในรายการ ลูกค้าเลือก "รุ่นอื่นๆ / Other (ประเภท)" ของยี่ห้อนั้น หรือยี่ห้อ "อื่นๆ / Other" ได้ ราคาคิดตามประเภทรถ จึงจองต่อได้ทันที แล้ว Admin เพิ่มรุ่นจริงภายหลังได้จากหน้า Admin
 
@@ -355,6 +366,7 @@ ORDER BY t.created_at DESC;
 | [`2026-11-15_staff_service.sql`](database/migrations/2026-11-15_staff_service.sql) | ตาราง `vehicle_check_ins`, `booking_notes` |
 | [`2026-11-15_payment_verifications.sql`](database/migrations/2026-11-15_payment_verifications.sql) | ตาราง `payment_verifications` |
 | [`2026-11-16_pay_before_confirm.sql`](database/migrations/2026-11-16_pay_before_confirm.sql) | สถานะ `PENDING_PAYMENT` |
+| [`2026-11-21_notifications.sql`](database/migrations/2026-11-21_notifications.sql) | ตาราง `notifications` (ต้องรันด้วยบัญชีที่สร้างตารางได้ เช่น root เพราะบัญชีของแอปมีสิทธิ์แค่อ่าน/เขียนข้อมูล) |
 
 ---
 
@@ -431,7 +443,7 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 **ผลล่าสุด (21 พ.ย. 2569)**
 | ส่วน | ผล |
 |---|---|
-| Backend: 20 ไฟล์เทสต์ | `tests 173 · pass 173 · fail 0` |
+| Backend: 22 ไฟล์เทสต์ | `tests 184 · pass 184 · fail 0` |
 | Frontend: ESLint ทั้งโปรเจกต์ | ไม่มี error |
 | Frontend: build | สำเร็จ |
 | Frontend: unit test | `tests 6 · pass 6 · fail 0` |
@@ -442,6 +454,8 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 | `customerRegistrationService`, `customerRegistrationValidator` | สมัครสมาชิก, อีเมลซ้ำ, ข้อมูลไม่ถูกต้อง |
 | `customerProfileRoutes`, `customerVehicleRoutes` | โปรไฟล์และรถของลูกค้า |
 | `customerCatalogRoutes`, `customerServiceCatalogRoutes` | แคตตาล็อกรถ บริการ และราคา |
+| `adminPaymentLookupRoutes` | Admin ค้นด้วยหมายเลข/เลขอ้างอิง/ชื่อ/อีเมล/เบอร์/ทะเบียน, ตัวอักษร % และ _ ไม่ถูกตีความเป็น wildcard, สิทธิ์เฉพาะ Admin |
+| `notificationRoutes` | กระดิ่งแจ้งเตือน: ต้องล็อกอิน, เห็นเฉพาะของตัวเอง, อ่านแล้วบางรายการ/ทั้งหมด, ก่อนรัน migration แสดงว่าง, แจ้งเตือนล้มเหลวไม่ทำให้งานหลักพัง |
 | `publicAvailabilityRoutes` | ปฏิทินช่วงเวลาว่างแบบไม่ต้องล็อกอิน: สถานะว่าง/เต็ม/ผ่านแล้ว, ไม่เปิดเผยข้อมูลการจอง, ตรวจ query ไม่ถูกต้อง |
 | `customerScheduleAvailabilityRoutes`, `scheduleGeneration` | ช่วงเวลาว่าง (รวมเวลาที่ผ่านไปแล้ว) และการสร้างตารางเวลา |
 | `customerBookingRoutes`, `customerBookingValidator`, `customerBookingHistoryRoutes` | สร้างการจอง คูปอง และประวัติการจอง |
@@ -488,11 +502,12 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 
 ### ✅ เสร็จแล้ว
 - **Auth:** ล็อกอินรวมทุก role, สมัครสมาชิกลูกค้า, ตรวจ session, ออกจากระบบ, หน้า Login/Register แบบโรงรถพร้อมรถ Urus 3D และเสียงเครื่องยนต์, ปุ่มแสดง/ซ่อนรหัสผ่าน
+- **แจ้งเตือนในเว็บ (กระดิ่ง):** ลูกค้าได้รับเมื่อจ่ายเงินสำเร็จ, ไม่จ่ายใน 15 นาที, รับรถ, เริ่มบริการ, รถเสร็จพร้อมรับ, ไม่มาตามนัด, ยกเลิก/คืนเงิน และเตือนนัดล่วงหน้า 1 วัน · พนักงานได้รับเมื่อมีคิวใหม่วันนี้และการโอนรอตรวจ · Admin ได้รับเมื่อมีการโอนรอตรวจและการยกเลิก · มี toast เด้งเมื่อมีแจ้งเตือนใหม่ (เช็กทุก 20 วินาที)
 - **หน้าเกี่ยวกับโปรเจกต์ `/about`:** ทีมผู้พัฒนาและโมดูลที่รับผิดชอบ, อาจารย์ผู้สอน, License, เครดิตเทคโนโลยี/รูป/เสียง/โมเดล 3D, footer ใหม่ลิงก์มาหน้านี้
 - **ลูกค้า:** หน้าแรกพร้อมแอนิเมชันและดูราคาตามประเภทรถ, หน้าบริการ, โปรไฟล์, จัดการรถ, ดูเวลาว่าง (เวลาที่ผ่านแล้วกดไม่ได้), จองต่อหลายรอบ, เลือกและตรวจสิทธิ์คูปอง, จ่ายก่อนยืนยันภายใน 15 นาที (ออนไลน์จำลอง/โอน/กระเป๋าเงิน), ยกเลิกพร้อมคืนเงินเข้ากระเป๋า, ประวัติการจอง, สลับภาษาไทย/อังกฤษ
 - **Admin:** แดชบอร์ด, จัดการประเภท/ยี่ห้อ/รุ่นรถ, บริการและราคา (10 บริการ ราคาตามประเภทรถ), ตารางเวลาและจำนวนรถต่อรอบ, ผู้ใช้และสิทธิ์ (สร้าง/ตั้ง STAFF), คูปองพร้อมประวัติการใช้, ดูการจองพร้อมประวัติ, รายงานการจองและรายได้, การชำระเงินและกระเป๋าเงิน
 - **พนักงาน:** คิวงานรายวันพร้อมปฏิทิน, รายละเอียดลูกค้า/รถ/บริการ, รับรถ, เปลี่ยนสถานะพร้อมเหตุผล, หมายเหตุ, No-show, ยืนยันรับเงินสด/เงินโอน, ประวัติการให้บริการ
-- **ระบบ:** ฐานข้อมูล 22 ตารางบน Railway พร้อม `schema.sql` และ migration 3 ไฟล์, สคริปต์สร้างตารางเวลา, API 85 endpoint, เทสต์ backend ผ่าน 173/173, เอกสาร API, frontend deploy บน Vercel
+- **ระบบ:** ฐานข้อมูล 23 ตารางบน Railway พร้อม `schema.sql` และ migration 4 ไฟล์, สคริปต์สร้างตารางเวลา, API 88 endpoint, เทสต์ backend ผ่าน 184/184, เอกสาร API, frontend deploy บน Vercel
 
 ### 🔄 กำลังดำเนินการ
 - ทดสอบวงจรเต็มกับข้อมูลจริง: ลูกค้าจอง → ชำระเงิน → พนักงานรับรถ → ปิดงาน → Admin ดูรายงาน

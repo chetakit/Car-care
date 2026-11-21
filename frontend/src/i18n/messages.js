@@ -1366,6 +1366,25 @@ const adminTranslations = {
   'admin.payments.form.transferReference': { TH: 'เลขอ้างอิงการโอน (ตรวจสอบกับธนาคารก่อนยืนยัน)', EN: 'Bank transfer reference (check with the bank before confirming)' },
   'admin.payments.form.method': { TH: 'สร้างรายการชำระเงิน', EN: 'Create payment' },
   'admin.payments.search.searching': { TH: 'กำลังค้นหา…', EN: 'Searching…' },
+  'admin.payments.lookup.modeLabel': { TH: "ค้นหาด้วย", EN: "Search by" },
+  'admin.payments.lookup.byBooking': { TH: "หมายเลขการจอง", EN: "Booking ID" },
+  'admin.payments.lookup.byPayment': { TH: "ชื่อลูกค้า / ทะเบียน / เลขการชำระเงิน", EN: "Customer / plate / payment" },
+  'admin.payments.lookup.label': { TH: "ชื่อลูกค้า อีเมล เบอร์โทร ทะเบียนรถ หรือหมายเลข/เลขอ้างอิงการชำระเงิน", EN: "Customer name, e-mail, phone, licence plate, or payment ID / reference" },
+  'admin.payments.lookup.placeholder': { TH: "เช่น ธนวัฒน์, 2กร 4519, 682 หรือ SIM-…", EN: "e.g. Thanawat, 2กร 4519, 682 or SIM-…" },
+  'admin.payments.lookup.hint': { TH: "ชื่อ อีเมล เบอร์ และทะเบียนค้นบางส่วนได้ · หมายเลขและเลขอ้างอิงการชำระเงินต้องพิมพ์ให้ตรงทั้งหมด", EN: "Name, e-mail, phone and plate match any part · payment IDs and references must match exactly" },
+  'admin.payments.lookup.invalid': { TH: "กรอกหมายเลขการชำระเงินหรือเลขอ้างอิง (ไม่เกิน 128 ตัวอักษร)", EN: "Enter a payment ID or reference (up to 128 characters)." },
+  'admin.payments.lookup.notFound': { TH: "ไม่พบการชำระเงิน \"{query}\"", EN: "No payment found for \"{query}\"." },
+  'admin.payments.lookup.failed': { TH: "ค้นหาการชำระเงินไม่สำเร็จ", EN: "Could not look up the payment." },
+  'admin.payments.lookup.found': { TH: "เปิดการจอง #{booking} ของ {name}", EN: "Opened booking #{booking} for {name}." },
+  'admin.payments.party.customer': { TH: "ลูกค้า", EN: "Customer" },
+  'admin.payments.party.vehicle': { TH: "รถ", EN: "Vehicle" },
+  'admin.payments.party.appointment': { TH: "วันและเวลานัด", EN: "Appointment" },
+  'admin.payments.party.wallet': { TH: "กระเป๋าเงินลูกค้า", EN: "Customer wallet" },
+  'admin.payments.party.openWallet': { TH: "ดูกระเป๋าเงิน →", EN: "Open wallet →" },
+  'admin.payments.lookup.matches': { TH: "ผลการค้นหาการชำระเงิน", EN: "Payment search results" },
+  'admin.payments.lookup.choose': { TH: "พบ {count} การจอง เลือกรายการที่ต้องการ (แสดงสูงสุด 20 รายการล่าสุด)", EN: "{count} bookings found. Pick one (latest 20 shown)." },
+  'admin.payments.lookup.matchLine': { TH: "การจอง #{booking} · {date} {time} · {amount}", EN: "Booking #{booking} · {date} {time} · {amount}" },
+  'admin.payments.lookup.noPayment': { TH: "ยังไม่มีการชำระเงิน", EN: "No payment yet" },
   'admin.payments.search.submit': { TH: 'ค้นหา', EN: 'Search' },
   'admin.payments.loadingBooking': { TH: 'กำลังค้นหาการจอง…', EN: 'Searching for booking…' },
   'admin.payments.bookingTitle': { TH: 'การจองหมายเลข {id}', EN: 'Booking #{id}' },
@@ -1489,6 +1508,36 @@ const adminTranslations = {
   'admin.reports.table.bookings': { TH: 'การจอง', EN: 'Bookings' },
   'admin.reports.table.revenue': { TH: 'รายรับ', EN: 'Revenue' },
   'admin.reports.table.paidBookings': { TH: 'การจองที่ชำระแล้ว', EN: 'Paid bookings' },
+}
+
+const notificationTranslations = {
+  'notifications.bell': { TH: "การแจ้งเตือน", EN: "Notifications" },
+  'notifications.bellUnread': { TH: "การแจ้งเตือน ({count} รายการใหม่)", EN: "Notifications ({count} new)" },
+  'notifications.title': { TH: "การแจ้งเตือน", EN: "Notifications" },
+  'notifications.markAll': { TH: "อ่านทั้งหมด", EN: "Mark all as read" },
+  'notifications.empty': { TH: "ยังไม่มีการแจ้งเตือน", EN: "No notifications yet" },
+  'notifications.generic': { TH: "มีการอัปเดต", EN: "Update" },
+  'notifications.PAYMENT_CONFIRMED.title': { TH: "ยืนยันการจองแล้ว", EN: "Booking confirmed" },
+  'notifications.PAYMENT_CONFIRMED.body': { TH: "ชำระเงิน {amount} ฿ สำเร็จ นัด {date} เวลา {start_time}", EN: "Paid {amount} THB. See you on {date} at {start_time}." },
+  'notifications.PAYMENT_EXPIRED.title': { TH: "การจองถูกยกเลิกอัตโนมัติ", EN: "Booking cancelled automatically" },
+  'notifications.PAYMENT_EXPIRED.body': { TH: "ไม่ได้ชำระเงินภายใน 15 นาที นัด {date} เวลา {start_time} ถูกยกเลิก", EN: "Not paid within 15 minutes, so {date} at {start_time} was released." },
+  'notifications.TRANSFER_PENDING.title': { TH: "มีการโอนเงินรอตรวจสอบ", EN: "Bank transfer to check" },
+  'notifications.TRANSFER_PENDING.body': { TH: "{plate} ยอด {amount} ฿ (นัด {date} {start_time}) ยืนยันภายใน 15 นาที", EN: "{plate}, {amount} THB ({date} {start_time}). Confirm within 15 minutes." },
+  'notifications.NEW_BOOKING_TODAY.title': { TH: "มีคิวใหม่วันนี้", EN: "New booking today" },
+  'notifications.NEW_BOOKING_TODAY.body': { TH: "{plate} เวลา {start_time}", EN: "{plate} at {start_time}" },
+  'notifications.VEHICLE_CHECKED_IN.title': { TH: "รับรถเข้าร้านแล้ว", EN: "Car checked in" },
+  'notifications.VEHICLE_CHECKED_IN.body': { TH: "พนักงานรับรถ {plate} เรียบร้อย", EN: "Our team has received {plate}." },
+  'notifications.SERVICE_STARTED.title': { TH: "เริ่มให้บริการแล้ว", EN: "Service started" },
+  'notifications.SERVICE_STARTED.body': { TH: "กำลังดูแลรถ {plate} ของคุณ", EN: "We are working on {plate}." },
+  'notifications.SERVICE_COMPLETED.title': { TH: "รถพร้อมรับแล้ว", EN: "Your car is ready" },
+  'notifications.SERVICE_COMPLETED.body': { TH: "บริการรถ {plate} เสร็จเรียบร้อย มารับรถได้เลย", EN: "{plate} is done and ready to collect." },
+  'notifications.NO_SHOW.title': { TH: "บันทึกว่าไม่มาตามนัด", EN: "Marked as no-show" },
+  'notifications.NO_SHOW.body': { TH: "นัด {date} เวลา {start_time} ({plate})", EN: "Appointment on {date} at {start_time} ({plate})." },
+  'notifications.BOOKING_CANCELLED.title': { TH: "ยกเลิกการจองแล้ว", EN: "Booking cancelled" },
+  'notifications.BOOKING_CANCELLED.body': { TH: "นัด {date} เวลา {start_time} ({plate}) ถูกยกเลิก", EN: "{date} at {start_time} ({plate}) was cancelled." },
+  'notifications.APPOINTMENT_REMINDER.title': { TH: "พรุ่งนี้มีนัด", EN: "Appointment tomorrow" },
+  'notifications.APPOINTMENT_REMINDER.body': { TH: "{plate} เวลา {start_time} แล้วพบกันที่ร้าน", EN: "{plate} at {start_time}. See you at the shop." },
+  'notifications.BOOKING_CANCELLED.bodyRefund': { TH: "คืนเงิน {refund_amount} ฿ เข้ากระเป๋าเงินแล้ว (นัด {date} {start_time})", EN: "{refund_amount} THB refunded to your Wallet ({date} {start_time})." },
 }
 
 const staffTranslations = {
@@ -1694,6 +1743,12 @@ const messages = {
         translations.TH,
       ]),
     ),
+    ...Object.fromEntries(
+      Object.entries(notificationTranslations).map(([key, translations]) => [
+        key,
+        translations.TH,
+      ]),
+    ),
   },
   EN: {
     ...phaseOneMessages.EN,
@@ -1723,6 +1778,12 @@ const messages = {
     ),
     ...Object.fromEntries(
       Object.entries(staffTranslations).map(([key, translations]) => [
+        key,
+        translations.EN,
+      ]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(notificationTranslations).map(([key, translations]) => [
         key,
         translations.EN,
       ]),
