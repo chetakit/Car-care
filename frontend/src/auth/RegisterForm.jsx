@@ -5,6 +5,8 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9]{10}$/
+// Same rule as the backend (customerRegistrationValidator.js).
+const MIN_PASSWORD_LENGTH = 8
 
 function getRegistrationError({ fullName, email, password, phone }) {
   const normalizedName = fullName.trim()
@@ -23,7 +25,7 @@ function getRegistrationError({ fullName, email, password, phone }) {
     return 'auth.register.validation.nameEmail'
   }
 
-  if (password.length > 1024) {
+  if (passwordLength < MIN_PASSWORD_LENGTH || password.length > 1024) {
     return 'auth.register.validation.passwordLength'
   }
 
@@ -96,7 +98,11 @@ function RegisterForm({ onSwitch, onFail }) {
       window.dispatchEvent(new PopStateEvent('popstate'))
     } catch (registrationError) {
       setError(
-        registrationError instanceof ApiError
+        registrationError instanceof ApiError && registrationError.status === 429
+          ? t('auth.error.tooManyAttempts', {
+              minutes: Math.max(1, Math.ceil((registrationError.payload?.retry_after_seconds || 60) / 60)),
+            })
+          : registrationError instanceof ApiError
           ? registrationError.message
           : registrationError.message || 'auth.register.error',
       )
@@ -167,6 +173,7 @@ function RegisterForm({ onSwitch, onFail }) {
 
         <PasswordField
           autoComplete="new-password"
+          hint={t('auth.register.passwordHint')}
           label={t('auth.register.password')}
           maxLength={1024}
           onChange={(event) => {

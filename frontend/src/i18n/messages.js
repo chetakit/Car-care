@@ -108,8 +108,16 @@ const authTranslations = {
     EN: 'Provide a valid name and email address.',
   },
   'auth.register.validation.passwordLength': {
-    TH: 'รหัสผ่านต้องมีความยาวไม่เกิน 1024 ตัวอักษร',
-    EN: 'Password must be 1024 characters or fewer.',
+    TH: 'รหัสผ่านต้องมี 8 ถึง 1024 ตัวอักษร',
+    EN: 'Password must be 8 to 1024 characters.',
+  },
+  'auth.register.passwordHint': {
+    TH: 'อย่างน้อย 8 ตัวอักษร',
+    EN: 'At least 8 characters.',
+  },
+  'auth.error.tooManyAttempts': {
+    TH: 'ลองหลายครั้งเกินไป กรุณาลองใหม่อีกครั้งใน {minutes} นาที',
+    EN: 'Too many attempts. Please try again in {minutes} minutes.',
   },
   'auth.register.validation.phone': {
     TH: 'หมายเลขโทรศัพท์ต้องมีตัวเลข 10 หลักพอดี',

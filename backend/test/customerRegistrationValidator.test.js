@@ -68,14 +68,22 @@ test("registration rejects missing required fields", () => {
   assert.equal(result.nextCalled, false);
 });
 
-test("registration accepts a one-character password", () => {
+test("registration rejects a password shorter than 8 characters", () => {
+  for (const password of ["x", "1234567"]) {
+    const result = runValidator({ ...validRegistration, password });
+    assert.equal(result.statusCode, 400, password);
+    assert.equal(result.nextCalled, false);
+  }
+});
+
+test("registration accepts a password of exactly 8 characters", () => {
   const result = runValidator({
     ...validRegistration,
-    password: "x",
+    password: "12345678",
   });
 
   assert.equal(result.nextCalled, true);
-  assert.equal(result.req.customerRegistration.password, "x");
+  assert.equal(result.req.customerRegistration.password, "12345678");
 });
 
 test("registration rejects an empty password", () => {

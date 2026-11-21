@@ -6,7 +6,7 @@ const ALLOWED_FIELDS = new Set([
   "phone",
   "password",
 ]);
-const MIN_PASSWORD_LENGTH = 1;
+const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 1024;
 
 function sendValidationError(res, message) {
@@ -59,7 +59,7 @@ function validateCustomerRegistration(req, res, next) {
   ) {
     return sendValidationError(
       res,
-      "Password must contain 1 to 1024 characters.",
+      "Password must contain 8 to 1024 characters.",
     );
   }
 

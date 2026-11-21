@@ -37,6 +37,15 @@ const staffBookingRoutes = require("./Staff/routes/staffBookingRoutes");
 
 const app = express();
 
+// Don't advertise the framework in every response.
+app.disable("x-powered-by");
+// Behind a hosting proxy (Railway, Render...) set TRUST_PROXY=1 so req.ip is
+// the visitor's address, not the proxy's - the sign-in limiter counts per IP.
+if (process.env.TRUST_PROXY) {
+  const hops = Number(process.env.TRUST_PROXY);
+  app.set("trust proxy", Number.isInteger(hops) ? hops : process.env.TRUST_PROXY);
+}
+
 app.use(cors());
 app.use(express.json());
 // Record admin/staff changes in audit_logs (see shared/middleware/auditTrail.js).
@@ -96,6 +105,30 @@ app.get("/api/health/db", async (req, res) => {
       message: "Database connection failed",
     });
   }
+});
+
+// Unknown paths: short JSON instead of Express's HTML page.
+app.use((req, res) => {
+  res.status(404).json({ status: "error", message: "Not found." });
+});
+
+// Last stop for any error: never send a stack trace or file path back.
+// eslint-disable-next-line no-unused-vars
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  if (error.type === "entity.parse.failed") {
+    return res.status(400).json({ status: "error", message: "Request body is not valid JSON." });
+  }
+  if (error.type === "entity.too.large") {
+    return res.status(413).json({ status: "error", message: "Request body is too large." });
+  }
+  const status =
+    Number.isInteger(error.status) && error.status >= 400 && error.status < 500 ? error.status : 500;
+  if (status === 500) console.error("Unhandled error:", error.message);
+  return res.status(status).json({
+    status: "error",
+    message: status === 500 ? "Something went wrong. Please try again." : "The request could not be processed.",
+  });
 });
 
 module.exports = app;

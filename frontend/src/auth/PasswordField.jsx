@@ -3,7 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 // Password input with a show/hide button.
-function PasswordField({ label, ...inputProps }) {
+function PasswordField({ label, hint, ...inputProps }) {
   const { t } = useLanguage()
   const [shown, setShown] = useState(false)
   const toggleLabel = t(shown ? 'auth.password.hide' : 'auth.password.show')
@@ -24,6 +24,7 @@ function PasswordField({ label, ...inputProps }) {
           {shown ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
         </button>
       </span>
+      {hint && <small className="garage-field-hint">{hint}</small>}
     </label>
   )
 }

@@ -53,7 +53,11 @@ function LoginForm({ registrationSuccess = false, onSwitch, onFail, beforeCommit
       await login(email, password, { beforeCommit })
     } catch (loginError) {
       setError(
-        loginError instanceof ApiError
+        loginError instanceof ApiError && loginError.status === 429
+          ? t('auth.error.tooManyAttempts', {
+              minutes: Math.max(1, Math.ceil((loginError.payload?.retry_after_seconds || 60) / 60)),
+            })
+          : loginError instanceof ApiError
           ? loginError.message
           : loginError.message || 'auth.login.error',
       )
