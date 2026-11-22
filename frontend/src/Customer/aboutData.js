@@ -89,7 +89,7 @@ export const TEAM = [
   },
   {
     id: '67112963',
-    name: { TH: 'เมธัส เชยชม', EN: 'Mathus choeichom' },
+    name: { TH: 'เมธัส เชยชม', EN: 'Mathus Choeichom' },
     initial: 'ม',
     role: 'Software Developer & UI Designer',
     module: 'Staff & Service Management',
