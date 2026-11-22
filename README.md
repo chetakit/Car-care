@@ -454,7 +454,7 @@ cd backend && node --test test/*.test.js
 cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 ```
 
-**ผลล่าสุด (21 พ.ย. 2569)**
+**ผลล่าสุด (22 พ.ย. 2569)**
 | ส่วน | ผล |
 |---|---|
 | Backend: 25 ไฟล์เทสต์ | `tests 200 · pass 200 · fail 0` |
@@ -465,7 +465,8 @@ cd frontend && npx eslint . && npm run build && node --test test/*.test.js
 | ไฟล์เทสต์ | ครอบคลุม |
 |---|---|
 | `authService`, `sessionRoutes` | ล็อกอิน, role ที่อนุญาต, ตรวจ session |
-| `customerRegistrationService`, `customerRegistrationValidator` | สมัครสมาชิก, อีเมลซ้ำ, ข้อมูลไม่ถูกต้อง |
+| `customerRegistrationService`, `customerRegistrationValidator` | สมัครสมาชิก, อีเมลซ้ำ, ข้อมูลไม่ถูกต้อง, รหัสผ่านต้องยาว ≥ 8 ตัว |
+| `securityHardening` | ล็อกอินผิด 5 ครั้งโดนพัก (แม้รหัสถูก), ล็อกอินถูกแล้วนับใหม่, กันลองรหัสเดียวหลายอีเมลต่อ IP, จำกัดการสมัครต่อ IP, JSON พัง/ใหญ่เกิน/path ไม่มี ได้ JSON สั้นๆ ไม่มี stack trace |
 | `customerProfileRoutes`, `customerVehicleRoutes` | โปรไฟล์และรถของลูกค้า |
 | `customerCatalogRoutes`, `customerServiceCatalogRoutes` | แคตตาล็อกรถ บริการ และราคา |
 | `auditTrail` | การกระทำที่บันทึก, เก็บแค่ช่องที่เปลี่ยน, ไม่เก็บรหัสผ่าน, ไม่บันทึกคำขอที่ถูกปฏิเสธ (และไม่เสีย query เพิ่ม), หน้าประวัติเปิดได้เฉพาะ Admin |
