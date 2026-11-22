@@ -20,6 +20,7 @@ const { EXPIRY_REASON } = require("../shared/services/bookingPaymentHold");
 const { calculateDiscount, toCents, centsToDecimal } = require("../shared/services/couponPricing");
 const { calculateRefund } = require("../Admin/services/cancellationService");
 const D = require("./demo-data");
+const { addDemoAuditLogs } = require("./demo-audit-logs");
 
 const HISTORY_DAYS = 28;
 const FUTURE_DAYS = 21; // three weeks of upcoming bookings
@@ -728,6 +729,8 @@ async function seed(conn, password) {
 
   await addDemoNotifications(conn, batch, plans, users);
   await batch.flush(conn);
+  // The last week of staff work, as the audit log would have recorded it.
+  await addDemoAuditLogs(conn);
   for (const wallet of wallets.values()) {
     await conn.query("UPDATE wallets SET balance = ? WHERE wallet_id = ?", [
       centsToDecimal(wallet.balanceCents),

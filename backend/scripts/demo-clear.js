@@ -45,6 +45,16 @@ async function main() {
     };
 
     if (bookingIds.length) {
+      // Audit rows a demo account wrote about a demo booking (the samples
+      // from demo-audit-logs.js, or clicks during a live demo) go with it.
+      await run(
+        "audit_logs",
+        `DELETE FROM audit_logs
+        WHERE user_id IN (?) AND table_name IN ('bookings', 'payments', 'booking_notes') AND record_id IN (?)`,
+        [userIds, bookingIds.map(String)],
+      ).catch((error) => {
+        if (error.code !== "ER_NO_SUCH_TABLE") throw error;
+      });
       // Give coupon uses back before the usage rows go.
       const [uses] = await conn.query(
         "SELECT coupon_id, COUNT(*) AS n FROM coupon_usages WHERE booking_id IN (?) GROUP BY coupon_id",
