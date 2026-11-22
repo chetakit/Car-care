@@ -3,7 +3,7 @@ import { Code, Copyright, CreditCard, Database, GraduationCap, Mail } from 'luci
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import CustomerFooter from './CustomerFooter.jsx'
 import CustomerHeader from './CustomerHeader.jsx'
-import { COURSE_CODE, FACULTY, INSTRUCTOR, STACK, TEAM, UNIVERSITY } from './aboutData.js'
+import { COURSE_CODE, FACULTY, INSTRUCTOR, STACK, TEAM, UNIVERSITY, personInitial, personName } from './aboutData.js'
 import { useRevealOnScroll } from './useLandingMotion.js'
 import './customer.css'
 
@@ -83,7 +83,7 @@ function photoStyle(crop, size) {
 }
 
 // Photo if one is set and loads; otherwise the initial letter.
-function MemberAvatar({ member }) {
+function MemberAvatar({ member, language }) {
   const [failed, setFailed] = useState(false)
   const [size, setSize] = useState(null)
   if (member.photo && !failed) {
@@ -91,7 +91,7 @@ function MemberAvatar({ member }) {
       <span className="about-avatar has-photo">
         <span className="about-avatar-frame">
           <img
-            alt={member.name}
+            alt={personName(member, language)}
             decoding="async"
             onError={() => setFailed(true)}
             onLoad={(event) =>
@@ -104,12 +104,12 @@ function MemberAvatar({ member }) {
       </span>
     )
   }
-  return <span aria-hidden="true" className="about-avatar">{member.initial}</span>
+  return <span aria-hidden="true" className="about-avatar">{personInitial(member, language)}</span>
 }
 
 // Who built the site, under what terms, and with what.
 function AboutPage({ user, onLogout }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const rootRef = useRef(null)
   useRevealOnScroll(rootRef, 'about')
 
@@ -162,13 +162,13 @@ function AboutPage({ user, onLogout }) {
               <p>{t('customer.about.teamNote', { count: TEAM.length })}</p>
             </header>
             <article className="about-instructor" data-reveal>
-              <MemberAvatar member={INSTRUCTOR} />
+              <MemberAvatar language={language} member={INSTRUCTOR} />
               <div className="about-instructor-body">
                 <span className="about-instructor-label">
                   <GraduationCap aria-hidden="true" />
                   {t('customer.about.instructor', { course: COURSE_CODE })}
                 </span>
-                <h3>{INSTRUCTOR.name}</h3>
+                <h3>{personName(INSTRUCTOR, language)}</h3>
                 <p>{INSTRUCTOR.department}</p>
                 {UNIVERSITY && <p className="about-instructor-school">{UNIVERSITY}</p>}
               </div>
@@ -181,9 +181,9 @@ function AboutPage({ user, onLogout }) {
               {TEAM.map((member, index) => (
                 <li data-reveal key={member.id} style={{ '--reveal-delay': `${index * 90}ms` }}>
                   <article className={`about-member${member.lead ? ' is-lead' : ''}`}>
-                    <MemberAvatar member={member} />
+                    <MemberAvatar language={language} member={member} />
                     {member.lead && <span className="about-lead-badge">{t('customer.about.leader')}</span>}
-                    <h3>{member.name}</h3>
+                    <h3>{personName(member, language)}</h3>
                     <span className="about-member-id">{member.id}</span>
                     <p className="about-member-role">{member.role}</p>
                     {member.module && (

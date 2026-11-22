@@ -1,5 +1,5 @@
 // Content for the About page (/about): the team, the tools we built on, and
-// credits. Names stay in Thai in both languages; roles are job titles.
+// credits. Names follow the TH / EN switch; roles are job titles.
 //
 // HOW TO EDIT (any team member, then commit + push):
 //   photo  : put the image in frontend/public/team/ (square, e.g. 400x400)
@@ -10,6 +10,8 @@
 //            61% across / 30% down the photo, zoomed in 1.8 times.
 //   github : your GitHub username or profile link — 'chetakit' and
 //            'https://github.com/chetakit' both work. Leave it '' to hide it.
+//   name   : { TH: 'ชื่อ นามสกุล', EN: 'Name Surname' }. If one is '' the
+//            other is shown, so a missing spelling never leaves a gap.
 //   UNIVERSITY / FACULTY : leave as '' to hide them.
 
 import {
@@ -40,9 +42,9 @@ export const COURSE_CODE = 'CSI400'
 export const UNIVERSITY = 'Sripatum University - SPU'
 export const FACULTY = 'Information Technology'
 
-// Course instructor, shown above the team. Name stays in English.
+// Course instructor, shown above the team.
 export const INSTRUCTOR = {
-  name: 'Thinnaphat Borirak',
+  name: { TH: 'ทินภัทร บริรักษ์', EN: 'Thinnaphat Borirak' },
   initial: 'T',
   department: 'Department of Computer Science and Software Development Innovation',
   email: 'thinnaphat.bo@spu.ac.th',
@@ -54,7 +56,7 @@ export const INSTRUCTOR = {
 export const TEAM = [
   {
     id: '67150490',
-    name: 'เชษฐกิตติ์ สืบสุขสันติ',
+    name: { TH: 'เชษฐกิตติ์ สืบสุขสันติ', EN: 'Chetakit Subsuksanti' },
     initial: 'ช',
     role: 'Leader Developer & Project Manager',
     module: 'Admin & Payment Management',
@@ -67,7 +69,7 @@ export const TEAM = [
   },
   {
     id: '67115191',
-    name: 'ณัฐนันท์ แสงทอง',
+    name: { TH: 'ณัฐนันท์ แสงทอง', EN: 'Natthanan Saengthong' },
     initial: 'ณ',
     role: 'Software Developer & QA Tester',
     module: 'Booking & Queue Management',
@@ -77,7 +79,7 @@ export const TEAM = [
   },
   {
     id: '67159844',
-    name: 'ภูริภัทร ทองมวน',
+    name: { TH: 'ภูริภัทร ทองมวน', EN: 'Phuriphat Thongmaun' },
     initial: 'ภ',
     role: 'Software Developer & UI Designer',
     module: 'Customer & Vehicle Management',
@@ -87,7 +89,7 @@ export const TEAM = [
   },
   {
     id: '67112963',
-    name: 'เมธัส เชยชม',
+    name: { TH: 'เมธัส เชยชม', EN: 'Mathus choeichom' },
     initial: 'ม',
     role: 'Software Developer & UI Designer',
     module: 'Staff & Service Management',
@@ -123,3 +125,18 @@ export const STACK = [
   { name: 'nodemon', icon: RefreshCw, color: '#76d04b', part: 'Dev tools · backend', license: 'MIT', href: 'https://nodemon.io' },
   { name: 'glTF Transform', icon: PackageOpen, color: '#0ca678', part: 'Dev tools · 3D model', license: 'MIT', href: 'https://gltf-transform.dev' },
 ]
+
+// The name to show for the current language, falling back to the other one.
+export function personName(person, language) {
+  const name = person.name
+  if (typeof name === 'string') return name
+  return (language === 'EN' ? name.EN || name.TH : name.TH || name.EN) || ''
+}
+
+// Avatar letter: the set Thai initial when the Thai name is shown, else the
+// first letter of the name on screen.
+export function personInitial(person, language) {
+  const shown = personName(person, language)
+  if (person.initial && typeof person.name === 'object' && shown === person.name.TH) return person.initial
+  return Array.from(shown.trim())[0]?.toUpperCase() || person.initial || ''
+}
